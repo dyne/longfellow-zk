@@ -26,18 +26,11 @@
 
 #include "util/log.h"
 
-extern "C" {
-#include <zenroom.h>
-// declares extern void *ZEN;
-#include <zen_error.h>
-}
-
 namespace proofs {
 
 inline void check(bool truth, const char* why) {
   if (!truth) {
     log(INFO, "PANIC %s", why);
-	lerror(((zenroom_t*)ZEN)->lua,"%s",why);
   }
 }
 
