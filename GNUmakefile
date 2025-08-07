@@ -1,7 +1,9 @@
 all:
 	$(info 🌉 Building sources)
-	@$(MAKE) -s -C src
+	@$(MAKE) -C vendor/zstd libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0
+	@$(MAKE) -C src
 	@ls -lh src/liblongfellow-zk.a | awk '{printf("🌉 %s %s\n",$$5,$$9)}'
+	@$(MAKE) -C src/cli
 
 import-vendor: vendor/longfellow-zk
 	$(info 🌉 Importing source from upstream)
@@ -15,6 +17,7 @@ vendor/longfellow-zk:
 clean-vendor:
 	$(info 🌉 Clean up build and all imported vendor sources)
 	@bash scripts/import_upstream.sh clean
+	@$(MAKE) -C vendor/zstd clean
 
 clean:
 	@$(MAKE) -C src clean
