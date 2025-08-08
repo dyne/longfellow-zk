@@ -1,11 +1,26 @@
-all:
-	$(info 🌉 Building sources)
-	@$(MAKE) -C vendor/zstd libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0
-	@$(MAKE) -C src
-	@ls -lh src/liblongfellow-zk.a | awk '{printf("🌉 %s %s\n",$$5,$$9)}'
-	@$(MAKE) -C src/cli
+WASI_SDK_PATH := /opt/wasi-sdk
+INCLUDES := -I. -I..
 
-import-vendor: vendor/longfellow-zk
+wasm: CXX := /opt/wasi-sdk/bin/clang++
+wasm: CC := /opt/wasi-sdk/bin/clang
+wasm: CXXFLAGS := -O3 --sysroot=$(WASI_SDK_PATH)/share/wasi-sysroot -D__wasi__
+wasm:
+	$(info 🌉 Building fox $@)
+	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CXXFLAGS)" CC="$(CC)" VERBOSE=1
+	@$(MAKE) -C src CXXFLAGS="-nostdlib -msimd128 $(CXXFLAGS) $(INCLUDES) -I../vendor/zstd/lib" CXX="$(CXX)"
+	/opt/wasi-sdk/bin/llvm-ranlib src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	wasm-ld -o longfellow-zk.wasm --no-entry --strip-all --export-dynamic --allow-undefined --initial-memory=131072 --error-limit=0 \
+		--lto-O3 -O3 --gc-sections src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+x86: CXXFLAGS := -O3
+x86:
+	$(info 🌉 Building fox $@)
+	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CXXFLAGS)" VERBOSE=1
+	@$(MAKE) -C src CXXFLAGS="-mpclmul $(CXXFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
+	@$(MAKE) -C src/cli CXXFLAGS="$(CXXFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
+
+import-vendor:
+	$(MAKE) -C vendor
 	$(info 🌉 Importing source from upstream)
 	@bash scripts/import_upstream.sh vendor/longfellow-zk
 

@@ -66,7 +66,15 @@
 # endif
 #endif
 
-#ifdef __EMSCRIPTEN__
+#if defined(__wasi__)
+#include <wasi/api.h>
+int randombytes_js_randombytes_wasi(void *buf, size_t n) {
+	__wasi_errno_t err = __wasi_random_get((uint8_t*)buf, sizeof(buf));
+  return err == __WASI_ERRNO_SUCCESS ? 0 : -1;
+}
+#endif
+
+#if defined(__EMSCRIPTEN__)
 #include <stdlib.h>
 #include <emscripten.h>
 int randombytes_js_randombytes_nodejs(void *buf, size_t n) {
@@ -85,9 +93,9 @@ int randombytes_js_randombytes_nodejs(void *buf, size_t n) {
 				return arr;
 			}
 		};
-		var getRandomBytes = ((typeof self !== 'undefined' && 
-							   (self.crypto || self.msCrypto)) 
-							 ? browserRandomBytes 
+		var getRandomBytes = ((typeof self !== 'undefined' &&
+							   (self.crypto || self.msCrypto))
+							 ? browserRandomBytes
 							 : nodeRandomBytes)();
 		var out = _malloc($0);
 		writeArrayToMemory(getRandomBytes($0), out);
@@ -248,7 +256,10 @@ extern "C" {
 int randombytes(void *buf, size_t n)
 {
 	if(!n) return 0;
-#if defined(__EMSCRIPTEN__)
+#if defined(__wasi__)
+# pragma message("Using crypto api from WASI SDK")
+    return randombytes_js_randombytes_wasi(buf, n);
+#elif defined(__EMSCRIPTEN__)
 # pragma message("Using crypto api from NodeJS")
 	return randombytes_js_randombytes_nodejs(buf, n);
 #elif defined(__linux__)
