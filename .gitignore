@@ -2,4 +2,5 @@
 *.a
 *.so
 *.wasm
-vendor
+vendor/facebook
+vendor/google
