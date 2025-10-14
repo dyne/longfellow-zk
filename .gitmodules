@@ -1,0 +1,6 @@
+[submodule "vendor/longfellow-zk"]
+	path = vendor/longfellow-zk
+	url = https://github.com/google/longfellow-zk
+[submodule "vendor/zstd"]
+	path = vendor/zstd
+	url = https://github.com/facebook/zstd
