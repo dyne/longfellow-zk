@@ -30,7 +30,6 @@ x86:
 	@$(MAKE) -C src/cli CXXFLAGS="$(CXXFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
 
 import-vendor:
-	$(MAKE) -C vendor
 	$(info 🌉 Importing source from upstream)
 	@bash scripts/import_upstream.sh vendor/longfellow-zk
 

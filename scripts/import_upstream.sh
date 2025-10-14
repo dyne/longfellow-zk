@@ -66,8 +66,6 @@ EOF
 	exit 1
 }
 
-cd $1 && git pull --rebase && cd -
-
 echo "SOURCES := \\" > src/sources.mk
 for i in ${sources[@]}; do
 	mkdir -p src/`dirname $i`
