@@ -10,7 +10,9 @@ wasm:
 	@$(MAKE) -C src CXXFLAGS="-nostdlib -msimd128 $(CXXFLAGS) $(INCLUDES) -I../vendor/zstd/lib" CXX="$(CXX)"
 	/opt/wasi-sdk/bin/llvm-ranlib src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	/opt/wasi-sdk/bin/clang++ ${CXXFLAGS} --target=wasm32-wasi --sysroot=/opt/wasi-sdk/share/wasi-sysroot \
-		-Wl,--no-entry -Wl,--export=run_mdoc_prover -Wl,--export=run_mdoc_verifier -nostartfiles \
+		-Wl,--no-entry -nostartfiles \
+		-Wl,--export=run_mdoc_prover -Wl,--export=run_mdoc_verifier \
+		-Wl,--export=find_zk_spec \
     -o longfellow-zk.wasm src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 # /opt/wasi-sdk/bin/wasm-ld -o longfellow-zk.wasm --no-entry --strip-all --export-dynamic --allow-undefined \

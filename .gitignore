@@ -4,3 +4,4 @@
 *.wasm
 vendor/facebook
 vendor/google
+sources.mk
