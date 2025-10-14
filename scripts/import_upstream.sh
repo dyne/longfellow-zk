@@ -8,7 +8,7 @@ ec/p256.cc algebra/nat.cc circuits/sha/flatsha256_witness.cc
 circuits/sha/sha256_constants.cc circuits/base64/decode_util.cc
 circuits/mdoc/mdoc_zk.cc circuits/mdoc/zk_spec.cc
 circuits/sha3/sha3_reference.cc circuits/sha3/sha3_round_constants.cc
-
+circuits/mdoc/mdoc_decompress.cc
 EOF
 
 readarray -t headers <<EOF
