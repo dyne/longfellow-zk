@@ -21,13 +21,14 @@ algebra/permutations.h algebra/twiddle.h algebra/rfft.h algebra/fp2.h
 algebra/reed_solomon.h algebra/utility.h arrays/dense.h algebra/poly.h
 arrays/affine.h circuits/compiler/circuit_dump.h
 circuits/compiler/compiler.h algebra/hash.h util/crc64.h
-circuits/compiler/circuit_id.h sumcheck/circuit.h sumcheck/quad.h
+sumcheck/circuit_id.h sumcheck/circuit.h sumcheck/quad.h
 algebra/compare.h arrays/eqs.h circuits/compiler/node.h
 circuits/compiler/pdqhash.h circuits/compiler/schedule.h
+circuits/mdoc/mdoc_decompress.h circuits/mdoc/mdoc_attribute_ids.h
 circuits/logic/bit_plucker.h algebra/interpolation.h
 circuits/logic/bit_plucker_constants.h circuits/logic/polynomial.h
 circuits/logic/compiler_backend.h circuits/logic/logic.h
-gf2k/gf2_128.h gf2k/gf2poly.h gf2k/sysdep.h circuits/mac/mac_circuit.h
+gf2k/gf2_128.h gf2k/gf2poly.h circuits/mac/mac_circuit.h
 circuits/mac/mac_reference.h random/random.h
 circuits/mac/mac_witness.h circuits/logic/bit_plucker_encoder.h
 circuits/mdoc/mdoc_examples.h circuits/mdoc/mdoc_hash.h

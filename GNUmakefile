@@ -9,8 +9,10 @@ wasm:
 	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CXXFLAGS)" CC="$(CC)" VERBOSE=1
 	@$(MAKE) -C src CXXFLAGS="-nostdlib -msimd128 $(CXXFLAGS) $(INCLUDES) -I../vendor/zstd/lib" CXX="$(CXX)"
 	/opt/wasi-sdk/bin/llvm-ranlib src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
-	wasm-ld -o longfellow-zk.wasm --no-entry --strip-all --export-dynamic --allow-undefined --initial-memory=131072 --error-limit=0 \
-		--lto-O3 -O3 --gc-sections src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	/opt/wasi-sdk/bin/wasm-ld -o longfellow-zk.wasm --no-entry --strip-all --export-dynamic --allow-undefined \
+		--initial-memory=131072 --error-limit=0 --lto-O3 -O3 --gc-sections \
+		--export=run_mdoc_prover --export run_mdoc_verifier \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 x86: CXXFLAGS := -O3
 x86:
@@ -23,11 +25,6 @@ import-vendor:
 	$(MAKE) -C vendor
 	$(info 🌉 Importing source from upstream)
 	@bash scripts/import_upstream.sh vendor/longfellow-zk
-
-vendor/longfellow-zk:
-	$(info 🌉 Cloning upstreaming from google/longfellow-zk)
-	@mkdir -p vendor
-	git clone https://github.com/google/longfellow-zk vendor/longfellow-zk
 
 clean-vendor:
 	$(info 🌉 Clean up build and all imported vendor sources)
