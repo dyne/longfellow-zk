@@ -2,6 +2,8 @@
 
 Prove attributes without revealing the underlying credential data: privacy-preserving verification of digital credentials using zero-knowledge proofs.
 
+⚠️ This repository has been deprecated in favour of [Zenroom](https://github.com/dyne/zenroom), which includes our port of Longfellow-zk ⚠️
+
 ## Project Overview
 
 This is a community based distribution of Google's **Longfellow-ZK** library, maintained by **Dyne.org**.
