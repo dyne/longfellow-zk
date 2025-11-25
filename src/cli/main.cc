@@ -29,11 +29,13 @@
 #include "CLI11.hpp"
 #include "json.hpp"
 #include "encoding.h"
+#include "nanobench.h"
 #include <magic_enum.hpp>
 #include <circuits/mdoc/mdoc_zk.h>
 #include <circuits/mdoc/mdoc_examples.h>
 
 using json = nlohmann::json;
+namespace nb = ankerl::nanobench;
 
 namespace fs = std::filesystem;
 
@@ -170,8 +172,23 @@ int circuit_gen(const std::string& circuit_file, const std::string& zkspec_str) 
 
         uint8_t* circuit_bytes = nullptr;
         size_t circuit_len = 0;
+        CircuitGenerationErrorCode result;
 
-        auto result = generate_circuit(zk_spec, &circuit_bytes, &circuit_len);
+        // Benchmark circuit generation
+        nb::Bench bench;
+        bench.title("Circuit Generation")
+             .unit("circuit")
+             .warmup(0)
+             .epochs(1)
+             .minEpochIterations(1)
+             .relative(false)
+             .timeUnit(std::chrono::seconds(1), "s");
+        
+        bench.run(std::string("zkspec_") + std::to_string(zkspec_index) + 
+                  "_" + std::to_string(zk_spec->num_attributes) + "attr", [&] {
+            result = generate_circuit(zk_spec, &circuit_bytes, &circuit_len);
+            nb::doNotOptimizeAway(circuit_bytes);
+        });
 
         if (result != CIRCUIT_GENERATION_SUCCESS) {
             std::cerr << "Circuit generation failed with error: "
@@ -189,15 +206,15 @@ int circuit_gen(const std::string& circuit_file, const std::string& zkspec_str) 
         // Create circuit JSON
         json circuit_json;
         circuit_json["circuit_data_base64"] = encoding::bytes_to_base64(circuit_bytes, circuit_len);
-        circuit_json["circuit_size"] = circuit_len;
-        circuit_json["zkspec"] = {
+        circuit_json["_circuit_size"] = circuit_len;
+        circuit_json["_zkspec"] = {
             {"index", zkspec_index},
             {"system", zk_spec->system},
             {"version", zk_spec->version},
             {"num_attributes", zk_spec->num_attributes},
             {"circuit_hash", zk_spec->circuit_hash}
         };
-        circuit_json["generated"] = std::time(nullptr);
+        circuit_json["_generated"] = std::time(nullptr);
         circuit_json["_metadata"] = {
             {"description", "ZK circuit for mDoc verification"},
             {"format", "base64-encoded compressed circuit"}
@@ -336,16 +353,31 @@ int mdoc_prove(const std::string& circuit_file,
         const auto* zk_spec = &kZkSpecs[mdoc_zkspec_index];
         uint8_t* proof = nullptr;
         size_t proof_len = 0;
+        MdocProverErrorCode result;
 
-        auto result = run_mdoc_prover(
-            circuit_data.data(), circuit_data.size(),
-            mdoc_data.data(), mdoc_data.size(),
-            pkx_hex.c_str(), pky_hex.c_str(),
-            transcript_bytes.data(), transcript_bytes.size(),
-            attrs.data(), attrs.size(),
-            time_str.c_str(),
-            &proof, &proof_len, zk_spec
-        );
+        // Benchmark proof generation
+        nb::Bench bench;
+        bench.title("Proof Generation")
+             .unit("proof")
+             .warmup(0)
+             .epochs(1)
+             .minEpochIterations(1)
+             .relative(false)
+             .timeUnit(std::chrono::seconds(1), "s");
+        
+        bench.run(std::string("zkspec_") + std::to_string(mdoc_zkspec_index) + 
+                  "_" + std::to_string(attrs.size()) + "attr", [&] {
+            result = run_mdoc_prover(
+                circuit_data.data(), circuit_data.size(),
+                mdoc_data.data(), mdoc_data.size(),
+                pkx_hex.c_str(), pky_hex.c_str(),
+                transcript_bytes.data(), transcript_bytes.size(),
+                attrs.data(), attrs.size(),
+                time_str.c_str(),
+                &proof, &proof_len, zk_spec
+            );
+            nb::doNotOptimizeAway(proof);
+        });
 
         if (result != MDOC_PROVER_SUCCESS) {
             std::cerr << "Prover failed with error: "
@@ -455,16 +487,31 @@ int mdoc_verify(const std::string& circuit_file,
         auto transcript_bytes = encoding::hex_to_bytes(transcript_hex);
 
         const auto* zk_spec = &kZkSpecs[zkspec_index];
+        MdocVerifierErrorCode result;
 
-        auto result = run_mdoc_verifier(
-            circuit_data.data(), circuit_data.size(),
-            pkx_hex.c_str(), pky_hex.c_str(),
-            transcript_bytes.data(), transcript_bytes.size(),
-            attrs.data(), attrs.size(),
-            time_str.c_str(),
-            proof_data.data(), proof_data.size(), doc_type.c_str(),
-            zk_spec
-        );
+        // Benchmark proof verification
+        nb::Bench bench;
+        bench.title("Proof Verification")
+             .unit("verification")
+             .warmup(0)
+             .epochs(1)
+             .minEpochIterations(1)
+             .relative(false)
+             .timeUnit(std::chrono::seconds(1), "s");
+        
+        bench.run(std::string("zkspec_") + std::to_string(zkspec_index) + 
+                  "_" + std::to_string(attrs.size()) + "attr", [&] {
+            result = run_mdoc_verifier(
+                circuit_data.data(), circuit_data.size(),
+                pkx_hex.c_str(), pky_hex.c_str(),
+                transcript_bytes.data(), transcript_bytes.size(),
+                attrs.data(), attrs.size(),
+                time_str.c_str(),
+                proof_data.data(), proof_data.size(), doc_type.c_str(),
+                zk_spec
+            );
+            nb::doNotOptimizeAway(result);
+        });
 
         if (result != MDOC_VERIFIER_SUCCESS) {
             std::cerr << "Verification failed with error: "
