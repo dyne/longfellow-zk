@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  # Static Analysis and Linting
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - name: Cache APT packages
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: "clang-tidy clang-format cppcheck iwyo"
+    - name: Check code formatting (clang-format)
+      run: |
+        echo 'Checking C++ code formatting...'
+        find src test -name '*.cc' -o -name '*.h' | while read file; do
+          if ! clang-format --dry-run --Werror "${file}" 2>/dev/null; then
+            echo "::warning file=${file}::File needs formatting"
+          fi
+        done
+    - name: Run cppcheck
+      run: |
+        echo 'Running cppcheck static analysis...'
+        cppcheck --enable=warning,style,performance,portability \
+                 --inline-suppr \
+                 --suppress=missingIncludeSystem \
+                 --suppress=unusedFunction \
+                 --suppress=unmatchedSuppression \
+                 --error-exitcode=0 \
+                 -I src \
+                 src/ test/ 2>&1 | tee cppcheck-report.txt
+        # Check for high-severity issues
+        if grep -E "error:|warning:" cppcheck-report.txt | grep -v "Cppcheck cannot find all the include files"; then
+          echo "::warning::Found potential issues in cppcheck"
+        fi
+    - name: Run clang-tidy on sample files
+      run: |
+        echo 'Running clang-tidy on key files...'
+        # Only check a few key files to keep CI fast
+        for file in src/cli/main.cc src/cli/encoding.cc; do
+          if [ -f "${file}" ]; then
+            echo "Checking ${file}..."
+            clang-tidy "${file}" \
+              -checks='-*,readability-*,modernize-*,performance-*,bugprone-*' \
+              -- -std=c++17 -Isrc 2>&1 | head -50 || true
+          fi
+        done
+
+  # Build and Test
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - { cc: gcc, cxx: g++ }
+          - { cc: clang, cxx: clang++ }
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - name: Cache APT packages
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: "build-essential g++ clang make jq xxd"
+    - name: Setup compiler
+      run: |
+        echo "CC=${{ matrix.compiler.cc }}" >> $GITHUB_ENV
+        echo "CXX=${{ matrix.compiler.cxx }}" >> $GITHUB_ENV
+    - name: Extract test data
+      run: |
+        cd test
+        echo 'Building dynamic extraction tool...'
+        make extract
+    - name: Build project
+      run: |
+        echo "Building with ${{ matrix.compiler.cc }}..."
+        make clean
+        make -j$(nproc)
+    - name: Verify binaries
+      run: |
+        echo 'Checking built binaries...'
+        ls -lh longfellow-zk
+        file longfellow-zk
+        ldd longfellow-zk || true
+    - name: Run CLI help
+      run: |
+        ./longfellow-zk --help
+    - name: List ZK specs
+      run: |
+        ./longfellow-zk circuit_gen --zkspec list
+    - name: Run tests
+      run: |
+        cd test
+        ./bats/bin/bats mdoc.bats
+    # - name: Upload test results
+    #   if: always()
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: test-results-${{ matrix.compiler.cc }}
+    #     path: |
+    #       test/*.json
+    #       test/circuit_*.json
+    #       test/proof_*.json
+    #     retention-days: 7
