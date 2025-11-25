@@ -87,7 +87,7 @@ jobs:
         echo "CXX=${{ matrix.compiler.cxx }}" >> $GITHUB_ENV
     - name: Import upstream longfellow-zk
       run: |
-        bash scripts/import_upstrea.sh vendor/longfellow-zk
+        bash scripts/import_upstream.sh vendor/longfellow-zk
     - name: Extract test data
       run: |
         cd test
