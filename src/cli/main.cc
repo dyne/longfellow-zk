@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <cstring>
 #include <algorithm>
+#include <ctime>
 
 #include "CLI11.hpp"
 #include "json.hpp"
@@ -153,6 +154,15 @@ int circuit_gen(const std::string& circuit_file, const std::string& zkspec_str) 
             return 1; // Error already printed by find_zkspec
         }
 
+        // Find zkspec index
+        int zkspec_index = -1;
+        for (int i = 0; i < kNumZkSpecs; i++) {
+            if (&kZkSpecs[i] == zk_spec) {
+                zkspec_index = i;
+                break;
+            }
+        }
+
         std::cout << "Using ZK spec: " << zk_spec->system
                   << " (v" << zk_spec->version
                   << ", " << zk_spec->num_attributes << " attributes)\n";
@@ -176,17 +186,34 @@ int circuit_gen(const std::string& circuit_file, const std::string& zkspec_str) 
             return 1;
         }
 
-        // Write circuit to file
-        std::ofstream output(circuit_file, std::ios::binary);
+        // Create circuit JSON
+        json circuit_json;
+        circuit_json["circuit_data_base64"] = encoding::bytes_to_base64(circuit_bytes, circuit_len);
+        circuit_json["circuit_size"] = circuit_len;
+        circuit_json["zkspec"] = {
+            {"index", zkspec_index},
+            {"system", zk_spec->system},
+            {"version", zk_spec->version},
+            {"num_attributes", zk_spec->num_attributes},
+            {"circuit_hash", zk_spec->circuit_hash}
+        };
+        circuit_json["generated"] = std::time(nullptr);
+        circuit_json["_metadata"] = {
+            {"description", "ZK circuit for mDoc verification"},
+            {"format", "base64-encoded compressed circuit"}
+        };
+
+        // Write circuit JSON to file
+        std::ofstream output(circuit_file);
         if (!output) {
             std::cerr << "Failed to open output file: " << circuit_file << "\n";
             free(circuit_bytes);
             return 1;
         }
 
-        output.write(reinterpret_cast<const char*>(circuit_bytes), circuit_len);
+        output << circuit_json.dump(2);
         if (!output.good()) {
-            std::cerr << "Failed to write circuit data to file\n";
+            std::cerr << "Failed to write circuit JSON to file\n";
             free(circuit_bytes);
             return 1;
         }
@@ -195,7 +222,7 @@ int circuit_gen(const std::string& circuit_file, const std::string& zkspec_str) 
 
         std::cout << "Circuit generated successfully!\n";
         std::cout << "  File: " << circuit_file << "\n";
-        std::cout << "  Size: " << circuit_len << " bytes\n";
+        std::cout << "  Binary size: " << circuit_len << " bytes\n";
         std::cout << "  ZK spec: " << zk_spec->system << " v" << zk_spec->version << "\n";
         std::cout << "  Attributes: " << zk_spec->num_attributes << "\n";
 
@@ -231,6 +258,17 @@ int mdoc_prove(const std::string& circuit_file,
     std::cout << "  Proof output: " << proof_file << "\n";
 
     try {
+        // Read circuit JSON
+        std::ifstream circuit_stream(circuit_file);
+        if (!circuit_stream) {
+            throw std::runtime_error("Cannot open circuit file: " + circuit_file);
+        }
+        json circuit_json = json::parse(circuit_stream);
+
+        // Extract circuit data
+        auto circuit_data = encoding::base64_to_bytes(circuit_json["circuit_data_base64"]);
+        int circuit_zkspec_index = circuit_json["zkspec"]["index"];
+
         // Read mDoc JSON configuration
         std::ifstream mdoc_stream(mdoc_file);
         if (!mdoc_stream) {
@@ -238,14 +276,23 @@ int mdoc_prove(const std::string& circuit_file,
         }
         json mdoc_json = json::parse(mdoc_stream);
 
-        // Extract mDoc data
-        std::string mdoc_data_file = mdoc_json["mdoc_data"];
+        // Extract mDoc data - prefer base64 from JSON
+        std::vector<uint8_t> mdoc_data;
+        if (mdoc_json.contains("mdoc_data_base64")) {
+            mdoc_data = encoding::base64_to_bytes(mdoc_json["mdoc_data_base64"]);
+        } else if (mdoc_json.contains("mdoc_data")) {
+            std::string mdoc_data_file = mdoc_json["mdoc_data"];
+            mdoc_data = encoding::read_binary_file(mdoc_data_file);
+        } else {
+            throw std::runtime_error("mDoc JSON must contain either mdoc_data_base64 or mdoc_data");
+        }
+
         std::string transcript_hex = mdoc_json["transcript"];
         std::string pkx_hex = mdoc_json["public_key"]["x"];
         std::string pky_hex = mdoc_json["public_key"]["y"];
         std::string time_str = mdoc_json["time"];
         std::string doc_type = mdoc_json["doc_type"];
-        int zkspec_index = mdoc_json.value("zkspec", kNumZkSpecs - 1);
+        int mdoc_zkspec_index = mdoc_json.value("zkspec", kNumZkSpecs - 1);
 
         // Parse requested attributes
         std::vector<RequestedAttribute> attrs;
@@ -257,14 +304,14 @@ int mdoc_prove(const std::string& circuit_file,
                 std::string cbor_hex = attr_json["cbor_value"];
 
                 auto cbor_bytes = encoding::hex_to_bytes(cbor_hex);
-                
+
                 std::memcpy(attr.namespace_id, ns.c_str(), std::min(ns.size(), sizeof(attr.namespace_id)));
                 std::memcpy(attr.id, id.c_str(), std::min(id.size(), sizeof(attr.id)));
                 std::memcpy(attr.cbor_value, cbor_bytes.data(), std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
                 attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
                 attr.id_len = std::min(id.size(), sizeof(attr.id));
                 attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
-                
+
                 attrs.push_back(attr);
             }
         }
@@ -272,18 +319,26 @@ int mdoc_prove(const std::string& circuit_file,
         std::cout << "  Doc type: " << doc_type << "\n";
         std::cout << "  Time: " << time_str << "\n";
         std::cout << "  Attributes: " << attrs.size() << "\n";
+        std::cout << "  Circuit zkspec index: " << circuit_zkspec_index << "\n";
+        std::cout << "  mDoc requires zkspec index: " << mdoc_zkspec_index << "\n";
 
-        // Read files
-        auto circuit = FileReader(circuit_file);
-        auto mdoc_data = encoding::read_binary_file(mdoc_data_file);
+        // Verify circuit matches mdoc requirement
+        if (circuit_zkspec_index != mdoc_zkspec_index) {
+            std::cerr << "Error: Circuit zkspec (" << circuit_zkspec_index
+                      << ") does not match mDoc requirement (" << mdoc_zkspec_index << ")\n";
+            return 1;
+        }
+
+        // Read transcript
         auto transcript_bytes = encoding::hex_to_bytes(transcript_hex);
 
-        const auto* zk_spec = &kZkSpecs[zkspec_index];
+        // Use the mdoc's zkspec (which should match the circuit)
+        const auto* zk_spec = &kZkSpecs[mdoc_zkspec_index];
         uint8_t* proof = nullptr;
         size_t proof_len = 0;
 
         auto result = run_mdoc_prover(
-            circuit.data(), circuit.size(),
+            circuit_data.data(), circuit_data.size(),
             mdoc_data.data(), mdoc_data.size(),
             pkx_hex.c_str(), pky_hex.c_str(),
             transcript_bytes.data(), transcript_bytes.size(),
@@ -298,30 +353,38 @@ int mdoc_prove(const std::string& circuit_file,
             return 1;
         }
 
-        // Write proof to file
-        encoding::write_binary_file(proof_file, proof, proof_len);
-        
-        // Write proof metadata JSON
-        json proof_meta;
-        proof_meta["proof_file"] = proof_file;
-        proof_meta["proof_size"] = proof_len;
-        proof_meta["mdoc_source"] = mdoc_file;
-        proof_meta["circuit"] = circuit_file;
-        proof_meta["zkspec"] = zkspec_index;
-        proof_meta["doc_type"] = doc_type;
-        proof_meta["time"] = time_str;
-        proof_meta["attributes"] = mdoc_json["attributes"];
-        proof_meta["public_key"] = mdoc_json["public_key"];
-        proof_meta["transcript"] = transcript_hex;
-        
-        std::string meta_file = proof_file + ".json";
-        std::ofstream meta_out(meta_file);
-        meta_out << proof_meta.dump(2);
+        // Create proof JSON with embedded binary data and full metadata
+        json proof_json;
+        proof_json["proof_data_base64"] = encoding::bytes_to_base64(proof, proof_len);
+        proof_json["proof_size"] = proof_len;
+        proof_json["circuit_number"] = circuit_zkspec_index;
+        proof_json["mdoc_source"] = mdoc_file;
+        proof_json["circuit_source"] = circuit_file;
+        proof_json["zkspec"] = mdoc_zkspec_index;
+        proof_json["doc_type"] = doc_type;
+        proof_json["time"] = time_str;
+        proof_json["attributes"] = mdoc_json["attributes"];
+        proof_json["public_key"] = mdoc_json["public_key"];
+        proof_json["transcript"] = transcript_hex;
+        proof_json["generated"] = std::time(nullptr);
+        proof_json["_metadata"] = {
+            {"description", "ZK proof for mDoc verification"},
+            {"format", "base64-encoded proof data"}
+        };
+
+        // Write proof JSON
+        std::ofstream proof_out(proof_file);
+        if (!proof_out) {
+            std::cerr << "Failed to open proof output file: " << proof_file << "\n";
+            free(proof);
+            return 1;
+        }
+        proof_out << proof_json.dump(2);
 
         free(proof);
 
         std::cout << "Proof generated successfully (" << proof_len << " bytes)\n";
-        std::cout << "Metadata saved to: " << meta_file << "\n";
+        std::cout << "Proof saved to: " << proof_file << "\n";
         return 0;
 
     } catch (const std::exception& e) {
@@ -338,40 +401,48 @@ int mdoc_verify(const std::string& circuit_file,
     std::cout << "  Proof: " << proof_file << "\n";
 
     try {
-        // Read proof metadata JSON
-        std::string meta_file = proof_file + ".json";
-        std::ifstream meta_stream(meta_file);
-        if (!meta_stream) {
-            throw std::runtime_error("Cannot open proof metadata file: " + meta_file);
+        // Read circuit JSON
+        std::ifstream circuit_stream(circuit_file);
+        if (!circuit_stream) {
+            throw std::runtime_error("Cannot open circuit file: " + circuit_file);
         }
-        json proof_meta = json::parse(meta_stream);
+        json circuit_json = json::parse(circuit_stream);
+        auto circuit_data = encoding::base64_to_bytes(circuit_json["circuit_data_base64"]);
 
-        // Extract verification parameters from metadata
-        std::string transcript_hex = proof_meta["transcript"];
-        std::string pkx_hex = proof_meta["public_key"]["x"];
-        std::string pky_hex = proof_meta["public_key"]["y"];
-        std::string time_str = proof_meta["time"];
-        std::string doc_type = proof_meta["doc_type"];
-        int zkspec_index = proof_meta.value("zkspec", kNumZkSpecs - 1);
+        // Read proof JSON
+        std::ifstream proof_stream(proof_file);
+        if (!proof_stream) {
+            throw std::runtime_error("Cannot open proof file: " + proof_file);
+        }
+        json proof_json = json::parse(proof_stream);
+
+        // Extract verification parameters from proof JSON
+        auto proof_data = encoding::base64_to_bytes(proof_json["proof_data_base64"]);
+        std::string transcript_hex = proof_json["transcript"];
+        std::string pkx_hex = proof_json["public_key"]["x"];
+        std::string pky_hex = proof_json["public_key"]["y"];
+        std::string time_str = proof_json["time"];
+        std::string doc_type = proof_json["doc_type"];
+        int zkspec_index = proof_json.value("zkspec", kNumZkSpecs - 1);
 
         // Parse requested attributes
         std::vector<RequestedAttribute> attrs;
-        if (proof_meta.contains("attributes")) {
-            for (const auto& attr_json : proof_meta["attributes"]) {
+        if (proof_json.contains("attributes")) {
+            for (const auto& attr_json : proof_json["attributes"]) {
                 RequestedAttribute attr = {};
                 std::string ns = attr_json["namespace"];
                 std::string id = attr_json["id"];
                 std::string cbor_hex = attr_json["cbor_value"];
 
                 auto cbor_bytes = encoding::hex_to_bytes(cbor_hex);
-                
+
                 std::memcpy(attr.namespace_id, ns.c_str(), std::min(ns.size(), sizeof(attr.namespace_id)));
                 std::memcpy(attr.id, id.c_str(), std::min(id.size(), sizeof(attr.id)));
                 std::memcpy(attr.cbor_value, cbor_bytes.data(), std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
                 attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
                 attr.id_len = std::min(id.size(), sizeof(attr.id));
                 attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
-                
+
                 attrs.push_back(attr);
             }
         }
@@ -380,20 +451,18 @@ int mdoc_verify(const std::string& circuit_file,
         std::cout << "  Time: " << time_str << "\n";
         std::cout << "  Attributes: " << attrs.size() << "\n";
 
-        // Read files
-        auto circuit = FileReader(circuit_file);
-        auto proof = FileReader(proof_file);
+        // Decode transcript
         auto transcript_bytes = encoding::hex_to_bytes(transcript_hex);
 
         const auto* zk_spec = &kZkSpecs[zkspec_index];
 
         auto result = run_mdoc_verifier(
-            circuit.data(), circuit.size(),
+            circuit_data.data(), circuit_data.size(),
             pkx_hex.c_str(), pky_hex.c_str(),
             transcript_bytes.data(), transcript_bytes.size(),
             attrs.data(), attrs.size(),
             time_str.c_str(),
-            proof.data(), proof.size(), doc_type.c_str(),
+            proof_data.data(), proof_data.size(), doc_type.c_str(),
             zk_spec
         );
 

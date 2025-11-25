@@ -57,8 +57,12 @@ int main() {
         // Transcript as hex
         mdoc_json["transcript"] = encoding::bytes_to_hex(example.transcript, example.transcript_size);
 
-        // Default zkspec (will be overridden based on attribute count)
-        mdoc_json["zkspec"] = 11; // Default to latest
+        // Determine zkspec based on number of attributes
+        // Current valid zkspecs: 0-7 (8 total)
+        // v6: indices 0-3 (1-4 attrs), v5: indices 4-7 (1-4 attrs)
+        // For now, default to index 0 (v6, 1 attribute) for all examples
+        // TODO: Automatically determine based on actual attributes parsed from mDoc
+        mdoc_json["zkspec"] = 0;  // v6, 1 attribute
 
         // Attributes - add example attributes based on the doc_type
         mdoc_json["attributes"] = json::array();
@@ -95,7 +99,7 @@ int main() {
                   << " (doc_type: " << (example.doc_type ? example.doc_type : "unknown") << ")\n";
     }
 
-    std::cout << "\nAll examples extracted as JSON to test/ directory\n";
-    std::cout << "  JSON config: mdoc_XX.json\n";
+    std::cout << "\n✓ All examples extracted as JSON to test/ directory\n";
+    std::cout << "  JSON files: mdoc_XX.json (with embedded base64 mDoc data)\n";
     return 0;
 }
