@@ -60,7 +60,6 @@ jobs:
           fi
         done
 
-  # Build and Test
   posix-x86:
     name: Build & Test on POSIX x86
     runs-on: ubuntu-22.04
@@ -148,3 +147,42 @@ jobs:
         echo 'Building with WASI-SDK...'
         make clean
         make -j$(nproc) wasm CXX="ccache /opt/wasi-sdk/bin/clang++"
+
+  apple-osx:
+    name: Build & Test on Apple OSX
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - uses: hendrikmuhs/ccache-action@v1.2
+    - name: Import upstream longfellow-zk
+      run: |
+        bash scripts/import_upstream.sh vendor/longfellow-zk
+    - name: Extract test data
+      run: |
+        cd test
+        echo 'Building mdoc example extraction tool...'
+        make extract CXX="clang++"
+    - name: Build project
+      run: |
+        echo "Building with clang++..."
+        make clean
+        make -j$(nproc) CXX="clang++"
+    - name: Verify binaries
+      run: |
+        echo 'Checking built binaries...'
+        ls -lh longfellow-zk
+        file longfellow-zk
+        otool -L longfellow-zk || true
+    - name: Run CLI help
+      run: |
+        ./longfellow-zk --help
+    - name: List ZK specs
+      run: |
+        ./longfellow-zk circuit_gen --zkspec list
+    - name: Run tests
+      run: |
+        cd test
+        ./bats/bin/bats mdoc.bats
