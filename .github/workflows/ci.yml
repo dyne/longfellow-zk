@@ -95,7 +95,7 @@ jobs:
       run: |
         echo "Building with ${{ matrix.compiler.cxx }}..."
         make clean
-        make -j$(nproc) ccache
+        make -j$(nproc) CXX="ccache ${{ matrix.compiler.cxx}}" CC="ccache ${{ matrix.compiler.cc}}"
     - name: Verify binaries
       run: |
         echo 'Checking built binaries...'
@@ -146,7 +146,7 @@ jobs:
       run: |
         echo 'Building with WASI-SDK...'
         make clean
-        make -j$(nproc) wasm CXX="ccache /opt/wasi-sdk/bin/clang++"
+        make -j$(nproc) wasm CXX="ccache /opt/wasi-sdk/bin/clang++" CC="ccache /opt/wasi-sdk/bin/clang"
 
   apple-osx:
     name: Build & Test on Apple OSX
@@ -173,7 +173,7 @@ jobs:
       run: |
         echo "Building with clang++..."
         make clean
-        make -j$(nproc) CXX="ccache clang++"
+        make -j$(nproc) osx-arm64 CXX="ccache clang++" CC="ccache clang"
     - name: Verify binaries
       run: |
         echo 'Checking built binaries...'
