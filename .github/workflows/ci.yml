@@ -1,0 +1,192 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  # Static Analysis and Linting
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-22.04
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Cache APT packages
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: "clang-tidy clang-format cppcheck"
+    - name: Check code formatting (clang-format)
+      run: |
+        echo 'Checking C++ code formatting...'
+        find src test -name '*.cc' -o -name '*.h' | while read file; do
+          if ! clang-format --dry-run --Werror "${file}" 2>/dev/null; then
+            echo "::warning file=${file}::File needs formatting"
+          fi
+        done
+    - name: Run cppcheck
+      run: |
+        echo 'Running cppcheck static analysis...'
+        cppcheck --enable=warning,style,performance,portability \
+                 --inline-suppr \
+                 --suppress=missingIncludeSystem \
+                 --suppress=unusedFunction \
+                 --suppress=unmatchedSuppression \
+                 --error-exitcode=0 \
+                 -I src \
+                 src/ test/ 2>&1 | tee cppcheck-report.txt
+        # Check for high-severity issues
+        if grep -E "error:|warning:" cppcheck-report.txt | grep -v "Cppcheck cannot find all the include files"; then
+          echo "::warning::Found potential issues in cppcheck"
+        fi
+    - name: Run clang-tidy on sample files
+      run: |
+        echo 'Running clang-tidy on key files...'
+        # Only check a few key files to keep CI fast
+        for file in src/cli/main.cc src/cli/encoding.cc; do
+          if [ -f "${file}" ]; then
+            echo "Checking ${file}..."
+            clang-tidy "${file}" \
+              -checks='-*,readability-*,modernize-*,performance-*,bugprone-*' \
+              -- -std=c++17 -Isrc 2>&1 | head -50 || true
+          fi
+        done
+
+  posix-x86:
+    name: Build & Test on POSIX x86
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - { cc: gcc, cxx: g++ }
+          - { cc: clang, cxx: clang++ }
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - uses: hendrikmuhs/ccache-action@v1.2
+    - name: Cache APT packages
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: "build-essential g++ clang make jq xxd"
+    - name: Setup compiler
+      run: |
+        echo "CC=${{ matrix.compiler.cc }}" >> $GITHUB_ENV
+        echo "CXX=${{ matrix.compiler.cxx }}" >> $GITHUB_ENV
+    - name: Import upstream longfellow-zk
+      run: |
+        bash scripts/import_upstream.sh vendor/longfellow-zk
+    - name: Extract test data
+      run: |
+        cd test
+        echo 'Building dynamic extraction tool...'
+        make extract CXX="ccache ${{ matrix.compiler.cxx}}"
+    - name: Build project
+      run: |
+        echo "Building with ${{ matrix.compiler.cxx }}..."
+        make clean
+        make -j$(nproc) CXX="ccache ${{ matrix.compiler.cxx}}" CC="ccache ${{ matrix.compiler.cc}}"
+    - name: Verify binaries
+      run: |
+        echo 'Checking built binaries...'
+        ls -lh longfellow-zk
+        file longfellow-zk
+        ldd longfellow-zk || true
+    - name: Run CLI help
+      run: |
+        ./longfellow-zk --help
+    - name: List ZK specs
+      run: |
+        ./longfellow-zk circuit_gen --zkspec list
+    - name: Run tests
+      run: |
+        cd test
+        ./bats/bin/bats mdoc.bats
+
+  wasm-wasi:
+    name: Build & Test on WASM WASI
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - uses: hendrikmuhs/ccache-action@v1.2
+    - name: Cache APT packages
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: "build-essential make jq xxd g++"
+    - name: Install WASI SDK
+      uses: konsumer/install-wasi-sdk@v1
+      with:
+        version: "29"   # specify WASI SDK version
+        install-path: "/opt/wasi-sdk"
+        add-to-path: true
+    - name: Import upstream longfellow-zk
+      run: |
+        bash scripts/import_upstream.sh vendor/longfellow-zk
+    - name: Extract test data
+      run: |
+        cd test
+        echo 'Building dynamic extraction tool...'
+        make extract CXX="ccache g++"
+    - name: Build project
+      run: |
+        echo 'Building with WASI-SDK...'
+        make clean
+        make -j$(nproc) wasm CXX="ccache /opt/wasi-sdk/bin/clang++" CC="ccache /opt/wasi-sdk/bin/clang"
+
+  apple-osx:
+    name: Build & Test on Apple OSX
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - uses: hendrikmuhs/ccache-action@v1.2
+    - name: Install latest Bash via Homebrew
+      run: |
+        brew install bash
+        echo "/opt/homebrew/bin/bash" >> $GITHUB_PATH
+    - name: Import upstream longfellow-zk
+      run: |
+        bash scripts/import_upstream.sh vendor/longfellow-zk
+    - name: Extract test data
+      run: |
+        cd test
+        echo 'Building mdoc example extraction tool...'
+        make extract CXX="ccache clang++"
+    - name: Build project
+      run: |
+        echo "Building with clang++..."
+        make clean
+        make -j$(nproc) osx-arm64 CXX="ccache clang++" CC="ccache clang"
+    - name: Verify binaries
+      run: |
+        echo 'Checking built binaries...'
+        ls -lh longfellow-zk
+        file longfellow-zk
+        otool -L longfellow-zk || true
+    - name: Run CLI help
+      run: |
+        ./longfellow-zk --help
+    - name: List ZK specs
+      run: |
+        ./longfellow-zk circuit_gen --zkspec list
+    - name: Run tests
+      run: |
+        cd test
+        ./bats/bin/bats mdoc.bats

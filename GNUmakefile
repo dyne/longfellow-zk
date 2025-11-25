@@ -1,12 +1,20 @@
+CFLAGS ?= -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow
 WASI_SDK_PATH := /opt/wasi-sdk
 INCLUDES := -I. -I..
 
-posix: CXXFLAGS := -O3 -std=c++17 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow
+posix: ARCHFLAGS := -mpclmul
 posix:
 	$(info 🌉 Building for $@)
-	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="-O3"
-	@$(MAKE) -C src CXXFLAGS="-mpclmul $(CXXFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
-	@$(MAKE) -C src/cli CXXFLAGS="$(CXXFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
+	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CFLAGS)" CC="$(CC)" VERBOSE=1
+	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
+	@$(MAKE) -C src/cli CXXFLAGS="-std=c++17 $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
+
+osx-arm64: ARCHFLAGS := -march=armv8.1-a+crypto
+osx-arm64:
+	$(info 🌉 Building for $@)
+	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CFLAGS)" CC="$(CC)" VERBOSE=1
+	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
+	@$(MAKE) -C src/cli CXXFLAGS="-std=c++17 $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
 
 wasm: CXX := /opt/wasi-sdk/bin/clang++
 wasm: CC := /opt/wasi-sdk/bin/clang

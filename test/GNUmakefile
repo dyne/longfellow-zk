@@ -1,5 +1,5 @@
-CXX := g++
-CXXFLAGS := -std=c++17 -O3 -I../src
+CXX ?= g++
+CXXFLAGS ?= -std=c++17 -O3 -I../src
 
 .PHONY: extract
 extract: extract_mdocs
