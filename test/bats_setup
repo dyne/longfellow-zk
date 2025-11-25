@@ -1,0 +1,12 @@
+# setup paths for BATS test units
+setup() {
+    bats_require_minimum_version 1.5.0
+    T="$BATS_TEST_DIRNAME"
+    R=`cd "$T"/.. && pwd`
+    TMP="$BATS_TEST_TMPDIR"
+    load "$T"/test_helper/bats-support/load
+    load "$T"/test_helper/bats-assert/load
+    load "$T"/test_helper/bats-file/load
+    ZTMP="$BATS_FILE_TMPDIR"
+    cd $ZTMP
+}
