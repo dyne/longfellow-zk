@@ -1,10 +1,10 @@
 WASI_SDK_PATH := /opt/wasi-sdk
 INCLUDES := -I. -I..
 
-posix: CXXFLAGS := -O3
+posix: CXXFLAGS := -O3 -std=c++17 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow
 posix:
 	$(info 🌉 Building for $@)
-	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CXXFLAGS)" VERBOSE=1
+	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="-O3"
 	@$(MAKE) -C src CXXFLAGS="-mpclmul $(CXXFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
 	@$(MAKE) -C src/cli CXXFLAGS="$(CXXFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
 
@@ -39,4 +39,7 @@ clean-vendor: clean
 	@$(MAKE) -C vendor/zstd clean
 
 clean:
+	rm -f *.a
+	rm -f longfellow-zk longfellow-zk.wasm
 	@$(MAKE) -C src clean
+	@$(MAKE) -C vendor/zstd clean
