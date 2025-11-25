@@ -28,21 +28,21 @@ namespace encoding {
 std::vector<uint8_t> hex_to_bytes(const std::string& hex) {
     std::vector<uint8_t> bytes;
     std::string clean_hex = hex;
-    
+
     // Remove "0x" prefix if present
     if (clean_hex.size() >= 2 && clean_hex[0] == '0' && (clean_hex[1] == 'x' || clean_hex[1] == 'X')) {
         clean_hex = clean_hex.substr(2);
     }
-    
+
     // Remove spaces
     clean_hex.erase(std::remove(clean_hex.begin(), clean_hex.end(), ' '), clean_hex.end());
-    
+
     for (size_t i = 0; i < clean_hex.length(); i += 2) {
         std::string byte_str = clean_hex.substr(i, 2);
         uint8_t byte = static_cast<uint8_t>(std::strtoul(byte_str.c_str(), nullptr, 16));
         bytes.push_back(byte);
     }
-    
+
     return bytes;
 }
 
@@ -76,28 +76,36 @@ std::vector<uint8_t> base64_to_bytes(const std::string& base64_str) {
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
     };
-    
+
     std::vector<uint8_t> result;
     result.reserve(base64_str.length() * 3 / 4);
-    
+
     for (size_t i = 0; i < base64_str.length(); i += 4) {
         uint32_t val = 0;
         int padding = 0;
-        
-        for (int j = 0; j < 4 && i + j < base64_str.length(); j++) {
-            char c = base64_str[i + j];
-            if (c == '=') {
-                padding++;
-            } else {
-                val = (val << 6) | base64_decode_table[static_cast<uint8_t>(c)];
+
+        // Read all 4 characters in this block, always shift 6 bits
+        for (int j = 0; j < 4; j++) {
+            val <<= 6;
+            if (i + j < base64_str.length()) {
+                char c = base64_str[i + j];
+                if (c == '=') {
+                    padding++;
+                } else {
+                    val |= base64_decode_table[static_cast<uint8_t>(c)];
+                }
             }
         }
-        
-        if (padding < 2) result.push_back((val >> 16) & 0xFF);
-        if (padding < 1) result.push_back((val >> 8) & 0xFF);
+
+        // Decode based on padding:
+        // No padding (XXXX) -> 3 bytes
+        // One = (XXX=) -> 2 bytes
+        // Two == (XX==) -> 1 byte
+        result.push_back((val >> 16) & 0xFF);
+        if (padding <= 1) result.push_back((val >> 8) & 0xFF);
         if (padding == 0) result.push_back(val & 0xFF);
     }
-    
+
     return result;
 }
 
@@ -107,21 +115,21 @@ std::string bytes_to_base64(const uint8_t* data, size_t len) {
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz"
         "0123456789+/";
-    
+
     std::string result;
     result.reserve(((len + 2) / 3) * 4);
-    
+
     for (size_t i = 0; i < len; i += 3) {
         uint32_t val = data[i] << 16;
         if (i + 1 < len) val |= data[i + 1] << 8;
         if (i + 2 < len) val |= data[i + 2];
-        
+
         result.push_back(base64_chars[(val >> 18) & 0x3F]);
         result.push_back(base64_chars[(val >> 12) & 0x3F]);
         result.push_back((i + 1 < len) ? base64_chars[(val >> 6) & 0x3F] : '=');
         result.push_back((i + 2 < len) ? base64_chars[val & 0x3F] : '=');
     }
-    
+
     return result;
 }
 
@@ -131,12 +139,12 @@ std::vector<uint8_t> read_binary_file(const std::string& filename) {
     if (!file) {
         throw std::runtime_error("Cannot open file: " + filename);
     }
-    
+
     size_t size = file.tellg();
     std::vector<uint8_t> data(size);
     file.seekg(0);
     file.read(reinterpret_cast<char*>(data.data()), size);
-    
+
     return data;
 }
 
