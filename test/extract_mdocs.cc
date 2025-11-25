@@ -57,25 +57,75 @@ int main() {
         // Transcript as hex
         mdoc_json["transcript"] = encoding::bytes_to_hex(example.transcript, example.transcript_size);
 
-        // Determine zkspec based on number of attributes
-        // Current valid zkspecs: 0-7 (8 total)
-        // v6: indices 0-3 (1-4 attrs), v5: indices 4-7 (1-4 attrs)
-        // For now, default to index 0 (v6, 1 attribute) for all examples
-        // TODO: Automatically determine based on actual attributes parsed from mDoc
-        mdoc_json["zkspec"] = 0;  // v6, 1 attribute
-
-        // Attributes - add example attributes based on the doc_type
+        // Determine zkspec and attributes based on example
+        // Attribute information extracted from mdoc_zk_test.cc and mdoc_test_attributes.h
         mdoc_json["attributes"] = json::array();
 
-        // For example 0, we know it has age_over_18
-        if (i == 0) {
+        auto add_attr = [&](const char* ns, const char* id, const char* cbor_hex) {
             json attr;
-            attr["namespace"] = "org.iso.18013.5.1";
-            attr["id"] = "age_over_18";
-            attr["cbor_value"] = "0xf5"; // CBOR true
+            attr["namespace"] = ns;
+            attr["id"] = id;
+            attr["cbor_value"] = cbor_hex;
             mdoc_json["attributes"].push_back(attr);
+        };
+
+        switch (i) {
+            case 0:  // age_over_18
+            case 1:  // age_over_18
+            case 2:  // age_over_18
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute
+                add_attr("org.iso.18013.5.1", "age_over_18", "0xf5");
+                break;
+
+            case 3:  // Multiple attributes available: familyname, birthdate, height
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute - using familyname
+                add_attr("org.iso.18013.5.1", "family_name", "0x6a4d75737465726d616e6e");
+                break;
+
+            case 4:  // birthdate_1998_09_04 (Google IDPass, different docType)
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute
+                add_attr("org.iso.18013.5.1", "birth_date", "0xd903ec6a313939382d30392d3034");
+                break;
+
+            case 5:  // age_over_18 (website explainer example)
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute
+                add_attr("org.iso.18013.5.1", "age_over_18", "0xf5");
+                break;
+
+            case 6:  // not_over_18 (large mdoc, value is false)
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute
+                add_attr("org.iso.18013.5.1", "age_over_18", "0xf4");  // CBOR false
+                break;
+
+            case 7:  // birthdate_1968_04_27, issue_date (has 2 attrs, but we can use 1)
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute
+                add_attr("org.iso.18013.5.1", "birth_date", "0xd903ec6a313936382d30342d3237");
+                break;
+
+            case 8:  // age_birth_year (integer field)
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute
+                add_attr("org.iso.18013.5.1", "age_birth_year", "0x1907b0");
+                break;
+
+            case 9:  // europa_age_over_18 (EU namespace)
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute
+                add_attr("eu.europa.ec.av.1", "age_over_18", "0xf5");
+                break;
+
+            case 10:  // aamva_dhs_compliance
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute
+                add_attr("org.iso.18013.5.aamva", "DHS_compliance", "0x6146");
+                break;
+
+            case 11:  // age_over_18 (Sparkasse Age Assurance)
+                mdoc_json["zkspec"] = 0;  // v6, 1 attribute
+                add_attr("eu.europa.ec.av.1", "age_over_18", "0xf5");
+                break;
+
+            default:
+                mdoc_json["zkspec"] = 0;
+                break;
         }
-        // TODO: Parse other examples to extract their attributes automatically
 
         // Add metadata
         mdoc_json["_metadata"] = {

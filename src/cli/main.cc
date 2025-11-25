@@ -182,8 +182,8 @@ int circuit_gen(const std::string& circuit_file, const std::string& zkspec_str) 
              .minEpochIterations(1)
              .relative(false)
              .timeUnit(std::chrono::seconds(1), "s");
-        
-        bench.run(std::string("zkspec_") + std::to_string(zkspec_index) + 
+
+        bench.run(std::string("zkspec_") + std::to_string(zkspec_index) +
                   "_" + std::to_string(zk_spec->num_attributes) + "attr", [&] {
             result = generate_circuit(zk_spec, &circuit_bytes, &circuit_len);
             nb::doNotOptimizeAway(circuit_bytes);
@@ -318,9 +318,14 @@ int mdoc_prove(const std::string& circuit_file,
             }
         }
 
+        // Dummy attribute for empty case (C API requires non-null pointer)
+        RequestedAttribute dummy_attr = {};
+        const RequestedAttribute* attrs_ptr = attrs.empty() ? &dummy_attr : attrs.data();
+        size_t attrs_len = attrs.size();
+
         std::cout << "  Doc type: " << doc_type << "\n";
         std::cout << "  Time: " << time_str << "\n";
-        std::cout << "  Attributes: " << attrs.size() << "\n";
+        std::cout << "  Attributes: " << attrs_len << "\n";
         std::cout << "  Circuit zkspec index: " << circuit_zkspec_index << "\n";
         std::cout << "  mDoc requires zkspec index: " << mdoc_zkspec_index << "\n";
 
@@ -349,15 +354,15 @@ int mdoc_prove(const std::string& circuit_file,
              .minEpochIterations(1)
              .relative(false)
              .timeUnit(std::chrono::seconds(1), "s");
-        
-        bench.run(std::string("zkspec_") + std::to_string(mdoc_zkspec_index) + 
-                  "_" + std::to_string(attrs.size()) + "attr", [&] {
+
+        bench.run(std::string("zkspec_") + std::to_string(mdoc_zkspec_index) +
+                  "_" + std::to_string(attrs_len) + "attr", [&] {
             result = run_mdoc_prover(
                 circuit_data.data(), circuit_data.size(),
                 mdoc_data.data(), mdoc_data.size(),
                 pkx_hex.c_str(), pky_hex.c_str(),
                 transcript_bytes.data(), transcript_bytes.size(),
-                attrs.data(), attrs.size(),
+                attrs_ptr, attrs_len,
                 time_str.c_str(),
                 &proof, &proof_len, zk_spec
             );
@@ -469,9 +474,14 @@ int mdoc_verify(const std::string& circuit_file,
             }
         }
 
+        // Dummy attribute for empty case (C API requires non-null pointer)
+        RequestedAttribute dummy_attr = {};
+        const RequestedAttribute* attrs_ptr = attrs.empty() ? &dummy_attr : attrs.data();
+        size_t attrs_len = attrs.size();
+
         std::cout << "  Doc type: " << doc_type << "\n";
         std::cout << "  Time: " << time_str << "\n";
-        std::cout << "  Attributes: " << attrs.size() << "\n";
+        std::cout << "  Attributes: " << attrs_len << "\n";
 
         // Decode transcript
         auto transcript_bytes = encoding::hex_to_bytes(transcript_hex);
@@ -488,14 +498,14 @@ int mdoc_verify(const std::string& circuit_file,
              .minEpochIterations(1)
              .relative(false)
              .timeUnit(std::chrono::seconds(1), "s");
-        
-        bench.run(std::string("zkspec_") + std::to_string(zkspec_index) + 
-                  "_" + std::to_string(attrs.size()) + "attr", [&] {
+
+        bench.run(std::string("zkspec_") + std::to_string(zkspec_index) +
+                  "_" + std::to_string(attrs_len) + "attr", [&] {
             result = run_mdoc_verifier(
                 circuit_data.data(), circuit_data.size(),
                 pkx_hex.c_str(), pky_hex.c_str(),
                 transcript_bytes.data(), transcript_bytes.size(),
-                attrs.data(), attrs.size(),
+                attrs_ptr, attrs_len,
                 time_str.c_str(),
                 proof_data.data(), proof_data.size(), doc_type.c_str(),
                 zk_spec
