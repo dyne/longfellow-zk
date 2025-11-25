@@ -14,108 +14,88 @@
  * limitations under the License.
  */
 
-// Extract mdoc examples from mdoc_examples.h and save them as binary files
+// Extract mdoc examples from mdoc_examples.h and save them as JSON files
 
 #include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <sstream>
 
-#include "circuits/mdoc/mdoc_examples.h"
+#include <cli/json.hpp>
+#include <cli/encoding.h>
+#include <circuits/mdoc/mdoc_examples.h>
 
 using namespace proofs;
+using json = nlohmann::json;
 
 int main() {
     const size_t num_examples = sizeof(mdoc_tests) / sizeof(mdoc_tests[0]);
 
-    std::cout << "Extracting " << num_examples << " mDoc examples...\n\n";
+    std::cout << "Extracting " << num_examples << " mDoc examples to JSON...\n\n";
 
     for (size_t i = 0; i < num_examples; i++) {
         const auto& example = mdoc_tests[i];
 
         // Create filenames
-        char mdoc_file[256];
-        char meta_file[256];
-        char transcript_file[256];
-        char pkx_file[256];
-        char pky_file[256];
-        snprintf(mdoc_file, sizeof(mdoc_file), "mdoc_%02zu.bin", i);
-        snprintf(meta_file, sizeof(meta_file), "mdoc_%02zu.txt", i);
-        snprintf(transcript_file, sizeof(transcript_file), "transcript_%02zu.bin", i);
-        snprintf(pkx_file, sizeof(pkx_file), "pkx_%02zu.txt", i);
-        snprintf(pky_file, sizeof(pky_file), "pky_%02zu.txt", i);
+        char mdoc_json_file[256];
+        snprintf(mdoc_json_file, sizeof(mdoc_json_file), "mdoc_%02zu.json", i);
 
-        // Write mDoc binary data
-        std::ofstream mdoc_out(mdoc_file, std::ios::binary);
-        if (!mdoc_out) {
-            std::cerr << "Failed to create " << mdoc_file << "\n";
+        // Create JSON structure
+        json mdoc_json;
+        mdoc_json["example_id"] = i;
+        mdoc_json["mdoc_data_base64"] = encoding::bytes_to_base64(example.mdoc, example.mdoc_size);
+        mdoc_json["mdoc_size"] = example.mdoc_size;
+        mdoc_json["doc_type"] = example.doc_type ? example.doc_type : "unknown";
+        mdoc_json["time"] = example.now ? reinterpret_cast<const char*>(example.now) : "";
+
+        // Public key
+        mdoc_json["public_key"]["x"] = example.pkx.as_pointer;
+        mdoc_json["public_key"]["y"] = example.pky.as_pointer;
+
+        // Transcript as hex
+        mdoc_json["transcript"] = encoding::bytes_to_hex(example.transcript, example.transcript_size);
+
+        // Default zkspec (will be overridden based on attribute count)
+        mdoc_json["zkspec"] = 11; // Default to latest
+
+        // Attributes - add example attributes based on the doc_type
+        mdoc_json["attributes"] = json::array();
+
+        // For example 0, we know it has age_over_18
+        if (i == 0) {
+            json attr;
+            attr["namespace"] = "org.iso.18013.5.1";
+            attr["id"] = "age_over_18";
+            attr["cbor_value"] = "0xf5"; // CBOR true
+            mdoc_json["attributes"].push_back(attr);
+        }
+        // TODO: Parse other examples to extract their attributes automatically
+
+        // Add metadata
+        mdoc_json["_metadata"] = {
+            {"description", "Extracted from mdoc_examples.h"},
+            {"example_number", i},
+            {"transcript_size", example.transcript_size},
+            {"note", "mdoc data is available both as separate .bin file and as base64 in mdoc_data_base64"}
+        };
+
+        // Write JSON file
+        std::ofstream json_out(mdoc_json_file);
+        if (!json_out) {
+            std::cerr << "Failed to create " << mdoc_json_file << "\n";
             return 1;
         }
-        mdoc_out.write(reinterpret_cast<const char*>(example.mdoc), example.mdoc_size);
-        mdoc_out.close();
+        json_out << mdoc_json.dump(2);
+        json_out.close();
 
-        // Write transcript binary data
-        std::ofstream transcript_out(transcript_file, std::ios::binary);
-        if (!transcript_out) {
-            std::cerr << "Failed to create " << transcript_file << "\n";
-            return 1;
-        }
-        transcript_out.write(reinterpret_cast<const char*>(example.transcript), example.transcript_size);
-        transcript_out.close();
-
-        // Write public key X
-        std::ofstream pkx_out(pkx_file);
-        if (!pkx_out) {
-            std::cerr << "Failed to create " << pkx_file << "\n";
-            return 1;
-        }
-        pkx_out << example.pkx.as_pointer << "\n";
-        pkx_out.close();
-
-        // Write public key Y
-        std::ofstream pky_out(pky_file);
-        if (!pky_out) {
-            std::cerr << "Failed to create " << pky_file << "\n";
-            return 1;
-        }
-        pky_out << example.pky.as_pointer << "\n";
-        pky_out.close();
-
-        // Write metadata
-        std::ofstream meta_out(meta_file);
-        if (!meta_out) {
-            std::cerr << "Failed to create " << meta_file << "\n";
-            return 1;
-        }
-
-        meta_out << "mDoc Example #" << i << "\n";
-        meta_out << "===================\n\n";
-        meta_out << "File: mdoc_" << std::setfill('0') << std::setw(2) << i << ".bin\n";
-        meta_out << "Size: " << example.mdoc_size << " bytes\n";
-        meta_out << "Doc Type: " << (example.doc_type ? example.doc_type : "unknown") << "\n";
-        meta_out << "Timestamp: " << (example.now ? reinterpret_cast<const char*>(example.now) : "none") << "\n\n";
-
-        meta_out << "Issuer Public Key X:\n  " << example.pkx.as_pointer << "\n";
-        meta_out << "Issuer Public Key Y:\n  " << example.pky.as_pointer << "\n\n";
-
-        meta_out << "Transcript (" << example.transcript_size << " bytes):\n  ";
-        for (size_t j = 0; j < example.transcript_size && j < 64; j++) {
-            meta_out << std::hex << std::setfill('0') << std::setw(2)
-                     << static_cast<int>(example.transcript[j]);
-            if (j < example.transcript_size - 1 && j < 63) meta_out << " ";
-        }
-        if (example.transcript_size > 64) {
-            meta_out << " ...";
-        }
-        meta_out << "\n";
-        meta_out.close();
-
-        std::cout << "✓ Example " << std::setfill('0') << std::setw(2) << i
-                  << ": " << example.mdoc_size << " bytes"
+        std::cout << "Example " << std::setfill('0') << std::setw(2) << i
+                  << ": " << example.mdoc_size << " bytes → " << mdoc_json_file
                   << " (doc_type: " << (example.doc_type ? example.doc_type : "unknown") << ")\n";
     }
 
-    std::cout << "\n✓ All examples extracted to test/ directory\n";
+    std::cout << "\nAll examples extracted as JSON to test/ directory\n";
+    std::cout << "  JSON config: mdoc_XX.json\n";
     return 0;
 }

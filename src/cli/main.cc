@@ -26,9 +26,13 @@
 #include <algorithm>
 
 #include "CLI11.hpp"
+#include "json.hpp"
+#include "encoding.h"
 #include <magic_enum.hpp>
 #include <circuits/mdoc/mdoc_zk.h>
 #include <circuits/mdoc/mdoc_examples.h>
+
+using json = nlohmann::json;
 
 namespace fs = std::filesystem;
 
@@ -218,49 +222,72 @@ int mdoc_example() {
 }
 
 int mdoc_prove(const std::string& circuit_file,
-               const std::string& proof_file,
-               const std::string& public_key_file,
-               const std::string& transcript_file,
-               const std::string& time_str,
-               const std::string& doc_type) {
+               const std::string& mdoc_file,
+               const std::string& proof_file) {
 
-    std::cout << "Proving mDoc with:\n";
+    std::cout << "Proving mDoc:\n";
     std::cout << "  Circuit: " << circuit_file << "\n";
+    std::cout << "  mDoc: " << mdoc_file << "\n";
     std::cout << "  Proof output: " << proof_file << "\n";
-    std::cout << "  Public key: " << public_key_file << "\n";
-    std::cout << "  Transcript: " << transcript_file << "\n";
-    std::cout << "  Time: " << time_str << "\n";
-    std::cout << "  Doc type: " << doc_type << "\n";
 
     try {
+        // Read mDoc JSON configuration
+        std::ifstream mdoc_stream(mdoc_file);
+        if (!mdoc_stream) {
+            throw std::runtime_error("Cannot open mDoc file: " + mdoc_file);
+        }
+        json mdoc_json = json::parse(mdoc_stream);
+
+        // Extract mDoc data
+        std::string mdoc_data_file = mdoc_json["mdoc_data"];
+        std::string transcript_hex = mdoc_json["transcript"];
+        std::string pkx_hex = mdoc_json["public_key"]["x"];
+        std::string pky_hex = mdoc_json["public_key"]["y"];
+        std::string time_str = mdoc_json["time"];
+        std::string doc_type = mdoc_json["doc_type"];
+        int zkspec_index = mdoc_json.value("zkspec", kNumZkSpecs - 1);
+
+        // Parse requested attributes
+        std::vector<RequestedAttribute> attrs;
+        if (mdoc_json.contains("attributes")) {
+            for (const auto& attr_json : mdoc_json["attributes"]) {
+                RequestedAttribute attr = {};
+                std::string ns = attr_json["namespace"];
+                std::string id = attr_json["id"];
+                std::string cbor_hex = attr_json["cbor_value"];
+
+                auto cbor_bytes = encoding::hex_to_bytes(cbor_hex);
+                
+                std::memcpy(attr.namespace_id, ns.c_str(), std::min(ns.size(), sizeof(attr.namespace_id)));
+                std::memcpy(attr.id, id.c_str(), std::min(id.size(), sizeof(attr.id)));
+                std::memcpy(attr.cbor_value, cbor_bytes.data(), std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
+                attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
+                attr.id_len = std::min(id.size(), sizeof(attr.id));
+                attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
+                
+                attrs.push_back(attr);
+            }
+        }
+
+        std::cout << "  Doc type: " << doc_type << "\n";
+        std::cout << "  Time: " << time_str << "\n";
+        std::cout << "  Attributes: " << attrs.size() << "\n";
+
+        // Read files
         auto circuit = FileReader(circuit_file);
-        auto transcript = FileReader(transcript_file);
+        auto mdoc_data = encoding::read_binary_file(mdoc_data_file);
+        auto transcript_bytes = encoding::hex_to_bytes(transcript_hex);
 
-        // For demo purposes, use the first example data
-        const auto& example = proofs::mdoc_tests[0];
-
-        const auto* zk_spec = &kZkSpecs[kNumZkSpecs - 1];
+        const auto* zk_spec = &kZkSpecs[zkspec_index];
         uint8_t* proof = nullptr;
         size_t proof_len = 0;
 
-        // Create a simple RequestedAttribute for demo (age_over_18)
-        RequestedAttribute attrs[1];
-        const char* attr_namespace = "org.iso.18013.5.1";
-        const char* attr_id = "age_over_18";
-        const uint8_t cbor_true = 0xf5;  // CBOR encoding for boolean true
-        std::memcpy(attrs[0].namespace_id, attr_namespace, std::min(strlen(attr_namespace), sizeof(attrs[0].namespace_id)));
-        std::memcpy(attrs[0].id, attr_id, std::min(strlen(attr_id), sizeof(attrs[0].id)));
-        attrs[0].cbor_value[0] = cbor_true;
-        attrs[0].namespace_len = std::min(strlen(attr_namespace), sizeof(attrs[0].namespace_id));
-        attrs[0].id_len = std::min(strlen(attr_id), sizeof(attrs[0].id));
-        attrs[0].cbor_value_len = 1;
-
         auto result = run_mdoc_prover(
             circuit.data(), circuit.size(),
-            example.mdoc, example.mdoc_size,
-            example.pkx.as_pointer, example.pky.as_pointer,
-            transcript.data(), transcript.size(),
-            attrs, 1,
+            mdoc_data.data(), mdoc_data.size(),
+            pkx_hex.c_str(), pky_hex.c_str(),
+            transcript_bytes.data(), transcript_bytes.size(),
+            attrs.data(), attrs.size(),
             time_str.c_str(),
             &proof, &proof_len, zk_spec
         );
@@ -272,17 +299,29 @@ int mdoc_prove(const std::string& circuit_file,
         }
 
         // Write proof to file
-        std::ofstream output(proof_file, std::ios::binary);
-        if (!output) {
-            std::cerr << "Failed to open proof output file: " << proof_file << "\n";
-            free(proof);
-            return 1;
-        }
+        encoding::write_binary_file(proof_file, proof, proof_len);
+        
+        // Write proof metadata JSON
+        json proof_meta;
+        proof_meta["proof_file"] = proof_file;
+        proof_meta["proof_size"] = proof_len;
+        proof_meta["mdoc_source"] = mdoc_file;
+        proof_meta["circuit"] = circuit_file;
+        proof_meta["zkspec"] = zkspec_index;
+        proof_meta["doc_type"] = doc_type;
+        proof_meta["time"] = time_str;
+        proof_meta["attributes"] = mdoc_json["attributes"];
+        proof_meta["public_key"] = mdoc_json["public_key"];
+        proof_meta["transcript"] = transcript_hex;
+        
+        std::string meta_file = proof_file + ".json";
+        std::ofstream meta_out(meta_file);
+        meta_out << proof_meta.dump(2);
 
-        output.write(reinterpret_cast<const char*>(proof), proof_len);
         free(proof);
 
         std::cout << "Proof generated successfully (" << proof_len << " bytes)\n";
+        std::cout << "Metadata saved to: " << meta_file << "\n";
         return 0;
 
     } catch (const std::exception& e) {
@@ -292,47 +331,67 @@ int mdoc_prove(const std::string& circuit_file,
 }
 
 int mdoc_verify(const std::string& circuit_file,
-                const std::string& proof_file,
-                const std::string& public_key_file,
-                const std::string& transcript_file,
-                const std::string& time_str,
-                const std::string& doc_type) {
+                const std::string& proof_file) {
 
-    std::cout << "Verifying mDoc proof with:\n";
+    std::cout << "Verifying mDoc proof:\n";
     std::cout << "  Circuit: " << circuit_file << "\n";
     std::cout << "  Proof: " << proof_file << "\n";
-    std::cout << "  Public key: " << public_key_file << "\n";
-    std::cout << "  Transcript: " << transcript_file << "\n";
-    std::cout << "  Time: " << time_str << "\n";
-    std::cout << "  Doc type: " << doc_type << "\n";
 
     try {
+        // Read proof metadata JSON
+        std::string meta_file = proof_file + ".json";
+        std::ifstream meta_stream(meta_file);
+        if (!meta_stream) {
+            throw std::runtime_error("Cannot open proof metadata file: " + meta_file);
+        }
+        json proof_meta = json::parse(meta_stream);
+
+        // Extract verification parameters from metadata
+        std::string transcript_hex = proof_meta["transcript"];
+        std::string pkx_hex = proof_meta["public_key"]["x"];
+        std::string pky_hex = proof_meta["public_key"]["y"];
+        std::string time_str = proof_meta["time"];
+        std::string doc_type = proof_meta["doc_type"];
+        int zkspec_index = proof_meta.value("zkspec", kNumZkSpecs - 1);
+
+        // Parse requested attributes
+        std::vector<RequestedAttribute> attrs;
+        if (proof_meta.contains("attributes")) {
+            for (const auto& attr_json : proof_meta["attributes"]) {
+                RequestedAttribute attr = {};
+                std::string ns = attr_json["namespace"];
+                std::string id = attr_json["id"];
+                std::string cbor_hex = attr_json["cbor_value"];
+
+                auto cbor_bytes = encoding::hex_to_bytes(cbor_hex);
+                
+                std::memcpy(attr.namespace_id, ns.c_str(), std::min(ns.size(), sizeof(attr.namespace_id)));
+                std::memcpy(attr.id, id.c_str(), std::min(id.size(), sizeof(attr.id)));
+                std::memcpy(attr.cbor_value, cbor_bytes.data(), std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
+                attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
+                attr.id_len = std::min(id.size(), sizeof(attr.id));
+                attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
+                
+                attrs.push_back(attr);
+            }
+        }
+
+        std::cout << "  Doc type: " << doc_type << "\n";
+        std::cout << "  Time: " << time_str << "\n";
+        std::cout << "  Attributes: " << attrs.size() << "\n";
+
+        // Read files
         auto circuit = FileReader(circuit_file);
         auto proof = FileReader(proof_file);
-        auto transcript = FileReader(transcript_file);
+        auto transcript_bytes = encoding::hex_to_bytes(transcript_hex);
 
-        // For demo purposes, use the first example data
-        const auto& example = proofs::mdoc_tests[0];
-
-        const auto* zk_spec = &kZkSpecs[kNumZkSpecs - 1];
-
-        // Create the same RequestedAttribute as in prove
-        RequestedAttribute attrs[1];
-        const char* attr_namespace = "org.iso.18013.5.1";
-        const char* attr_id = "age_over_18";
-        const uint8_t cbor_true = 0xf5;  // CBOR encoding for boolean true
-        std::memcpy(attrs[0].namespace_id, attr_namespace, std::min(strlen(attr_namespace), sizeof(attrs[0].namespace_id)));
-        std::memcpy(attrs[0].id, attr_id, std::min(strlen(attr_id), sizeof(attrs[0].id)));
-        attrs[0].cbor_value[0] = cbor_true;
-        attrs[0].namespace_len = std::min(strlen(attr_namespace), sizeof(attrs[0].namespace_id));
-        attrs[0].id_len = std::min(strlen(attr_id), sizeof(attrs[0].id));
-        attrs[0].cbor_value_len = 1;
+        const auto* zk_spec = &kZkSpecs[zkspec_index];
 
         auto result = run_mdoc_verifier(
             circuit.data(), circuit.size(),
-            example.pkx.as_pointer, example.pky.as_pointer,
-            transcript.data(), transcript.size(),
-            attrs, 1,
+            pkx_hex.c_str(), pky_hex.c_str(),
+            transcript_bytes.data(), transcript_bytes.size(),
+            attrs.data(), attrs.size(),
             time_str.c_str(),
             proof.data(), proof.size(), doc_type.c_str(),
             zk_spec
@@ -344,7 +403,7 @@ int mdoc_verify(const std::string& circuit_file,
             return 1;
         }
 
-        std::cout << "Proof verification successful!\n";
+        std::cout << "✓ Proof verification successful!\n";
         return 0;
 
     } catch (const std::exception& e) {
@@ -376,8 +435,8 @@ int main(int argc, char** argv) {
     CLI::App app{"Longfellow-ZK: Zero-Knowledge Proof CLI for mDoc Verification", "longfellow-zk"};
     app.require_subcommand(1);
 
-    // Common options with file validation
-    std::string circuit_file, proof_file, public_key_file, transcript_file, time_str, doc_type;
+    // Common options
+    std::string circuit_file, proof_file, mdoc_file;
     std::string zkspec_str = "latest"; // Default to latest
 
     // Circuit generation command
@@ -423,29 +482,20 @@ int main(int argc, char** argv) {
     // mDoc prove command
     auto* prove_cmd = app.add_subcommand("mdoc_prove", "Generate ZK proof for mDoc");
     prove_cmd->add_option("-c,--circuit", circuit_file, "Circuit file")->required()->check(CLI::ExistingFile);
+    prove_cmd->add_option("-m,--mdoc", mdoc_file, "mDoc JSON file")->required()->check(CLI::ExistingFile);
     prove_cmd->add_option("-p,--proof", proof_file, "Output proof file")->required();
-    prove_cmd->add_option("--pk,--public-key", public_key_file, "Public key file")->required()->check(CLI::ExistingFile);
-    prove_cmd->add_option("-s,--transcript", transcript_file, "Session transcript file")->required()->check(CLI::ExistingFile);
-    prove_cmd->add_option("-t,--time", time_str, "Time string (ISO 8601 format)")->required();
-    prove_cmd->add_option("-d,--doc-type", doc_type, "Document type")->required();
 
     prove_cmd->callback([&]() {
-        return commands::mdoc_prove(circuit_file, proof_file, public_key_file,
-                                   transcript_file, time_str, doc_type);
+        return commands::mdoc_prove(circuit_file, mdoc_file, proof_file);
     });
 
     // mDoc verify command
     auto* verify_cmd = app.add_subcommand("mdoc_verify", "Verify ZK proof for mDoc");
     verify_cmd->add_option("-c,--circuit", circuit_file, "Circuit file")->required()->check(CLI::ExistingFile);
-    verify_cmd->add_option("-p,--proof", proof_file, "Proof file")->required()->check(CLI::ExistingFile);
-    verify_cmd->add_option("--pk,--public-key", public_key_file, "Public key file")->required()->check(CLI::ExistingFile);
-    verify_cmd->add_option("-s,--transcript", transcript_file, "Session transcript file")->required()->check(CLI::ExistingFile);
-    verify_cmd->add_option("-t,--time", time_str, "Time string (ISO 8601 format)")->required();
-    verify_cmd->add_option("-d,--doc-type", doc_type, "Document type")->required();
+    verify_cmd->add_option("-p,--proof", proof_file, "Proof file (will read proof.bin.json for metadata)")->required()->check(CLI::ExistingFile);
 
     verify_cmd->callback([&]() {
-        return commands::mdoc_verify(circuit_file, proof_file, public_key_file,
-                                    transcript_file, time_str, doc_type);
+        return commands::mdoc_verify(circuit_file, proof_file);
     });
 
     try {
