@@ -124,6 +124,7 @@ jobs:
       with:
         fetch-depth: 0
         submodules: recursive
+    - uses: hendrikmuhs/ccache-action@v1.2
     - name: Cache APT packages
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
@@ -146,4 +147,4 @@ jobs:
       run: |
         echo 'Building with WASI-SDK...'
         make clean
-        make -j$(nproc) wasm
+        make -j$(nproc) wasm CXX="ccache /opt/wasi-sdk/bin/clang++"
