@@ -24,7 +24,7 @@ jobs:
     - name: Cache APT packages
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: "clang-tidy clang-format cppcheck iwyo"
+        packages: "clang-tidy clang-format cppcheck"
     - name: Check code formatting (clang-format)
       run: |
         echo 'Checking C++ code formatting...'
