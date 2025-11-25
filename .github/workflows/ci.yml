@@ -77,10 +77,11 @@ jobs:
       with:
         fetch-depth: 0
         submodules: recursive
+    - uses: hendrikmuhs/ccache-action@v1.2
     - name: Cache APT packages
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: "build-essential g++ clang make jq xxd"
+        packages: "build-essential g++ clang make jq xxd ccache"
     - name: Setup compiler
       run: |
         echo "CC=${{ matrix.compiler.cc }}" >> $GITHUB_ENV
