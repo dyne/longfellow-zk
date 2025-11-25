@@ -2,17 +2,19 @@
 
 Longfellow-ZK is a **Zero Knowledge** circuit [system developed by engineers at Google](https://github.com/google/longfellow-zk) and specifically designed to create ad-hoc ZK circuits that can be executed at competitive speed both for presenting and verifying proofs. Here is [our independent benchmark](https://news.dyne.org/longfellow-zero-knowledge-google-zk/) and the results are impressive.
 
-This repository is a soft fork of [Google's Longfellow-ZK library](https://github.com/google/longfellow-zk), it is made in **Europe** and maintained by the **Dyne.org foundation**, based in Amsterdam to best serve the purposes of the [EUDI ARF development](https://github.com/eu-digital-identity-wallet/eudi-doc-architecture-and-reference-framework). Our effort is currently supported by the EU HORIZON grant nr.[101132610](https://cordis.europa.eu/project/id/101132610) (PACESETTERS).
+This repository is a soft fork of [Google's Longfellow-ZK library](https://github.com/google/longfellow-zk), it is made in **Europe** and maintained by the **Dyne.org foundation**, based in Amsterdam to best serve the purposes of the [EUDI ARF development](https://github.com/eu-digital-identity-wallet/eudi-doc-architecture-and-reference-framework).
 
-[![PACESETTERS project](/docs/pacesetters_logo.svg)](https://pacesetters.eu)
+Our effort is currently supported by the EU HORIZON grant nr.[101132610](https://cordis.europa.eu/project/id/101132610) (PACESETTERS).
+
+[![PACESETTERS project](/docs/eurobuild_card.jpg)](https://pacesetters.eu)
 
 ## Purpose and strategy
 
-The purpose of this distribution is to make Longfellow-ZK available for European wallets and to welcome contributions without the need to sign any development agreement with Google. We work to grant full portability to WebAssembly (WASM) builds, native mobile environments (Android and iOS) as well add usable command-line tools (CLI) for testing purposes.
+The purpose of this distribution is to make **Longfellow-ZK available for European wallets** and to welcome contributions without the need to sign any development agreement with Google. Our build removes any dependency from the Google Play API for the use of this ZK technology, **granting freedom of choice for mobile OS** and solving a [privacy problem impacting the use of ZK](https://news.dyne.org/privacy-in-eudi). We work further to grant full portability to **WebAssembly (WASM) builds**, native mobile environments (Android and iOS) as well add usable command-line tools (CLI) for testing purposes.
 
-By **soft fork** we mean that changes we make to the code are fully backward compatible with Google's upstream code, while we may adopt different implementation approaches: for instance we already removed the OpenSSL dependency with embedded code, we added a bunch of SIMD128 assembler primitives and made a few more lower-system changes for portability.
+By **soft fork** we mean that changes we make to the code are fully backward compatible with Google's upstream code, while we may adopt different implementation approaches: for instance **we already removed the OpenSSL dependency** with embedded code, we added a bunch of SIMD128 assembler primitives and made a few more lower-system changes for portability.
 
-This If Longfellow-ZK will ever include changes that break EUDI functionalities or go against the interest of European implementations, this will turn into an hard-fork and we'll publish a roadmap to highlight divergent paths and compatibilities.
+If upstream will ever include changes that break EUDI functionalities or go against the interest of European implementations, this will turn into an hard-fork and we'll publish a roadmap to highlight divergent paths and compatibilities.
 
 ## Current Status
 
