@@ -157,6 +157,10 @@ jobs:
         fetch-depth: 0
         submodules: recursive
     - uses: hendrikmuhs/ccache-action@v1.2
+    - name: Install latest Bash via Homebrew
+      run: |
+        brew install bash
+        echo "/opt/homebrew/bin/bash" >> $GITHUB_PATH
     - name: Import upstream longfellow-zk
       run: |
         bash scripts/import_upstream.sh vendor/longfellow-zk
@@ -164,12 +168,12 @@ jobs:
       run: |
         cd test
         echo 'Building mdoc example extraction tool...'
-        make extract CXX="clang++"
+        make extract CXX="ccache clang++"
     - name: Build project
       run: |
         echo "Building with clang++..."
         make clean
-        make -j$(nproc) CXX="clang++"
+        make -j$(nproc) CXX="ccache clang++"
     - name: Verify binaries
       run: |
         echo 'Checking built binaries...'
