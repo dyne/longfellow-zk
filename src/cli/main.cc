@@ -238,13 +238,15 @@ int mdoc_prove(const std::string& circuit_file,
 
         // Create a simple RequestedAttribute for demo (age_over_18)
         RequestedAttribute attrs[1];
+        const char* attr_namespace = "org.iso.18013.5.1";
         const char* attr_id = "age_over_18";
-        const char* attr_value = "true";
+        const uint8_t cbor_true = 0xf5;  // CBOR encoding for boolean true
+        std::memcpy(attrs[0].namespace_id, attr_namespace, std::min(strlen(attr_namespace), sizeof(attrs[0].namespace_id)));
         std::memcpy(attrs[0].id, attr_id, std::min(strlen(attr_id), sizeof(attrs[0].id)));
-        std::memcpy(attrs[0].value, attr_value, std::min(strlen(attr_value), sizeof(attrs[0].value)));
+        attrs[0].cbor_value[0] = cbor_true;
+        attrs[0].namespace_len = std::min(strlen(attr_namespace), sizeof(attrs[0].namespace_id));
         attrs[0].id_len = std::min(strlen(attr_id), sizeof(attrs[0].id));
-        attrs[0].value_len = std::min(strlen(attr_value), sizeof(attrs[0].value));
-        attrs[0].type = kPrimitive;
+        attrs[0].cbor_value_len = 1;
 
         auto result = run_mdoc_prover(
             circuit.data(), circuit.size(),
@@ -309,13 +311,15 @@ int mdoc_verify(const std::string& circuit_file,
 
         // Create the same RequestedAttribute as in prove
         RequestedAttribute attrs[1];
+        const char* attr_namespace = "org.iso.18013.5.1";
         const char* attr_id = "age_over_18";
-        const char* attr_value = "true";
+        const uint8_t cbor_true = 0xf5;  // CBOR encoding for boolean true
+        std::memcpy(attrs[0].namespace_id, attr_namespace, std::min(strlen(attr_namespace), sizeof(attrs[0].namespace_id)));
         std::memcpy(attrs[0].id, attr_id, std::min(strlen(attr_id), sizeof(attrs[0].id)));
-        std::memcpy(attrs[0].value, attr_value, std::min(strlen(attr_value), sizeof(attrs[0].value)));
+        attrs[0].cbor_value[0] = cbor_true;
+        attrs[0].namespace_len = std::min(strlen(attr_namespace), sizeof(attrs[0].namespace_id));
         attrs[0].id_len = std::min(strlen(attr_id), sizeof(attrs[0].id));
-        attrs[0].value_len = std::min(strlen(attr_value), sizeof(attrs[0].value));
-        attrs[0].type = kPrimitive;
+        attrs[0].cbor_value_len = 1;
 
         auto result = run_mdoc_verifier(
             circuit.data(), circuit.size(),
