@@ -61,17 +61,15 @@ jobs:
         done
 
   # Build and Test
-  build-and-test:
-    name: Build & Test
+  posix-x86:
+    name: Build & Test on POSIX x86
     runs-on: ubuntu-22.04
-
     strategy:
       fail-fast: false
       matrix:
         compiler:
           - { cc: gcc, cxx: g++ }
           - { cc: clang, cxx: clang++ }
-
     steps:
     - uses: actions/checkout@v4
       with:
@@ -115,13 +113,37 @@ jobs:
       run: |
         cd test
         ./bats/bin/bats mdoc.bats
-    # - name: Upload test results
-    #   if: always()
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: test-results-${{ matrix.compiler.cc }}
-    #     path: |
-    #       test/*.json
-    #       test/circuit_*.json
-    #       test/proof_*.json
-    #     retention-days: 7
+
+  wasm-wasi:
+    name: Build & Test on WASM WASI
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - name: Cache APT packages
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: "build-essential make jq xxd g++ ccache"
+    - name: Install WASI SDK
+      uses: konsumer/install-wasi-sdk@v1
+      with:
+        version: "29"   # specify WASI SDK version
+        install-path: "/opt/wasi-sdk"
+        add-to-path: true
+    - name: Import upstream longfellow-zk
+      run: |
+        bash scripts/import_upstream.sh vendor/longfellow-zk
+    - name: Extract test data
+      run: |
+        cd test
+        echo 'Building dynamic extraction tool...'
+        make extract CXX="ccache g++"
+    - name: Build project
+      run: |
+        echo 'Building with WASI-SDK...'
+        make clean
+        make -j$(nproc) wasm
