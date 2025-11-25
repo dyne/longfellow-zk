@@ -78,7 +78,7 @@ jobs:
     - name: Cache APT packages
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: "build-essential g++ clang make jq xxd ccache"
+        packages: "build-essential g++ clang make jq xxd"
     - name: Setup compiler
       run: |
         echo "CC=${{ matrix.compiler.cc }}" >> $GITHUB_ENV
@@ -127,7 +127,7 @@ jobs:
     - name: Cache APT packages
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: "build-essential make jq xxd g++ ccache"
+        packages: "build-essential make jq xxd g++"
     - name: Install WASI SDK
       uses: konsumer/install-wasi-sdk@v1
       with:

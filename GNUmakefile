@@ -9,15 +9,12 @@ posix:
 	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
 	@$(MAKE) -C src/cli CXXFLAGS="-std=c++17 $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
 
-osx-arm64: ARCHFLAGS := -mcpu=apple-m1 -mfpu=neon
+osx-arm64: ARCHFLAGS := -march=armv8.1-a+crypto
 osx-arm64:
 	$(info 🌉 Building for $@)
 	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CFLAGS)" CC="$(CC)" VERBOSE=1
 	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
 	@$(MAKE) -C src/cli CXXFLAGS="-std=c++17 $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
-
-ccache:
-	$(MAKE) posix CXX="ccache $(CXX)" CC="ccache $(CC)"
 
 wasm: CXX := /opt/wasi-sdk/bin/clang++
 wasm: CC := /opt/wasi-sdk/bin/clang
