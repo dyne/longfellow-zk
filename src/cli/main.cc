@@ -32,7 +32,6 @@
 #include "nanobench.h"
 #include <magic_enum.hpp>
 #include <circuits/mdoc/mdoc_zk.h>
-#include <circuits/mdoc/mdoc_examples.h>
 
 using json = nlohmann::json;
 namespace nb = ankerl::nanobench;
@@ -251,20 +250,6 @@ int circuit_gen(const std::string& circuit_file, const std::string& zkspec_str) 
     }
 }
 
-int mdoc_example() {
-    std::cout << "Running mDoc example...\n";
-
-    // Access the first example from mdoc_examples.h
-    const auto& example = proofs::mdoc_tests[0];
-
-    std::cout << "Example mDoc data loaded successfully\n";
-    std::cout << "Transcript size: " << example.transcript_size << " bytes\n";
-    std::cout << "mDoc size: " << example.mdoc_size << " bytes\n";
-    std::cout << "Doc type: " << example.doc_type << "\n";
-
-    return 0;
-}
-
 int mdoc_prove(const std::string& circuit_file,
                const std::string& mdoc_file,
                const std::string& proof_file) {
@@ -284,7 +269,7 @@ int mdoc_prove(const std::string& circuit_file,
 
         // Extract circuit data
         auto circuit_data = encoding::base64_to_bytes(circuit_json["circuit_data_base64"]);
-        int circuit_zkspec_index = circuit_json["zkspec"]["index"];
+        int circuit_zkspec_index = circuit_json["_zkspec"]["index"];
 
         // Read mDoc JSON configuration
         std::ifstream mdoc_stream(mdoc_file);
@@ -412,6 +397,11 @@ int mdoc_prove(const std::string& circuit_file,
             return 1;
         }
         proof_out << proof_json.dump(2);
+        if (!proof_out.good()) {
+            std::cerr << "Failed to write proof JSON to file\n";
+            free(proof);
+            return 1;
+        }
 
         free(proof);
 
@@ -554,6 +544,7 @@ int main(int argc, char** argv) {
     // Common options
     std::string circuit_file, proof_file, mdoc_file;
     std::string zkspec_str = "latest"; // Default to latest
+    int command_result = 0; // Store result from command callbacks
 
     // Circuit generation command
     auto* circuit_gen_cmd = app.add_subcommand("circuit_gen", "Generate ZK circuit");
@@ -576,23 +567,19 @@ int main(int argc, char** argv) {
         // Handle special case for list first
         if (zkspec_str == "list") {
             list_zkspecs();
-            return 0;
+            command_result = 0;
+            return;
         }
 
         // For actual generation, circuit file is required
         if (circuit_file.empty()) {
             std::cerr << "Error: --circuit option is required for circuit generation\n";
             std::cerr << "Use --zkspec list to list available specifications\n";
-            return 1;
+            command_result = 1;
+            return;
         }
 
-        return commands::circuit_gen(circuit_file, zkspec_str);
-    });
-
-    // mDoc example command
-    auto* example_cmd = app.add_subcommand("mdoc_example", "Show mDoc example data");
-    example_cmd->callback([&]() {
-        return commands::mdoc_example();
+        command_result = commands::circuit_gen(circuit_file, zkspec_str);
     });
 
     // mDoc prove command
@@ -602,7 +589,7 @@ int main(int argc, char** argv) {
     prove_cmd->add_option("-p,--proof", proof_file, "Output proof file")->required();
 
     prove_cmd->callback([&]() {
-        return commands::mdoc_prove(circuit_file, mdoc_file, proof_file);
+        command_result = commands::mdoc_prove(circuit_file, mdoc_file, proof_file);
     });
 
     // mDoc verify command
@@ -611,12 +598,12 @@ int main(int argc, char** argv) {
     verify_cmd->add_option("-p,--proof", proof_file, "Proof file (will read proof.bin.json for metadata)")->required()->check(CLI::ExistingFile);
 
     verify_cmd->callback([&]() {
-        return commands::mdoc_verify(circuit_file, proof_file);
+        command_result = commands::mdoc_verify(circuit_file, proof_file);
     });
 
     try {
         app.parse(argc, argv);
-        return 0;
+        return command_result;
     } catch (const CLI::ParseError& e) {
         return app.exit(e);
     } catch (const std::exception& e) {
