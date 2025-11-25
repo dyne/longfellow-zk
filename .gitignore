@@ -2,6 +2,10 @@
 *.a
 *.so
 *.wasm
+*.bin
+test/*.txt
+test/*.log
 vendor/facebook
 vendor/google
 sources.mk
+longfellow-zk

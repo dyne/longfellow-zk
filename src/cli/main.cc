@@ -108,7 +108,14 @@ const ZkSpecStruct* find_zkspec(const std::string& spec_str) {
     }
 
     if (spec_str == "latest") {
-        return &kZkSpecs[kNumZkSpecs - 1];
+        // Find the spec with the highest version number (most recent)
+        const ZkSpecStruct* latest = &kZkSpecs[0];
+        for (int i = 1; i < kNumZkSpecs; i++) {
+            if (kZkSpecs[i].version > latest->version) {
+                latest = &kZkSpecs[i];
+            }
+        }
+        return latest;
     }
 
     // Try to parse as index
