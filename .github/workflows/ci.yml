@@ -92,12 +92,12 @@ jobs:
       run: |
         cd test
         echo 'Building dynamic extraction tool...'
-        make extract
+        make extract CXX="ccache ${{ matrix.compiler.cxx}}"
     - name: Build project
       run: |
-        echo "Building with ${{ matrix.compiler.cc }}..."
+        echo "Building with ${{ matrix.compiler.cxx }}..."
         make clean
-        make -j$(nproc)
+        make -j$(nproc) ccache
     - name: Verify binaries
       run: |
         echo 'Checking built binaries...'
