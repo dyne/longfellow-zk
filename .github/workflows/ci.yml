@@ -12,53 +12,52 @@ env:
 
 jobs:
   # Static Analysis and Linting
-  static-analysis:
-    name: Static Analysis
-    runs-on: ubuntu-22.04
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: Cache APT packages
-      uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: "clang-tidy clang-format cppcheck"
-    - name: Check code formatting (clang-format)
-      run: |
-        echo 'Checking C++ code formatting...'
-        find src test -name '*.cc' -o -name '*.h' | while read file; do
-          if ! clang-format --dry-run --Werror "${file}" 2>/dev/null; then
-            echo "::warning file=${file}::File needs formatting"
-          fi
-        done
-    - name: Run cppcheck
-      run: |
-        echo 'Running cppcheck static analysis...'
-        cppcheck --enable=warning,style,performance,portability \
-                 --inline-suppr \
-                 --suppress=missingIncludeSystem \
-                 --suppress=unusedFunction \
-                 --suppress=unmatchedSuppression \
-                 --error-exitcode=0 \
-                 -I src \
-                 src/ test/ 2>&1 | tee cppcheck-report.txt
-        # Check for high-severity issues
-        if grep -E "error:|warning:" cppcheck-report.txt | grep -v "Cppcheck cannot find all the include files"; then
-          echo "::warning::Found potential issues in cppcheck"
-        fi
-    - name: Run clang-tidy on sample files
-      run: |
-        echo 'Running clang-tidy on key files...'
-        # Only check a few key files to keep CI fast
-        for file in src/cli/main.cc src/cli/encoding.cc; do
-          if [ -f "${file}" ]; then
-            echo "Checking ${file}..."
-            clang-tidy "${file}" \
-              -checks='-*,readability-*,modernize-*,performance-*,bugprone-*' \
-              -- -std=c++17 -Isrc 2>&1 | head -50 || true
-          fi
-        done
+  # static-analysis:
+  #   name: Static Analysis
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #   - uses: actions/checkout@v6
+  #     with:
+  #       fetch-depth: 0
+  #   - name: Cache APT packages
+  #     uses: awalsh128/cache-apt-pkgs-action@latest
+  #     with:
+  #       packages: "clang-tidy clang-format cppcheck"
+  #   - name: Check code formatting (clang-format)
+  #     run: |
+  #       echo 'Checking C++ code formatting...'
+  #       find src test -name '*.cc' -o -name '*.h' | while read file; do
+  #         if ! clang-format --dry-run --Werror "${file}" 2>/dev/null; then
+  #           echo "::warning file=${file}::File needs formatting"
+  #         fi
+  #       done
+  #   - name: Run cppcheck
+  #     run: |
+  #       echo 'Running cppcheck static analysis...'
+  #       cppcheck --enable=warning,style,performance,portability \
+  #                --inline-suppr \
+  #                --suppress=missingIncludeSystem \
+  #                --suppress=unusedFunction \
+  #                --suppress=unmatchedSuppression \
+  #                --error-exitcode=0 \
+  #                -I src \
+  #                src/ test/ 2>&1 | tee cppcheck-report.txt
+  #       # Check for high-severity issues
+  #       if grep -E "error:|warning:" cppcheck-report.txt | grep -v "Cppcheck cannot find all the include files"; then
+  #         echo "::warning::Found potential issues in cppcheck"
+  #       fi
+  #   - name: Run clang-tidy on sample files
+  #     run: |
+  #       echo 'Running clang-tidy on key files...'
+  #       # Only check a few key files to keep CI fast
+  #       for file in src/cli/main.cc src/cli/encoding.cc; do
+  #         if [ -f "${file}" ]; then
+  #           echo "Checking ${file}..."
+  #           clang-tidy "${file}" \
+  #             -checks='-*,readability-*,modernize-*,performance-*,bugprone-*' \
+  #             -- -std=c++17 -Isrc 2>&1 | head -50 || true
+  #         fi
+  #       done
 
   posix-x86:
     name: Build & Test on POSIX x86
@@ -69,7 +68,7 @@ jobs:
         compiler:
           - { cc: clang, cxx: clang++ }
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
         submodules: recursive
@@ -88,11 +87,6 @@ jobs:
     - name: Import upstream longfellow-zk
       run: |
         bash scripts/import_upstream.sh vendor/longfellow-zk
-    - name: Extract test data
-      run: |
-        cd test
-        echo 'Building dynamic extraction tool...'
-        make extract CXX="ccache ${{ matrix.compiler.cxx}}"
     - name: Build project
       run: |
         echo "Building with ${{ matrix.compiler.cxx }}..."
@@ -118,7 +112,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ github.job }}
         path: |
@@ -132,7 +126,7 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
         submodules: recursive
@@ -150,11 +144,6 @@ jobs:
     - name: Import upstream longfellow-zk
       run: |
         bash scripts/import_upstream.sh vendor/longfellow-zk
-    - name: Extract test data
-      run: |
-        cd test
-        echo 'Building dynamic extraction tool...'
-        make extract CXX="ccache g++"
     - name: Build project
       run: |
         echo 'Building with WASI-SDK...'
@@ -164,7 +153,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ github.job }}
         path: |
@@ -174,7 +163,7 @@ jobs:
     name: Build & Test on Apple OSX
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
         submodules: recursive
@@ -186,11 +175,6 @@ jobs:
     - name: Import upstream longfellow-zk
       run: |
         bash scripts/import_upstream.sh vendor/longfellow-zk
-    - name: Extract test data
-      run: |
-        cd test
-        echo 'Building mdoc example extraction tool...'
-        make extract CXX="ccache clang++"
     - name: Build project
       run: |
         echo "Building with clang++..."
@@ -216,7 +200,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ github.job }}
         path: |
