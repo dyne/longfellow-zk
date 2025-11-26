@@ -49,6 +49,51 @@ std::string format_string(const std::string& format, Args... args) {
     return std::string(buf.get(), buf.get() + size - 1);
 }
 
+// Global benchmark file path (set by --benchmark flag)
+static std::string g_benchmark_file = "";
+
+// Helper to run benchmark conditionally and output to file
+template<typename Func>
+void run_benchmark_if_enabled(const std::string& title, const std::string& unit,
+                               const std::string& name, Func&& func) {
+    if (g_benchmark_file.empty()) {
+        // Benchmarking disabled, just run the function once
+        func();
+        return;
+    }
+
+    // Benchmarking enabled - run with nanobench and capture to file
+    std::ofstream bench_file(g_benchmark_file, std::ios::app);
+    if (!bench_file) {
+        std::cerr << "Warning: Failed to open benchmark file: " << g_benchmark_file << "\n";
+        // Still run the function even if we can't write benchmark
+        func();
+        return;
+    }
+
+    // Add timestamp header
+    auto now = std::time(nullptr);
+    char timestamp[100];
+    std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", std::localtime(&now));
+    bench_file << "# " << timestamp << " - " << title << "\n";
+
+    // Create benchmark and redirect output to file
+    nb::Bench bench;
+    bench.title(title)
+         .unit(unit)
+         .warmup(0)
+         .epochs(1)
+         .minEpochIterations(1)
+         .relative(false)
+         .timeUnit(std::chrono::seconds(1), "s")
+         .output(&bench_file);  // Output directly to file
+
+    bench.run(name, std::forward<Func>(func));
+
+    bench_file << "\n";  // Add blank line after benchmark
+    bench_file.flush();
+}
+
 namespace fs = std::filesystem;
 
 // Modern C++17 utility for file validation
@@ -173,21 +218,17 @@ int circuit_gen(const std::string& circuit_file, const std::string& zkspec_str) 
         size_t circuit_len = 0;
         CircuitGenerationErrorCode result;
 
-        // Benchmark circuit generation
-        nb::Bench bench;
-        bench.title("Circuit Generation")
-             .unit("circuit")
-             .warmup(0)
-             .epochs(1)
-             .minEpochIterations(1)
-             .relative(false)
-             .timeUnit(std::chrono::seconds(1), "s");
-
-        bench.run(std::string("zkspec_") + std::to_string(zkspec_index) +
-                  "_" + std::to_string(zk_spec->num_attributes) + "attr", [&] {
-            result = generate_circuit(zk_spec, &circuit_bytes, &circuit_len);
-            nb::doNotOptimizeAway(circuit_bytes);
-        });
+        // Conditionally benchmark circuit generation
+        run_benchmark_if_enabled(
+            "Circuit Generation",
+            "circuit",
+            std::string("zkspec_") + std::to_string(zkspec_index) +
+                "_" + std::to_string(zk_spec->num_attributes) + "attr",
+            [&] {
+                result = generate_circuit(zk_spec, &circuit_bytes, &circuit_len);
+                nb::doNotOptimizeAway(circuit_bytes);
+            }
+        );
 
         if (result != CIRCUIT_GENERATION_SUCCESS) {
             std::cerr << "Circuit generation failed with error: "
@@ -345,29 +386,25 @@ int mdoc_prove(const std::string& circuit_file,
         size_t proof_len = 0;
         MdocProverErrorCode result;
 
-        // Benchmark proof generation
-        nb::Bench bench;
-        bench.title("Proof Generation")
-             .unit("proof")
-             .warmup(0)
-             .epochs(1)
-             .minEpochIterations(1)
-             .relative(false)
-             .timeUnit(std::chrono::seconds(1), "s");
-
-        bench.run(std::string("zkspec_") + std::to_string(mdoc_zkspec_index) +
-                  "_" + std::to_string(attrs_len) + "attr", [&] {
-            result = run_mdoc_prover(
-                circuit_data.data(), circuit_data.size(),
-                mdoc_data.data(), mdoc_data.size(),
-                pkx_hex.c_str(), pky_hex.c_str(),
-                transcript_bytes.data(), transcript_bytes.size(),
-                attrs_ptr, attrs_len,
-                time_str.c_str(),
-                &proof, &proof_len, zk_spec
-            );
-            nb::doNotOptimizeAway(proof);
-        });
+        // Conditionally benchmark proof generation
+        run_benchmark_if_enabled(
+            "Proof Generation",
+            "proof",
+            std::string("zkspec_") + std::to_string(mdoc_zkspec_index) +
+                "_" + std::to_string(attrs_len) + "attr",
+            [&] {
+                result = run_mdoc_prover(
+                    circuit_data.data(), circuit_data.size(),
+                    mdoc_data.data(), mdoc_data.size(),
+                    pkx_hex.c_str(), pky_hex.c_str(),
+                    transcript_bytes.data(), transcript_bytes.size(),
+                    attrs_ptr, attrs_len,
+                    time_str.c_str(),
+                    &proof, &proof_len, zk_spec
+                );
+                nb::doNotOptimizeAway(proof);
+            }
+        );
 
         if (result != MDOC_PROVER_SUCCESS) {
             std::cerr << "Prover failed with error: "
@@ -489,29 +526,25 @@ int mdoc_verify(const std::string& circuit_file,
         const auto* zk_spec = &kZkSpecs[zkspec_index];
         MdocVerifierErrorCode result;
 
-        // Benchmark proof verification
-        nb::Bench bench;
-        bench.title("Proof Verification")
-             .unit("verification")
-             .warmup(0)
-             .epochs(1)
-             .minEpochIterations(1)
-             .relative(false)
-             .timeUnit(std::chrono::seconds(1), "s");
-
-        bench.run(std::string("zkspec_") + std::to_string(zkspec_index) +
-                  "_" + std::to_string(attrs_len) + "attr", [&] {
-            result = run_mdoc_verifier(
-                circuit_data.data(), circuit_data.size(),
-                pkx_hex.c_str(), pky_hex.c_str(),
-                transcript_bytes.data(), transcript_bytes.size(),
-                attrs_ptr, attrs_len,
-                time_str.c_str(),
-                proof_data.data(), proof_data.size(), doc_type.c_str(),
-                zk_spec
-            );
-            nb::doNotOptimizeAway(result);
-        });
+        // Conditionally benchmark proof verification
+        run_benchmark_if_enabled(
+            "Proof Verification",
+            "verification",
+            std::string("zkspec_") + std::to_string(zkspec_index) +
+                "_" + std::to_string(attrs_len) + "attr",
+            [&] {
+                result = run_mdoc_verifier(
+                    circuit_data.data(), circuit_data.size(),
+                    pkx_hex.c_str(), pky_hex.c_str(),
+                    transcript_bytes.data(), transcript_bytes.size(),
+                    attrs_ptr, attrs_len,
+                    time_str.c_str(),
+                    proof_data.data(), proof_data.size(), doc_type.c_str(),
+                    zk_spec
+                );
+                nb::doNotOptimizeAway(result);
+            }
+        );
 
         if (result != MDOC_VERIFIER_SUCCESS) {
             std::cerr << "Verification failed with error: "
@@ -554,7 +587,12 @@ int main(int argc, char** argv) {
     // Common options
     std::string circuit_file, proof_file, mdoc_file;
     std::string zkspec_str = "latest"; // Default to latest
+    std::string benchmark_file = ""; // Benchmark output file (empty = disabled)
     int command_result = 0; // Store result from command callbacks
+
+    // Global benchmark flag
+    app.add_option("--benchmark", benchmark_file,
+        "Enable benchmarking and append results to specified file");
 
     // Circuit generation command
     auto* circuit_gen_cmd = app.add_subcommand("circuit_gen", "Generate ZK circuit");
@@ -574,6 +612,9 @@ int main(int argc, char** argv) {
         });
 
     circuit_gen_cmd->callback([&]() {
+        // Set global benchmark file
+        g_benchmark_file = benchmark_file;
+
         // Handle special case for list first
         if (zkspec_str == "list") {
             list_zkspecs();
@@ -599,6 +640,7 @@ int main(int argc, char** argv) {
     prove_cmd->add_option("-p,--proof", proof_file, "Output proof file")->required();
 
     prove_cmd->callback([&]() {
+        g_benchmark_file = benchmark_file;
         command_result = commands::mdoc_prove(circuit_file, mdoc_file, proof_file);
     });
 
@@ -608,6 +650,7 @@ int main(int argc, char** argv) {
     verify_cmd->add_option("-p,--proof", proof_file, "Proof file (will read proof.bin.json for metadata)")->required()->check(CLI::ExistingFile);
 
     verify_cmd->callback([&]() {
+        g_benchmark_file = benchmark_file;
         command_result = commands::mdoc_verify(circuit_file, proof_file);
     });
 
