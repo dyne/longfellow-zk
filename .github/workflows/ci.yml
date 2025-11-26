@@ -118,7 +118,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ github.job }}
         path: |
@@ -164,7 +164,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ github.job }}
         path: |
@@ -216,7 +216,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ${{ github.job }}
         path: |
