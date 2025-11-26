@@ -19,7 +19,7 @@ all:
 	cd test && ./bats/bin/bats .
 
 clean:
-  cd test && rm -f circuit*.json proof*.json
+	cd test && rm -f circuit*.json proof*.json
 EOF
 
 # cleanup test
