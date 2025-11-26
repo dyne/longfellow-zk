@@ -17,12 +17,15 @@ cat <<EOF >  ${DST}/GNUmakefile
 all:
 	$(info Running Longfellow-zk tests)
 	cd test && ./bats/bin/bats .
+
+clean:
+  cd test && rm -f circuit*.json proof*.json
 EOF
 
 # cleanup test
 cd ${DST}/test
 make clean
-rm -f GNUmakefile extract* *.json
+rm -f GNUmakefile extract* circuit*.json proof*.json
 cd -
 
 # zip it

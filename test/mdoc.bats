@@ -8,10 +8,12 @@ load bats_setup
   }
   assert_file_exist "$T/circuit_0.json"
   # Verify JSON structure
-  run jq -e '.circuit_data_base64' "$T/circuit_0.json"
-  assert_success
-  run jq -e '._zkspec.index == 0' "$T/circuit_0.json"
-  assert_success
+  command -v jq && {
+    run jq -e '.circuit_data_base64' "$T/circuit_0.json"
+    assert_success
+    run jq -e '._zkspec.index == 0' "$T/circuit_0.json"
+    assert_success
+  }
 }
 
 # Test 2: Prove with mdoc_00 (has 1 attribute - age_over_18)
@@ -19,21 +21,23 @@ load bats_setup
   run $R/longfellow-zk mdoc_prove \
     -c "$T/circuit_0.json" \
     -m "$T/mdoc_00.json" \
-    -p "proof_00.json"
+    -p "$T/proof_00.json"
   assert_success
-  assert_file_exist "proof_00.json"
+  assert_file_exist "$T/proof_00.json"
   # Verify proof JSON structure
-  run jq -e '.proof_data_base64' "proof_00.json"
-  assert_success
-  run jq -e '.proof_size > 0' "proof_00.json"
-  assert_success
+  command -v jq && {
+    run jq -e '.proof_data_base64' "$T/proof_00.json"
+    assert_success
+    run jq -e '.proof_size > 0' "$T/proof_00.json"
+    assert_success
+  }
 }
 
 # Test 3: Verify valid proof from mdoc_00
 @test "Verify valid proof from mdoc_00" {
   run $R/longfellow-zk mdoc_verify \
     -c "$T/circuit_0.json" \
-    -p "proof_00.json"
+    -p "$T/proof_00.json"
   assert_success
   assert_output --partial "verification successful"
 }
@@ -43,16 +47,16 @@ load bats_setup
   run $R/longfellow-zk mdoc_prove \
     -c "$T/circuit_0.json" \
     -m "$T/mdoc_01.json" \
-    -p "proof_01.json"
+    -p "$T/proof_01.json"
   assert_success
-  assert_file_exist "proof_01.json"
+  assert_file_exist "$T/proof_01.json"
 }
 
 # Test 5: Verify valid proof from mdoc_01
 @test "Verify valid proof from mdoc_01" {
   run $R/longfellow-zk mdoc_verify \
     -c "$T/circuit_0.json" \
-    -p "proof_01.json"
+    -p "$T/proof_01.json"
   assert_success
   assert_output --partial "verification successful"
 }
@@ -65,10 +69,12 @@ load bats_setup
   }
   assert_file_exist "$T/circuit_1.json"
   # Verify JSON structure
-  run jq -e '.circuit_data_base64' "$T/circuit_1.json"
-  assert_success
-  run jq -e '._zkspec.index == 1' "$T/circuit_1.json"
-  assert_success
+  command -v jq && {
+    run jq -e '.circuit_data_base64' "$T/circuit_1.json"
+    assert_success
+    run jq -e '._zkspec.index == 1' "$T/circuit_1.json"
+    assert_success
+  }
 }
 
 # Test 6: Failure case - mismatched circuit and proof zkspec
@@ -77,7 +83,7 @@ load bats_setup
   # Try to verify with wrong circuit
   run $R/longfellow-zk mdoc_verify \
     -c "$T/circuit_1.json" \
-    -p "proof_00.json"
+    -p "$T/proof_00.json"
   assert_failure
 }
 
@@ -85,11 +91,11 @@ load bats_setup
 @test "Verify fails with tampered proof" {
   # Tamper with proof by changing a byte in the base64 data
   jq '.proof_data_base64 = (.proof_data_base64[0:10] + "AAAA" + .proof_data_base64[14:])' \
-    "proof_00.json" > "proof_tampered.json"
+    "$T/proof_00.json" > "$T/proof_tampered.json"
 
   run $R/longfellow-zk mdoc_verify \
     -c "$T/circuit_0.json" \
-    -p "proof_tampered.json"
+    -p "$T/proof_tampered.json"
   assert_failure
 }
 
@@ -97,35 +103,37 @@ load bats_setup
 @test "Verify fails with wrong public key" {
   # Change public key coordinates
   jq '.public_key.x = "0x0000000000000000000000000000000000000000000000000000000000000001"' \
-    "proof_00.json" > "proof_wrong_pk.json"
+    "$T/proof_00.json" > "$T/proof_wrong_pk.json"
 
   run $R/longfellow-zk mdoc_verify \
     -c "$T/circuit_0.json" \
-    -p "proof_wrong_pk.json"
+    -p "$T/proof_wrong_pk.json"
   assert_failure
 }
 
 # Test 9: Failure case - wrong timestamp
 @test "Verify fails with wrong timestamp" {
-  # Change timestamp to invalid time (way in the past)
-  jq '.time = "1999-01-01T00:00:00Z"' \
-    "proof_00.json" > "proof_wrong_time.json"
+  command -v jq && {
+    # Change timestamp to invalid time (way in the past)
+    jq '.time = "1999-01-01T00:00:00Z"' \
+       "$T/proof_00.json" > "$T/proof_wrong_time.json"
 
-  run $R/longfellow-zk mdoc_verify \
-    -c "$T/circuit_0.json" \
-    -p "proof_wrong_time.json"
-  assert_failure
+    run $R/longfellow-zk mdoc_verify \
+        -c "$T/circuit_0.json" \
+        -p "$T/proof_wrong_time.json"
+    assert_failure
+  }
 }
 
 # Test 10: Failure case - modified attribute value
 @test "Verify fails with wrong attribute value" {
   # Change attribute value (age_over_18 from true=0xf5 to false=0xf4)
   jq '.attributes[0].cbor_value = "0xf4"' \
-    "proof_00.json" > "proof_wrong_attr.json"
+    "$T/proof_00.json" > "$T/proof_wrong_attr.json"
 
   run $R/longfellow-zk mdoc_verify \
     -c "$T/circuit_0.json" \
-    -p "proof_wrong_attr.json"
+    -p "$T/proof_wrong_attr.json"
   assert_failure
 }
 
@@ -137,8 +145,10 @@ load bats_setup
     assert_success
     assert_file_exist "$T/circuit_${spec}.json"
     # Verify zkspec index matches
-    run jq -e "._zkspec.index == $spec" "$T/circuit_${spec}.json"
-    assert_success
+    command -v jq && {
+      run jq -e "._zkspec.index == $spec" "$T/circuit_${spec}.json"
+      assert_success
+    }
   done
 }
 
@@ -148,12 +158,12 @@ load bats_setup
   run $R/longfellow-zk mdoc_prove \
     -c "$T/circuit_0.json" \
     -m "$T/mdoc_04.json" \
-    -p "proof_04.json"
+    -p "$T/proof_04.json"
   assert_success
 
   run $R/longfellow-zk mdoc_verify \
     -c "$T/circuit_0.json" \
-    -p "proof_04.json"
+    -p "$T/proof_04.json"
   assert_success
   assert_output --partial "verification successful"
 }
@@ -164,12 +174,12 @@ load bats_setup
   run $R/longfellow-zk mdoc_prove \
     -c "$T/circuit_0.json" \
     -m "$T/mdoc_09.json" \
-    -p "proof_09.json"
+    -p "$T/proof_09.json"
   assert_success
 
   run $R/longfellow-zk mdoc_verify \
     -c "$T/circuit_0.json" \
-    -p "proof_09.json"
+    -p "$T/proof_09.json"
   assert_success
   assert_output --partial "verification successful"
 }
@@ -179,7 +189,7 @@ load bats_setup
   run $R/longfellow-zk mdoc_prove \
     -c "nonexistent_circuit.json" \
     -m "$T/mdoc_00.json" \
-    -p "proof_fail.json"
+    -p "$T/proof_fail.json"
   assert_failure
 }
 
@@ -188,6 +198,6 @@ load bats_setup
   run $R/longfellow-zk mdoc_prove \
     -c "$T/circuit_0.json" \
     -m "nonexistent_mdoc.json" \
-    -p "proof_fail.json"
+    -p "$T/proof_fail.json"
   assert_failure
 }
