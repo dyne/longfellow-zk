@@ -67,13 +67,15 @@ jobs:
       fail-fast: false
       matrix:
         compiler:
-          - { cc: gcc, cxx: g++ }
           - { cc: clang, cxx: clang++ }
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
         submodules: recursive
+    - name: short SHA of current commit
+      id: sha
+      run: echo "git_sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
     - uses: hendrikmuhs/ccache-action@v1.2
     - name: Cache APT packages
       uses: awalsh128/cache-apt-pkgs-action@latest
@@ -112,6 +114,20 @@ jobs:
       run: |
         cd test
         ./bats/bin/bats mdoc.bats
+    - name: Pack build results
+      run: |
+        mkdir -p longfellow-zk_${{ github.job }}
+        cp longfellow-zk src/liblongfellow-zk.a longfellow-zk_${{ github.job }}
+        cp -ra test README.md                      longfellow-zk_${{ github.job }}
+        zip -r longfellow-zk_${{ github.job }}.zip longfellow-zk_${{ github.job }}
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.job }}
+        path: |
+          longfellow-zk_${{ github.job }}.zip
+    outputs:
+       git_sha_short: ${{ steps.sha.outputs.git_sha_short }}
 
   wasm-wasi:
     name: Build & Test on WASM WASI
@@ -147,6 +163,18 @@ jobs:
         echo 'Building with WASI-SDK...'
         make clean
         make -j$(nproc) wasm CXX="ccache /opt/wasi-sdk/bin/clang++" CC="ccache /opt/wasi-sdk/bin/clang"
+    - name: Pack build results
+      run: |
+        mkdir -p longfellow-zk_${{ github.job }}
+        cp longfellow-zk.wasm longfellow-zk_${{ github.job }}
+        cp -ra test README.md                      longfellow-zk_${{ github.job }}
+        zip -r longfellow-zk_${{ github.job }}.zip longfellow-zk_${{ github.job }}
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.job }}
+        path: |
+          longfellow-zk_${{ github.job }}.zip
 
   apple-osx:
     name: Build & Test on Apple OSX
@@ -190,3 +218,42 @@ jobs:
       run: |
         cd test
         ./bats/bin/bats mdoc.bats
+    - name: Pack build results
+      run: |
+        mkdir -p longfellow-zk_${{ github.job }}
+        cp longfellow-zk src/liblongfellow-zk.a longfellow-zk_${{ github.job }}
+        cp -r test README.md                       longfellow-zk_${{ github.job }}
+        zip -r longfellow-zk_${{ github.job }}.zip longfellow-zk_${{ github.job }}
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.job }}
+        path: |
+          longfellow-zk_${{ github.job }}.zip
+
+  draft-binary-release:
+    name: 📦 Pack
+    needs: [posix-x86, wasm-wasi, apple-osx]
+    runs-on: ubuntu-latest
+    steps:
+    - name: download binary artifacts
+      uses: actions/download-artifact@v6
+      with:
+        path: |
+          release
+    - name: show directory structure
+      run: tree
+    - name: list all files to release
+      run: |
+        find release -type f
+    - name: release all binary artifacts
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          release/posix-x86/*
+          release/wasm-wasi/*
+          release/apple-osx/*
+        tag_name: ${{ needs.posix-x86.outputs.git_sha_short }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
