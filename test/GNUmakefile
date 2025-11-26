@@ -13,4 +13,4 @@ extract_mdocs_dynamic: extract_mdocs_dynamic.cc ../src/cli/encoding.cc
 	$(CXX) $(CXXFLAGS) -o extract_mdocs_dynamic extract_mdocs_dynamic.cc ../src/cli/encoding.cc ../src/liblongfellow-zk.a
 
 clean:
-	rm -f extract_mdocs extract_mdocs_dynamic mdoc_*.json
+	rm -f extract_mdocs extract_mdocs_dynamic *.json
