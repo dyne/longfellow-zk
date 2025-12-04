@@ -9,8 +9,15 @@ posix:
 	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
 	@$(MAKE) -C src/cli CXXFLAGS="-std=c++17 $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
 
-osx-arm64: ARCHFLAGS := -march=armv8.1-a+crypto
+osx-arm64: ARCHFLAGS := -arch arm64 -march=armv8.1-a+crypto
 osx-arm64:
+	$(info 🌉 Building for $@)
+	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CFLAGS)" CC="$(CC)" VERBOSE=1
+	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
+	@$(MAKE) -C src/cli CXXFLAGS="-std=c++17 $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
+
+osx-x86: ARCHFLAGS := -arch x86_64 -mpclmul
+osx-x86:
 	$(info 🌉 Building for $@)
 	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CFLAGS)" CC="$(CC)" VERBOSE=1
 	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
@@ -24,11 +31,13 @@ wasm:
 	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CXXFLAGS)" CC="$(CC)" VERBOSE=1
 	@$(MAKE) -C src CXXFLAGS="-nostdlib -msimd128 $(CXXFLAGS) $(INCLUDES) -I../vendor/zstd/lib" CXX="$(CXX)"
 	/opt/wasi-sdk/bin/llvm-ranlib src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) ${CXXFLAGS} -Isrc -c -o src/cli/wasm.o src/cli/wasm.cc
 	/opt/wasi-sdk/bin/clang++ ${CXXFLAGS} --target=wasm32-wasi --sysroot=/opt/wasi-sdk/share/wasi-sysroot \
 		-Wl,--no-entry -nostartfiles \
-		-Wl,--export=run_mdoc_prover -Wl,--export=run_mdoc_verifier \
-		-Wl,--export=find_zk_spec \
-    -o longfellow-zk.wasm src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+		-Wl,--initial-memory=536870912 -Wl,--max-memory=4294967296 -Wl,--stack-first -Wl,-z,stack-size=16777216 \
+		-Wl,--export=wasm_generate_circuit -Wl,--export=wasm_generate_proof -Wl,--export=wasm_verify_proof \
+    -o longfellow-zk.wasm src/cli/wasm.o \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 # /opt/wasi-sdk/bin/wasm-ld -o longfellow-zk.wasm --no-entry --strip-all --export-dynamic --allow-undefined \
 # 	-L/opt/wasi-sdk/share/wasi-sysroot/lib/wasm32-wasi -lc -lc++ -lc++abi \
