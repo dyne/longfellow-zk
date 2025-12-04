@@ -153,6 +153,7 @@ jobs:
     name: 📦 Pack
     needs: [posix-x86, wasm-wasi, apple-osx]
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     steps:
     - name: download binary artifacts
       uses: actions/download-artifact@v6
