@@ -11,57 +11,9 @@ env:
   BUILD_TYPE: Release
 
 jobs:
-  # Static Analysis and Linting
-  # static-analysis:
-  #   name: Static Analysis
-  #   runs-on: ubuntu-22.04
-  #   steps:
-  #   - uses: actions/checkout@v6
-  #     with:
-  #       fetch-depth: 0
-  #   - name: Cache APT packages
-  #     uses: awalsh128/cache-apt-pkgs-action@latest
-  #     with:
-  #       packages: "clang-tidy clang-format cppcheck"
-  #   - name: Check code formatting (clang-format)
-  #     run: |
-  #       echo 'Checking C++ code formatting...'
-  #       find src test -name '*.cc' -o -name '*.h' | while read file; do
-  #         if ! clang-format --dry-run --Werror "${file}" 2>/dev/null; then
-  #           echo "::warning file=${file}::File needs formatting"
-  #         fi
-  #       done
-  #   - name: Run cppcheck
-  #     run: |
-  #       echo 'Running cppcheck static analysis...'
-  #       cppcheck --enable=warning,style,performance,portability \
-  #                --inline-suppr \
-  #                --suppress=missingIncludeSystem \
-  #                --suppress=unusedFunction \
-  #                --suppress=unmatchedSuppression \
-  #                --error-exitcode=0 \
-  #                -I src \
-  #                src/ test/ 2>&1 | tee cppcheck-report.txt
-  #       # Check for high-severity issues
-  #       if grep -E "error:|warning:" cppcheck-report.txt | grep -v "Cppcheck cannot find all the include files"; then
-  #         echo "::warning::Found potential issues in cppcheck"
-  #       fi
-  #   - name: Run clang-tidy on sample files
-  #     run: |
-  #       echo 'Running clang-tidy on key files...'
-  #       # Only check a few key files to keep CI fast
-  #       for file in src/cli/main.cc src/cli/encoding.cc; do
-  #         if [ -f "${file}" ]; then
-  #           echo "Checking ${file}..."
-  #           clang-tidy "${file}" \
-  #             -checks='-*,readability-*,modernize-*,performance-*,bugprone-*' \
-  #             -- -std=c++17 -Isrc 2>&1 | head -50 || true
-  #         fi
-  #       done
-
   posix-x86:
     name: Build & Test on POSIX x86
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -80,21 +32,15 @@ jobs:
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: "build-essential g++ clang make jq xxd"
-    - name: Setup compiler
-      run: |
-        echo "CC=${{ matrix.compiler.cc }}" >> $GITHUB_ENV
-        echo "CXX=${{ matrix.compiler.cxx }}" >> $GITHUB_ENV
     - name: Import upstream longfellow-zk
       run: |
         bash scripts/import_upstream.sh vendor/longfellow-zk
-    - name: Build project
+    - name: Build project with ${{ matrix.compiler.cxx }}
       run: |
-        echo "Building with ${{ matrix.compiler.cxx }}..."
         make clean
-        make -j$(nproc) CXX="ccache ${{ matrix.compiler.cxx}}" CC="ccache ${{ matrix.compiler.cc}}"
+        make -j$(nproc) CC="ccache ${{ matrix.compiler.cc }}" CXX="ccache ${{ matrix.compiler.cxx }}"
     - name: Verify binaries
       run: |
-        echo 'Checking built binaries...'
         ls -lh longfellow-zk
         file longfellow-zk
         ldd longfellow-zk || true
@@ -122,7 +68,7 @@ jobs:
 
   wasm-wasi:
     name: Build & Test on WASM WASI
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
     steps:
@@ -146,9 +92,8 @@ jobs:
         bash scripts/import_upstream.sh vendor/longfellow-zk
     - name: Build project
       run: |
-        echo 'Building with WASI-SDK...'
         make clean
-        make -j$(nproc) wasm CXX="ccache /opt/wasi-sdk/bin/clang++" CC="ccache /opt/wasi-sdk/bin/clang"
+        make -j$(nproc) wasm CC="ccache /opt/wasi-sdk/bin/clang" CXX="ccache /opt/wasi-sdk/bin/clang++"
     - name: Pack build results
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
@@ -160,8 +105,8 @@ jobs:
           longfellow-zk_${{ github.job }}.zip
 
   apple-osx:
-    name: Build & Test on Apple OSX
-    runs-on: macos-latest
+    name: Build & Test on Apple OSX 15 ARM64
+    runs-on: macos-15
     steps:
     - uses: actions/checkout@v6
       with:
@@ -177,12 +122,10 @@ jobs:
         bash scripts/import_upstream.sh vendor/longfellow-zk
     - name: Build project
       run: |
-        echo "Building with clang++..."
         make clean
-        make -j$(nproc) osx-arm64 CXX="ccache clang++" CC="ccache clang"
+        make -j$(nproc) osx-arm64 CC="ccache clang" CXX="ccache clang++"
     - name: Verify binaries
       run: |
-        echo 'Checking built binaries...'
         ls -lh longfellow-zk
         file longfellow-zk
         otool -L longfellow-zk || true
