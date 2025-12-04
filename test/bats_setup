@@ -7,6 +7,5 @@ setup() {
     load "$T"/test_helper/bats-support/load
     load "$T"/test_helper/bats-assert/load
     load "$T"/test_helper/bats-file/load
-    ZTMP="$BATS_FILE_TMPDIR"
-    cd $ZTMP
+    cd $TMP
 }
