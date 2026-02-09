@@ -31,7 +31,8 @@ For now, just like the upstream code, this is a demonstrator at TRL 4 and we jus
 ## Known implementations
 
 - Upstream Longfellow-zk: https://github.com/google/longfellow-zk
-- Zenroom VM: https://zenroom.org via "no-code" Zencode
+- ZKCC: Circuit Compiler DSL inside Zenroom VM: https://zenroom.org
+- EUDI-zk: EUDI compliant implementation journeys and [specifications](https://github.com/MyNextID/eudi-zk/tree/main/specs)
 - Multipaz https://github.com/openwallet-foundation/multipaz API library by Google and OWF
 - Rust: https://github.com/abetterinternet/zk-cred-longfellow experimental port by ISRG
 
