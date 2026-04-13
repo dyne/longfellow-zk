@@ -166,7 +166,7 @@ jobs:
       run: |
         find release -type f
     - name: release all binary artifacts
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: |
           release/posix-x86/*
