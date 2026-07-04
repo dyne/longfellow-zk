@@ -91,6 +91,31 @@ static inline gf2_128_elt_t gf2_128_mul(gf2_128_elt_t x, gf2_128_elt_t y) {
   t0 = gf2_128_reduce(t0, t1);
   return t0;
 }
+
+using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+
+static inline void gf2_128_mac(gf2_128_accum_t& acc, gf2_128_elt_t x,
+                               gf2_128_elt_t y) {
+  gf2_128_elt_t t0 = _mm_clmulepi64_si128(x, y, 0x00);
+  gf2_128_elt_t t1a = _mm_clmulepi64_si128(x, y, 0x01);
+  gf2_128_elt_t t1b = _mm_clmulepi64_si128(x, y, 0x10);
+  gf2_128_elt_t t1 = gf2_128_add(t1a, t1b);
+  gf2_128_elt_t t2 = _mm_clmulepi64_si128(x, y, 0x11);
+
+  acc[0] = gf2_128_add(acc[0], t0);
+  acc[1] = gf2_128_add(acc[1], t1);
+  acc[2] = gf2_128_add(acc[2], t2);
+}
+
+static inline gf2_128_elt_t gf2_128_accum_reduce(const gf2_128_accum_t& acc) {
+  gf2_128_elt_t t0 = acc[0];
+  gf2_128_elt_t t1 = acc[1];
+  gf2_128_elt_t t2 = acc[2];
+  t1 = gf2_128_reduce(t1, t2);
+  t0 = gf2_128_reduce(t0, t1);
+  return t0;
+}
+
 }  // namespace proofs
 #elif defined(__aarch64__)
 //
@@ -147,6 +172,32 @@ static inline gf2_128_elt_t gf2_128_mul(gf2_128_elt_t x, gf2_128_elt_t y) {
   t0 = gf2_128_reduce(t0, t1);
   return t0;
 }
+
+using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+
+static inline void gf2_128_mac(gf2_128_accum_t& acc, gf2_128_elt_t x,
+                               gf2_128_elt_t y) {
+  gf2_128_elt_t t0 = vmull_low(x, y);
+  gf2_128_elt_t swx = vextq_p64(x, x, 1);
+  gf2_128_elt_t t1a = vmull_low(swx, y);
+  gf2_128_elt_t t1b = vmull_high(swx, y);
+  gf2_128_elt_t t1 = gf2_128_add(t1a, t1b);
+  gf2_128_elt_t t2 = vmull_high(x, y);
+
+  acc[0] = gf2_128_add(acc[0], t0);
+  acc[1] = gf2_128_add(acc[1], t1);
+  acc[2] = gf2_128_add(acc[2], t2);
+}
+
+static inline gf2_128_elt_t gf2_128_accum_reduce(const gf2_128_accum_t& acc) {
+  gf2_128_elt_t t0 = acc[0];
+  gf2_128_elt_t t1 = acc[1];
+  gf2_128_elt_t t2 = acc[2];
+  t1 = gf2_128_reduce(t1, t2);
+  t0 = gf2_128_reduce(t0, t1);
+  return t0;
+}
+
 }  // namespace proofs
 
 #elif defined(__arm__)
@@ -306,6 +357,32 @@ static inline gf2_128_elt_t gf2_128_mul(gf2_128_elt_t x, gf2_128_elt_t y) {
   gf2_128_elt_t t2 = vmull_high(x, y);
   t1 = gf2_128_reduce(t1, t2);
   gf2_128_elt_t t0 = vmull_low(x, y);
+  t0 = gf2_128_reduce(t0, t1);
+  return t0;
+}
+
+using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+
+static inline void gf2_128_mac(gf2_128_accum_t& acc, gf2_128_elt_t x,
+                               gf2_128_elt_t y) {
+  poly8x8_t xl = vget_low_p8(x);
+  poly8x8_t xh = vget_high_p8(x);
+  poly8x8_t yl = vget_low_p8(y);
+  poly8x8_t yh = vget_high_p8(y);
+  gf2_128_elt_t t0 = pmul64x64(xl, yl);
+  gf2_128_elt_t t2 = pmul64x64(xh, yh);
+  gf2_128_elt_t t1 = pmul64x64(vadd_p8(xl, xh), vadd_p8(yl, yh));
+
+  acc[0] = gf2_128_add(acc[0], t0);
+  acc[1] = gf2_128_add(acc[1], t1);
+  acc[2] = gf2_128_add(acc[2], t2);
+}
+
+static inline gf2_128_elt_t gf2_128_accum_reduce(const gf2_128_accum_t& acc) {
+  gf2_128_elt_t t0 = acc[0];
+  gf2_128_elt_t t1 = gf2_128_add(acc[1], gf2_128_add(acc[0], acc[2]));
+  gf2_128_elt_t t2 = acc[2];
+  t1 = gf2_128_reduce(t1, t2);
   t0 = gf2_128_reduce(t0, t1);
   return t0;
 }
