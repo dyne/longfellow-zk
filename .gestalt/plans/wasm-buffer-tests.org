@@ -1,0 +1,42 @@
+#+TITLE: WASM Buffer Tests
+#+SUBTITLE: Make Node WASI tests avoid fd IO and pass in CI
+#+DATE: 2026-07-05
+#+KEYWORDS: wasm wasi node ci buffers longfellow-zk
+
+* WIP [#A] Stabilize WASM host bindings
+:PROPERTIES:
+:Effort: 1h
+:Goal: Replace brittle Node WASI usage with a minimal buffer-oriented WASI import surface.
+:Notes: The CI segfault occurs in Node 24 while running the WASM test suite. Current local work already moves away from Node's WASI helper; keep that direction minimal and explicit.
+:END:
+
+** WIP [#A] Remove fd output from the JavaScript WASI shim
+:PROPERTIES:
+:Why: The tests use _tobuf APIs, so stdout/stderr writes are not part of the contract and should not touch host fd IO.
+:Change: Keep WASI imports required by libc, but make fd writes count bytes into in-memory buffers and discard host output.
+:Tests: Run the WASM test suite with the generated module.
+:Done when: The Node bindings instantiate without Node's WASI helper and no shim path writes to process stdout or stderr.
+:END:
+
+** TODO [#A] Fix WASI random byte length
+:PROPERTIES:
+:Why: The WASI random implementation currently requests pointer-size bytes via sizeof(buf), leaving larger buffers uninitialized.
+:Change: Pass the requested length to __wasi_random_get.
+:Tests: Rebuild the WASM artifact and run the WASM test suite.
+:Done when: WASI random fills exactly the requested buffer size.
+:END:
+
+* TODO [#B] Verify CI-equivalent behavior
+:PROPERTIES:
+:Effort: 2h
+:Goal: Exercise the same local commands used by the WASM CI job after the focused fixes.
+:Notes: Prefer touched tests during L2 work, then full tests before closing the L1.
+:END:
+
+** TODO [#B] Run local WASM CI commands
+:PROPERTIES:
+:Why: The failing Actions job builds with WASI SDK and runs node test/wasm_test.mjs.
+:Change: Use the existing make wasm target and test script; only adjust CI workflow if local verification shows command drift.
+:Tests: make clean; make wasm; node test/wasm_test.mjs.
+:Done when: The WASM test suite completes without segfault or failed assertions locally, or a missing local dependency is documented.
+:END:
