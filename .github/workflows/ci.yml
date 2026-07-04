@@ -84,7 +84,7 @@ jobs:
     - name: Install WASI SDK
       uses: konsumer/install-wasi-sdk@v1
       with:
-        version: "29"   # specify WASI SDK version
+        version: "33"   # specify WASI SDK version
         install-path: "/opt/wasi-sdk"
         add-to-path: true
     - name: Import upstream longfellow-zk
