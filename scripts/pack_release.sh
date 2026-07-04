@@ -24,7 +24,7 @@ EOF
 
 # cleanup test
 cd ${DST}/test
-make clean
+rm -f circuit*.json proof*.json
 rm -f GNUmakefile extract* circuit*.json proof*.json
 cd -
 
