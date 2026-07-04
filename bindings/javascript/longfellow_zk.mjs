@@ -16,8 +16,10 @@ import { WASI } from 'node:wasi';
 let _mod = null;
 let _wasmPath = null;
 
-const DEFAULT_STDOUT = 65536;  // 64 KB
-const DEFAULT_STDERR = 16384;  // 16 KB
+const DEFAULT_STDOUT = 65536;   // 64 KB (for verify/small outputs)
+const CIRCUIT_STDOUT = 4194304;  // 4 MB (circuit JSON can be large)
+const PROOF_STDOUT = 1048576;    // 1 MB (proof output)
+const DEFAULT_STDERR = 16384;   // 16 KB
 
 /** Set the path to the longfellow-zk.wasm file (default: ./longfellow-zk.wasm). */
 export function setWasmPath(path) {
@@ -29,6 +31,7 @@ async function getModule() {
     if (_mod) return _mod;
 
     const wasmPath = _wasmPath || new URL('./longfellow-zk.wasm', import.meta.url).pathname;
+    const wasmBytes = await readFile(wasmPath);
     const wasmModule = await WebAssembly.compile(wasmBytes);
 
     const wasi = new WASI({ version: 'preview1', preopens: new Map() });
@@ -91,9 +94,9 @@ async function callBufferApi(funcName, argTypes, args, outBytes, errBytes) {
     const errPtr = malloc(instance, errBytes);
 
     try {
-        const heap = new Uint8Array(memory.buffer);
-        heap.fill(0, outPtr, outPtr + outBytes);
-        heap.fill(0, errPtr, errPtr + errBytes);
+        // Zero out the buffers (must use fresh view each time)
+        new Uint8Array(memory.buffer, outPtr, outBytes).fill(0);
+        new Uint8Array(memory.buffer, errPtr, errBytes).fill(0);
 
         // Build call args: domain args + outPtr, outLen, errPtr, errLen
         const callArgs = encodeArgs(instance, memory, argTypes, args);
@@ -101,6 +104,8 @@ async function callBufferApi(funcName, argTypes, args, outBytes, errBytes) {
 
         const status = func(...callArgs);
 
+        // Read results from CURRENT memory buffer (may have grown during call)
+        const heap = new Uint8Array(memory.buffer);
         const result = readCString(heap, outPtr, outBytes);
         const logs = readCString(heap, errPtr, errBytes);
 
@@ -188,7 +193,7 @@ export async function generateCircuit(zkspecIndex) {
         'longfellow_zk_generate_circuit_tobuf',
         ['number'],
         [zkspecIndex],
-        DEFAULT_STDOUT,
+        CIRCUIT_STDOUT,
         DEFAULT_STDERR
     );
 }
@@ -225,7 +230,7 @@ export async function generateProof({
         'longfellow_zk_generate_proof_tobuf',
         ['string', 'string', 'string', 'string', 'string', 'string', 'string', 'number', 'string'],
         [circuitHex, mdocHex, pkxHex, pkyHex, transcriptHex, time, docType, zkspecIndex, attrsJson],
-        65536 * 2,  // 128 KB output
+        PROOF_STDOUT,
         DEFAULT_STDERR
     );
 }
