@@ -25,6 +25,7 @@ osx-x86:
 
 wasm: CXX := /opt/wasi-sdk/bin/clang++
 wasm: CC := /opt/wasi-sdk/bin/clang
+wasm: CXX := /opt/wasi-sdk/bin/clang++
 wasm: CXXFLAGS := -O3 --sysroot=$(WASI_SDK_PATH)/share/wasi-sysroot -D__wasi__ -fno-exceptions -fno-rtti
 wasm:
 	$(info 🌉 Building fox $@)
