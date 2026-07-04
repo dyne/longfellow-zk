@@ -69,7 +69,7 @@
 #if defined(__wasi__)
 #include <wasi/api.h>
 int randombytes_js_randombytes_wasi(void *buf, size_t n) {
-	__wasi_errno_t err = __wasi_random_get((uint8_t*)buf, sizeof(buf));
+	__wasi_errno_t err = __wasi_random_get((uint8_t*)buf, n);
   return err == __WASI_ERRNO_SUCCESS ? 0 : -1;
 }
 #endif

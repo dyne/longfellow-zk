@@ -10,7 +10,7 @@
 :Notes: The CI segfault occurs in Node 24 while running the WASM test suite. Current local work already moves away from Node's WASI helper; keep that direction minimal and explicit.
 :END:
 
-** WIP [#A] Remove fd output from the JavaScript WASI shim
+** DONE [#A] Remove fd output from the JavaScript WASI shim
 :PROPERTIES:
 :Why: The tests use _tobuf APIs, so stdout/stderr writes are not part of the contract and should not touch host fd IO.
 :Change: Keep WASI imports required by libc, but make fd writes count bytes into in-memory buffers and discard host output.
@@ -18,7 +18,7 @@
 :Done when: The Node bindings instantiate without Node's WASI helper and no shim path writes to process stdout or stderr.
 :END:
 
-** TODO [#A] Fix WASI random byte length
+** DONE [#A] Fix WASI random byte length
 :PROPERTIES:
 :Why: The WASI random implementation currently requests pointer-size bytes via sizeof(buf), leaving larger buffers uninitialized.
 :Change: Pass the requested length to __wasi_random_get.
