@@ -39,6 +39,11 @@
 
 using json = nlohmann::json;
 
+enum : size_t {
+    kDefaultOutLen = 65536,
+    kCircuitOutLen = 8388608,
+};
+
 // -- buffer helpers ----------------------------------------------------
 
 static int buf_ok(char *buf, size_t buf_len) {
@@ -88,11 +93,23 @@ static std::string bytes_to_hex(const uint8_t *data, size_t len) {
     return result;
 }
 
-static void safe_copy(char *dst, size_t dst_len, const std::string &src) {
-    if (!dst || dst_len == 0) return;
-    size_t n = src.size() < dst_len - 1 ? src.size() : dst_len - 1;
-    memcpy(dst, src.c_str(), n);
-    dst[n] = '\0';
+static bool buf_copy(char *dst, size_t dst_len, const std::string &src) {
+    if (!dst || dst_len == 0) return false;
+    if (src.size() >= dst_len) {
+        dst[0] = '\0';
+        return false;
+    }
+    memcpy(dst, src.c_str(), src.size() + 1);
+    return true;
+}
+
+static int buf_copy_or_err(char *dst, size_t dst_len,
+                           char *err_buf, size_t err_len,
+                           const std::string &src) {
+    if (buf_copy(dst, dst_len, src)) return 0;
+    return buf_err(err_buf, err_len,
+                   "output buffer too small: need %zu bytes, got %zu",
+                   src.size() + 1, dst_len);
 }
 
 // -- attribute parsing ------------------------------------------------
@@ -175,8 +192,7 @@ int longfellow_zk_generate_circuit_tobuf(
         {"circuit_hash", zk_spec->circuit_hash}
     };
 
-    safe_copy(out_buf, out_len, output.dump());
-    return 0;
+    return buf_copy_or_err(out_buf, out_len, err_buf, err_len, output.dump());
 }
 
 int longfellow_zk_generate_proof_tobuf(
@@ -258,8 +274,7 @@ int longfellow_zk_generate_proof_tobuf(
 
     free(proof);
 
-    safe_copy(out_buf, out_len, output.dump());
-    return 0;
+    return buf_copy_or_err(out_buf, out_len, err_buf, err_len, output.dump());
 }
 
 int longfellow_zk_verify_proof_tobuf(
@@ -321,20 +336,25 @@ int longfellow_zk_verify_proof_tobuf(
                        "verification failed: error %d", result);
     }
 
-    safe_copy(out_buf, out_len, "{\"result\":\"verification successful\"}");
-    return 0;
+    return buf_copy_or_err(out_buf, out_len, err_buf, err_len,
+                           "{\"result\":\"verification successful\"}");
 }
 
 // -- compatibility wrappers (print to stdout) --------------------------
 // These match the original wasm_* API, now implemented via _tobuf.
 
 int wasm_generate_circuit(int zkspec_index) {
-    char out[4096] = {};
+    char *out = static_cast<char *>(malloc(kCircuitOutLen));
     char err[2048] = {};
+    if (!out) {
+        fprintf(stderr, "wasm_generate_circuit: failed to allocate output buffer\n");
+        return 1;
+    }
     int rc = longfellow_zk_generate_circuit_tobuf(
-        zkspec_index, out, sizeof(out), err, sizeof(err));
+        zkspec_index, out, kCircuitOutLen, err, sizeof(err));
     if (rc == 0) fprintf(stdout, "%s\n", out);
     else if (err[0]) fprintf(stderr, "%s\n", err);
+    free(out);
     return rc;
 }
 
