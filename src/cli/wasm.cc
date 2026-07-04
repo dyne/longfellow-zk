@@ -24,7 +24,9 @@
  * Return value: 0 = success, non-zero = error.
  */
 
+#include <cstdarg>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -99,31 +101,30 @@ static bool parse_attrs_json(const char *attrs_json,
                              std::vector<RequestedAttribute> &attrs,
                              char *err_buf, size_t err_len) {
     if (!attrs_json || !attrs_json[0]) return true; // no attrs is fine
-    try {
-        auto j = json::parse(attrs_json);
-        for (const auto &a : j) {
-            RequestedAttribute attr = {};
-            auto ns = a["namespace"].get<std::string>();
-            auto id = a["id"].get<std::string>();
-            auto cbor_hex = a["cbor_value"].get<std::string>();
-            auto cbor_bytes = hex_to_bytes(cbor_hex);
-
-            memcpy(attr.namespace_id, ns.c_str(),
-                   std::min(ns.size(), sizeof(attr.namespace_id)));
-            memcpy(attr.id, id.c_str(),
-                   std::min(id.size(), sizeof(attr.id)));
-            memcpy(attr.cbor_value, cbor_bytes.data(),
-                   std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
-            attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
-            attr.id_len = std::min(id.size(), sizeof(attr.id));
-            attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
-            attrs.push_back(attr);
-        }
-        return true;
-    } catch (...) {
+    auto j = json::parse(attrs_json, nullptr, false);
+    if (j.is_discarded()) {
         buf_err(err_buf, err_len, "failed to parse attrs_json");
         return false;
     }
+    for (const auto &a : j) {
+        RequestedAttribute attr = {};
+        auto ns = a.value("namespace", "");
+        auto id = a.value("id", "");
+        auto cbor_hex = a.value("cbor_value", "");
+        auto cbor_bytes = hex_to_bytes(cbor_hex);
+
+        memcpy(attr.namespace_id, ns.c_str(),
+               std::min(ns.size(), sizeof(attr.namespace_id)));
+        memcpy(attr.id, id.c_str(),
+               std::min(id.size(), sizeof(attr.id)));
+        memcpy(attr.cbor_value, cbor_bytes.data(),
+               std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
+        attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
+        attr.id_len = std::min(id.size(), sizeof(attr.id));
+        attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
+        attrs.push_back(attr);
+    }
+    return true;
 }
 
 // -- public API (_tobuf variants) --------------------------------------
@@ -249,7 +250,10 @@ int longfellow_zk_generate_proof_tobuf(
     output["doc_type"] = doc_type;
     output["zkspec"] = zkspec_index;
     if (attrs_json && attrs_json[0]) {
-        try { output["attributes"] = json::parse(attrs_json); } catch (...) {}
+        if (attrs_json && attrs_json[0]) {
+            auto a = json::parse(attrs_json, nullptr, false);
+            if (!a.is_discarded()) output["attributes"] = a;
+        }
     }
 
     free(proof);

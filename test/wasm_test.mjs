@@ -90,14 +90,14 @@ try {
     const attrs = (mdoc.attributes || []).map(a => ({
         namespace: a.namespace,
         id: a.id,
-        cbor_value: a.cbor_value,
+        cbor_value: a.cbor_value.replace(/^0x/, ''),
     }));
 
     const { result } = await generateProof({
         circuitHex,
         mdocHex,
-        pkxHex: mdoc.public_key.x.replace(/^0x/, ''),
-        pkyHex: mdoc.public_key.y.replace(/^0x/, ''),
+        pkxHex: mdoc.public_key.x,
+        pkyHex: mdoc.public_key.y,
         transcriptHex,
         time: mdoc.time,
         docType: mdoc.doc_type,
@@ -124,14 +124,14 @@ if (proof00) {
         const attrs = (mdoc.attributes || []).map(a => ({
             namespace: a.namespace,
             id: a.id,
-            cbor_value: a.cbor_value,
+            cbor_value: a.cbor_value.replace(/^0x/, ''),
         }));
 
         const { result } = await verifyProof({
             circuitHex,
             proofHex: proof00.proof_data_hex,
-            pkxHex: mdoc.public_key.x.replace(/^0x/, ''),
-            pkyHex: mdoc.public_key.y.replace(/^0x/, ''),
+            pkxHex: mdoc.public_key.x,
+            pkyHex: mdoc.public_key.y,
             transcriptHex,
             time: mdoc.time,
             docType: mdoc.doc_type,
@@ -147,45 +147,53 @@ if (proof00) {
     }
 }
 
-// Test 5: Prove and verify with mdoc_04 (different doc type)
+// Test 5: Prove and verify with mdoc_01 (same zkspec, different data)
 console.log('\n--- Cross-document test ---');
 
-let proof04 = null;
+let proof01 = null;
 try {
-    const mdoc = await loadMdoc('mdoc_04.json');
+    const mdoc = await loadMdoc('mdoc_01.json');
     const mdocHex = bytesToHex(base64ToBytes(mdoc.mdoc_data_base64));
     const transcriptHex = mdoc.transcript.replace(/^0x/, '');
 
     const { result } = await generateProof({
         circuitHex,
         mdocHex,
-        pkxHex: mdoc.public_key.x.replace(/^0x/, ''),
-        pkyHex: mdoc.public_key.y.replace(/^0x/, ''),
+        pkxHex: mdoc.public_key.x,
+        pkyHex: mdoc.public_key.y,
         transcriptHex,
         time: mdoc.time,
         docType: mdoc.doc_type,
         zkspecIndex: mdoc.zkspec,
-        attributes: [],
+        attributes: (mdoc.attributes || []).map(a => ({
+            namespace: a.namespace,
+            id: a.id,
+            cbor_value: a.cbor_value.replace(/^0x/, ''),
+        })),
     });
 
-    proof04 = JSON.parse(result);
-    ok('Generate proof with mdoc_04 (idcard)');
+    proof01 = JSON.parse(result);
+    ok('Generate proof with mdoc_01');
 
     const { result: vr } = await verifyProof({
         circuitHex,
-        proofHex: proof04.proof_data_hex,
-        pkxHex: mdoc.public_key.x.replace(/^0x/, ''),
-        pkyHex: mdoc.public_key.y.replace(/^0x/, ''),
+        proofHex: proof01.proof_data_hex,
+        pkxHex: mdoc.public_key.x,
+        pkyHex: mdoc.public_key.y,
         transcriptHex,
         time: mdoc.time,
         docType: mdoc.doc_type,
         zkspecIndex: mdoc.zkspec,
-        attributes: [],
+        attributes: (mdoc.attributes || []).map(a => ({
+            namespace: a.namespace,
+            id: a.id,
+            cbor_value: a.cbor_value.replace(/^0x/, ''),
+        })),
     });
 
     const parsed = JSON.parse(vr);
     if (!parsed.result?.includes('successful')) throw new Error(`unexpected: ${vr}`);
-    ok('Verify proof from mdoc_04');
+    ok('Verify proof from mdoc_01');
 } catch (e) {
     nok(`Cross-document test — ${e.message}`);
 }
@@ -200,8 +208,8 @@ if (proof00 && circuit1Hex) {
         await verifyProof({
             circuitHex: circuit1Hex,
             proofHex: proof00.proof_data_hex,
-            pkxHex: mdoc.public_key.x.replace(/^0x/, ''),
-            pkyHex: mdoc.public_key.y.replace(/^0x/, ''),
+            pkxHex: mdoc.public_key.x,
+            pkyHex: mdoc.public_key.y,
             transcriptHex,
             time: mdoc.time,
             docType: mdoc.doc_type,
