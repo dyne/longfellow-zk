@@ -10,16 +10,55 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { WASI } from 'node:wasi';
+import { randomFillSync } from 'node:crypto';
 
 // -- module cache ------------------------------------------------------
 let _mod = null;
 let _wasmPath = null;
 
 const DEFAULT_STDOUT = 65536;   // 64 KB (for verify/small outputs)
-const CIRCUIT_STDOUT = 4194304;  // 4 MB (circuit JSON can be large)
-const PROOF_STDOUT = 1048576;    // 1 MB (proof output)
+const CIRCUIT_STDOUT = 8388608;  // 8 MB (circuit JSON can be large)
+const PROOF_STDOUT = 2097152;    // 2 MB (proof output)
 const DEFAULT_STDERR = 16384;   // 16 KB
+
+// -- minimal WASI shim (avoids Node.js WASI segfault) -----------------
+function makeWasiImports(memRef) {
+    // Minimal WASI preview1 shim.
+    // memRef is { memory: WebAssembly.Memory } — we read .buffer fresh each
+    // call because it changes when the WASM module grows memory.
+    const buf = () => memRef.memory.buffer;
+    return {
+        fd_write(fd, iovsPtr, iovsLen, nwrittenPtr) {
+            const view = new DataView(buf());
+            let total = 0;
+            for (let i = 0; i < iovsLen; i++) {
+                const len = view.getUint32(iovsPtr + i * 8 + 4, true);
+                total += len;
+            }
+            view.setUint32(nwrittenPtr, total, true);
+            return 0;
+        },
+        fd_close() { return 0; },
+        fd_seek() { return 70; },
+        fd_read() { return 0; },
+        fd_fdstat_get(fd, bufPtr) {
+            const b = new Uint8Array(buf(), bufPtr, 24);
+            b.fill(0);
+            b[0] = 2; // filetype: character_device
+            return 0;
+        },
+        proc_exit() {},
+        environ_sizes_get() { return 0; },
+        environ_get() { return 0; },
+        args_sizes_get() { return 0; },
+        args_get() { return 0; },
+        clock_time_get() { return 0; },
+        random_get(bufPtr, bufLen) {
+            randomFillSync(new Uint8Array(buf(), bufPtr, bufLen));
+            return 0;
+        },
+    };
+}
 
 /** Set the path to the longfellow-zk.wasm file (default: ./longfellow-zk.wasm). */
 export function setWasmPath(path) {
@@ -34,19 +73,13 @@ async function getModule() {
     const wasmBytes = await readFile(wasmPath);
     const wasmModule = await WebAssembly.compile(wasmBytes);
 
-    const wasi = new WASI({
-        version: 'preview1',
-        args: ['longfellow-zk'],
-        env: {},
-        preopens: new Map(),
-        stdin: 0,
-        stdout: 1,
-        stderr: 2,
-    });
+    // Use a mutable reference so WASI imports can access memory after instantiation
+    // Store the memory object (not the buffer) so we always get the current buffer
+    const memRef = { memory: null };
     const wasmInstance = await WebAssembly.instantiate(wasmModule, {
-        wasi_snapshot_preview1: wasi.wasiImport,
+        wasi_snapshot_preview1: makeWasiImports(memRef),
     });
-    wasi.initialize(wasmInstance);
+    memRef.memory = wasmInstance.exports.memory;
 
     if (typeof wasmInstance.exports._initialize === 'function') {
         wasmInstance.exports._initialize();
