@@ -34,7 +34,15 @@ async function getModule() {
     const wasmBytes = await readFile(wasmPath);
     const wasmModule = await WebAssembly.compile(wasmBytes);
 
-    const wasi = new WASI({ version: 'preview1', preopens: new Map() });
+    const wasi = new WASI({
+        version: 'preview1',
+        args: ['longfellow-zk'],
+        env: {},
+        preopens: new Map(),
+        stdin: 0,
+        stdout: 1,
+        stderr: 2,
+    });
     const wasmInstance = await WebAssembly.instantiate(wasmModule, {
         wasi_snapshot_preview1: wasi.wasiImport,
     });
@@ -46,6 +54,10 @@ async function getModule() {
 
     const { memory } = wasmInstance.exports;
     if (!memory) throw new Error('WASM module does not export memory');
+
+    if (_heapNext === null) {
+        _heapNext = getHeapBase(wasmInstance);
+    }
 
     _mod = { instance: wasmInstance, memory };
     return _mod;
@@ -128,7 +140,16 @@ async function callBufferApi(funcName, argTypes, args, outBytes, errBytes) {
 
 let _malloc = null;
 let _free = null;
-let _heapNext = 65536; // start past static data
+let _heapNext = null;  // will be set from __heap_base after init
+
+function getHeapBase(instance) {
+    // Read __heap_base export if available, otherwise fall back to a safe offset
+    if (typeof instance.exports.__heap_base !== 'undefined') {
+        return instance.exports.__heap_base.value;
+    }
+    // With --stack-first and 16MB stack: safe to start at 32MB
+    return 32 * 1024 * 1024;
+}
 
 function malloc(instance, bytes) {
     // Try to use exported malloc if available (Emscripten pattern)
