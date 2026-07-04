@@ -35,7 +35,10 @@ wasm:
 	/opt/wasi-sdk/bin/clang++ ${CXXFLAGS} --target=wasm32-wasi --sysroot=/opt/wasi-sdk/share/wasi-sysroot \
 		-Wl,--no-entry -nostartfiles \
 		-Wl,--initial-memory=536870912 -Wl,--max-memory=4294967296 -Wl,--stack-first -Wl,-z,stack-size=16777216 \
-		-Wl,--export=wasm_generate_circuit -Wl,--export=wasm_generate_proof -Wl,--export=wasm_verify_proof \
+		-Wl,--export=wasm_generate_circuit \
+		-Wl,--export=longfellow_zk_generate_circuit_tobuf \
+		-Wl,--export=longfellow_zk_generate_proof_tobuf \
+		-Wl,--export=longfellow_zk_verify_proof_tobuf \
     -o longfellow-zk.wasm src/cli/wasm.o \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
