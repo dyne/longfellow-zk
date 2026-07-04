@@ -3,7 +3,7 @@
 #+DATE: 2026-07-05
 #+KEYWORDS: wasm wasi node ci buffers longfellow-zk
 
-* WIP [#A] Stabilize WASM host bindings
+* DONE [#A] Stabilize WASM host bindings
 :PROPERTIES:
 :Effort: 1h
 :Goal: Replace brittle Node WASI usage with a minimal buffer-oriented WASI import surface.
@@ -26,14 +26,14 @@
 :Done when: WASI random fills exactly the requested buffer size.
 :END:
 
-* TODO [#B] Verify CI-equivalent behavior
+* DONE [#B] Verify CI-equivalent behavior
 :PROPERTIES:
 :Effort: 2h
 :Goal: Exercise the same local commands used by the WASM CI job after the focused fixes.
 :Notes: Prefer touched tests during L2 work, then full tests before closing the L1.
 :END:
 
-** TODO [#B] Run local WASM CI commands
+** DONE [#B] Run local WASM CI commands
 :PROPERTIES:
 :Why: The failing Actions job builds with WASI SDK and runs node test/wasm_test.mjs.
 :Change: Use the existing make wasm target and test script; only adjust CI workflow if local verification shows command drift.
