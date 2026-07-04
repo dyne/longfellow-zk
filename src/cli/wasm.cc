@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 Dyne.org foundation
+ * Copyright (C) 2025-2026 Dyne.org foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +15,18 @@
  */
 
 /**
- * WASM-friendly wrapper functions for longfellow-zk
- * 
- * These functions accept only string arguments (no pointers) to make them
- * easy to call from WASM hosts like wasmtime, Node.js, browsers, etc.
- * 
- * All functions return:
- *   0 = success
- *   non-zero = error code
+ * WASM API for longfellow-zk — zenroom-style tobuf pattern.
+ *
+ * All binary inputs and outputs use lowercase hex strings.
+ * Each function has a _tobuf variant that writes results to
+ * pre-allocated buffers (out_buf / err_buf) instead of stdout/stderr.
+ *
+ * Return value: 0 = success, non-zero = error.
  */
 
-#include <cstdio>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -40,122 +37,136 @@
 
 using json = nlohmann::json;
 
-// Simple encoding helpers for WASM (no exceptions)
-namespace {
-    // Base64 encoding table
-    static const char base64_chars[] = 
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    
-    std::string bytes_to_base64(const uint8_t* data, size_t len) {
-        std::string ret;
-        int i = 0;
-        uint8_t char_array_3[3];
-        uint8_t char_array_4[4];
-        
-        while (len--) {
-            char_array_3[i++] = *(data++);
-            if (i == 3) {
-                char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-                char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-                char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-                char_array_4[3] = char_array_3[2] & 0x3f;
-                
-                for(i = 0; i < 4; i++)
-                    ret += base64_chars[char_array_4[i]];
-                i = 0;
-            }
-        }
-        
-        if (i) {
-            for(int j = i; j < 3; j++)
-                char_array_3[j] = '\0';
-            
-            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
-            
-            for (int j = 0; j < i + 1; j++)
-                ret += base64_chars[char_array_4[j]];
-            
-            while(i++ < 3)
-                ret += '=';
-        }
-        
-        return ret;
+// -- buffer helpers ----------------------------------------------------
+
+static int buf_ok(char *buf, size_t buf_len) {
+    if (buf && buf_len > 0) buf[0] = '\0';
+    return 0;
+}
+
+static int buf_err(char *buf, size_t buf_len, const char *fmt, ...) {
+    if (buf && buf_len > 0) {
+        va_list ap;
+        va_start(ap, fmt);
+        vsnprintf(buf, buf_len, fmt, ap);
+        va_end(ap);
     }
-    
-    std::vector<uint8_t> base64_to_bytes(const std::string& encoded) {
-        std::vector<uint8_t> out;
-        proofs::base64_decode_url(encoded, out);
-        return out;
+    return 1;
+}
+
+// -- hex <-> bytes -----------------------------------------------------
+
+static std::vector<uint8_t> hex_to_bytes(const std::string &hex) {
+    std::vector<uint8_t> bytes;
+    bytes.reserve(hex.length() / 2);
+    for (size_t i = 0; i + 1 < hex.length(); i += 2) {
+        char byte_str[3] = {hex[i], hex[i + 1], '\0'};
+        bytes.push_back(static_cast<uint8_t>(strtol(byte_str, nullptr, 16)));
     }
-    
-    std::vector<uint8_t> hex_to_bytes(const std::string& hex) {
-        std::vector<uint8_t> bytes;
-        for (size_t i = 0; i < hex.length(); i += 2) {
-            std::string byteString = hex.substr(i, 2);
-            uint8_t byte = (uint8_t) strtol(byteString.c_str(), nullptr, 16);
-            bytes.push_back(byte);
+    return bytes;
+}
+
+static bool is_hex(const char *s) {
+    if (!s || !*s) return false;
+    for (const char *p = s; *p; p++) {
+        if (!((*p >= '0' && *p <= '9') ||
+              (*p >= 'a' && *p <= 'f') ||
+              (*p >= 'A' && *p <= 'F')))
+            return false;
+    }
+    return (strlen(s) % 2) == 0;
+}
+
+static std::string bytes_to_hex(const uint8_t *data, size_t len) {
+    char *hex_str = static_cast<char *>(malloc(len * 2 + 1));
+    if (!hex_str) return "";
+    proofs::hex_to_str(hex_str, data, len);
+    std::string result(hex_str);
+    free(hex_str);
+    return result;
+}
+
+static void safe_copy(char *dst, size_t dst_len, const std::string &src) {
+    if (!dst || dst_len == 0) return;
+    size_t n = src.size() < dst_len - 1 ? src.size() : dst_len - 1;
+    memcpy(dst, src.c_str(), n);
+    dst[n] = '\0';
+}
+
+// -- attribute parsing ------------------------------------------------
+
+static bool parse_attrs_json(const char *attrs_json,
+                             std::vector<RequestedAttribute> &attrs,
+                             char *err_buf, size_t err_len) {
+    if (!attrs_json || !attrs_json[0]) return true; // no attrs is fine
+    try {
+        auto j = json::parse(attrs_json);
+        for (const auto &a : j) {
+            RequestedAttribute attr = {};
+            auto ns = a["namespace"].get<std::string>();
+            auto id = a["id"].get<std::string>();
+            auto cbor_hex = a["cbor_value"].get<std::string>();
+            auto cbor_bytes = hex_to_bytes(cbor_hex);
+
+            memcpy(attr.namespace_id, ns.c_str(),
+                   std::min(ns.size(), sizeof(attr.namespace_id)));
+            memcpy(attr.id, id.c_str(),
+                   std::min(id.size(), sizeof(attr.id)));
+            memcpy(attr.cbor_value, cbor_bytes.data(),
+                   std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
+            attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
+            attr.id_len = std::min(id.size(), sizeof(attr.id));
+            attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
+            attrs.push_back(attr);
         }
-        return bytes;
-    }
-    
-    std::string bytes_to_hex(const uint8_t* data, size_t len) {
-        char* hex_str = (char*)malloc(len * 2 + 1);
-        proofs::hex_to_str(hex_str, data, len);
-        std::string result(hex_str);
-        free(hex_str);
-        return result;
+        return true;
+    } catch (...) {
+        buf_err(err_buf, err_len, "failed to parse attrs_json");
+        return false;
     }
 }
 
+// -- public API (_tobuf variants) --------------------------------------
+
 extern "C" {
 
-/**
- * Generate a ZK circuit and print to stdout
- * 
- * @param zkspec_index Integer zkspec index (0-7)
- * @return 0 on success, error code otherwise
- * 
- * Example:
- *   wasm_generate_circuit(0)
- */
-int wasm_generate_circuit(int zkspec_index) {
-    fprintf(stderr, "[DEBUG] wasm_generate_circuit called with zkspec_index=%d\n", zkspec_index);
-    
+int longfellow_zk_generate_circuit_tobuf(
+    int zkspec_index,
+    char *out_buf, size_t out_len,
+    char *err_buf, size_t err_len) {
+
     if (zkspec_index < 0 || zkspec_index >= kNumZkSpecs) {
-        fprintf(stderr, "Error: Invalid zkspec index %d (must be 0-%d)\n", 
-                zkspec_index, kNumZkSpecs - 1);
-        return 2;
+        return buf_err(err_buf, err_len,
+                       "invalid zkspec index %d (must be 0-%d)",
+                       zkspec_index, kNumZkSpecs - 1);
     }
 
-    const auto* zk_spec = &kZkSpecs[zkspec_index];
-    fprintf(stderr, "Generating circuit for zkspec %d: %s v%zu (%zu attributes)\n",
-           zkspec_index, zk_spec->system, zk_spec->version, zk_spec->num_attributes);
+    const auto *zk_spec = &kZkSpecs[zkspec_index];
+    buf_ok(out_buf, out_len);
 
-    // Generate circuit
-    uint8_t* circuit_bytes = nullptr;
+    uint8_t *circuit_bytes = nullptr;
     size_t circuit_len = 0;
-    
+
     auto result = generate_circuit(zk_spec, &circuit_bytes, &circuit_len);
-    
     if (result != CIRCUIT_GENERATION_SUCCESS) {
-        fprintf(stderr, "Circuit generation failed with error code: %d\n", result);
-        return 10 + result;
+        free(circuit_bytes);
+        return buf_err(err_buf, err_len,
+                       "circuit generation failed: error %d", result);
     }
 
     if (!circuit_bytes || circuit_len == 0) {
-        fprintf(stderr, "Circuit generation returned null or empty circuit\n");
-        return 3;
+        free(circuit_bytes);
+        return buf_err(err_buf, err_len,
+                       "circuit generation returned empty circuit");
     }
 
-    fprintf(stderr, "Circuit generated: %zu bytes\n", circuit_len);
+    std::string circuit_hex = bytes_to_hex(circuit_bytes, circuit_len);
+    free(circuit_bytes);
 
-    // Create JSON output
-    json output_json;
-    output_json["circuit_data_base64"] = bytes_to_base64(circuit_bytes, circuit_len);
-    output_json["_circuit_size"] = circuit_len;
-    output_json["_zkspec"] = {
+    json output;
+    output["circuit_data_hex"] = circuit_hex;
+    output["_circuit_size"] = circuit_len;
+    output["_zkspec"] = {
         {"index", zkspec_index},
         {"system", zk_spec->system},
         {"version", zk_spec->version},
@@ -163,260 +174,177 @@ int wasm_generate_circuit(int zkspec_index) {
         {"circuit_hash", zk_spec->circuit_hash}
     };
 
-    // Print JSON to stdout
-    printf("%s\n", output_json.dump(2).c_str());
-
-    free(circuit_bytes);
-    
-    fprintf(stderr, "✓ Circuit generation complete\n");
+    safe_copy(out_buf, out_len, output.dump());
     return 0;
 }
 
-/**
- * Generate a proof from mDoc JSON file
- * 
- * @param circuit_file Path to circuit JSON file
- * @param mdoc_file Path to mDoc JSON file (contains all parameters)
- * @param output_file Path to output proof JSON file
- * @return 0 on success, error code otherwise
- * 
- * The mdoc_file should contain:
- *   - mdoc_data_base64: Base64-encoded mDoc bytes
- *   - public_key: {x, y} issuer public key hex strings
- *   - transcript: Hex-encoded transcript
- *   - time: ISO 8601 timestamp
- *   - doc_type: Document type string
- *   - attributes: Array of requested attributes
- *   - zkspec: ZK spec index
- * 
- * Example:
- *   wasm_generate_proof("circuit.json", "mdoc.json", "proof.json")
- */
-int wasm_generate_proof(const char* circuit_file, const char* mdoc_file, const char* output_file) {
-    if (!circuit_file || !mdoc_file || !output_file) {
-        fprintf(stderr, "Error: NULL arguments\n");
-        return 1;
+int longfellow_zk_generate_proof_tobuf(
+    const char *circuit_hex,
+    const char *mdoc_hex,
+    const char *pkx_hex,
+    const char *pky_hex,
+    const char *transcript_hex,
+    const char *time_str,
+    const char *doc_type,
+    int zkspec_index,
+    const char *attrs_json,
+    char *out_buf, size_t out_len,
+    char *err_buf, size_t err_len) {
+
+    // Validate required args
+    if (!circuit_hex || !mdoc_hex || !pkx_hex || !pky_hex ||
+        !transcript_hex || !time_str || !doc_type) {
+        return buf_err(err_buf, err_len, "missing required argument");
     }
 
-    // Read circuit file
-    std::ifstream circuit_in(circuit_file);
-    if (!circuit_in) {
-        fprintf(stderr, "Failed to open circuit file: %s\n", circuit_file);
-        return 2;
+    if (!is_hex(circuit_hex)) return buf_err(err_buf, err_len, "circuit_hex: not valid hex");
+    if (!is_hex(mdoc_hex)) return buf_err(err_buf, err_len, "mdoc_hex: not valid hex");
+    if (!is_hex(transcript_hex)) return buf_err(err_buf, err_len, "transcript_hex: not valid hex");
+
+    if (zkspec_index < 0 || zkspec_index >= kNumZkSpecs) {
+        return buf_err(err_buf, err_len,
+                       "invalid zkspec index %d", zkspec_index);
     }
-    json circuit_json;
-    circuit_in >> circuit_json;
-    circuit_in.close();
 
-    auto circuit_data = base64_to_bytes(
-        circuit_json["circuit_data_base64"].get<std::string>());
+    buf_ok(out_buf, out_len);
 
-    // Read mDoc file
-    std::ifstream mdoc_in(mdoc_file);
-    if (!mdoc_in) {
-        fprintf(stderr, "Failed to open mDoc file: %s\n", mdoc_file);
-        return 3;
-    }
-    json mdoc_json;
-    mdoc_in >> mdoc_json;
-    mdoc_in.close();
-
-    // Extract parameters from mDoc JSON
-    auto mdoc_data = base64_to_bytes(
-        mdoc_json["mdoc_data_base64"].get<std::string>());
-    
-    std::string pkx_hex = mdoc_json["public_key"]["x"].get<std::string>();
-    std::string pky_hex = mdoc_json["public_key"]["y"].get<std::string>();
-    std::string transcript_hex = mdoc_json["transcript"].get<std::string>();
-    std::string time_str = mdoc_json["time"].get<std::string>();
-    std::string doc_type = mdoc_json["doc_type"].get<std::string>();
-    int zkspec_index = mdoc_json["zkspec"].get<int>();
-
+    auto circuit_data = hex_to_bytes(circuit_hex);
+    auto mdoc_data = hex_to_bytes(mdoc_hex);
     auto transcript_bytes = hex_to_bytes(transcript_hex);
 
     // Parse attributes
     std::vector<RequestedAttribute> attrs;
-    if (mdoc_json.contains("attributes")) {
-        for (const auto& attr_json : mdoc_json["attributes"]) {
-            RequestedAttribute attr = {};
-            std::string ns = attr_json["namespace"];
-            std::string id = attr_json["id"];
-            std::string cbor_hex = attr_json["cbor_value"];
-            auto cbor_bytes = hex_to_bytes(cbor_hex);
+    if (!parse_attrs_json(attrs_json, attrs, err_buf, err_len)) return 1;
 
-            std::memcpy(attr.namespace_id, ns.c_str(), 
-                       std::min(ns.size(), sizeof(attr.namespace_id)));
-            std::memcpy(attr.id, id.c_str(), 
-                       std::min(id.size(), sizeof(attr.id)));
-            std::memcpy(attr.cbor_value, cbor_bytes.data(), 
-                       std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
-            attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
-            attr.id_len = std::min(id.size(), sizeof(attr.id));
-            attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
-
-            attrs.push_back(attr);
-        }
-    }
-
-    // Handle empty attributes case
     RequestedAttribute dummy_attr = {};
-    const RequestedAttribute* attrs_ptr = attrs.empty() ? &dummy_attr : attrs.data();
+    const RequestedAttribute *attrs_ptr = attrs.empty() ? &dummy_attr : attrs.data();
     size_t attrs_len = attrs.size();
 
-    const auto* zk_spec = &kZkSpecs[zkspec_index];
+    const auto *zk_spec = &kZkSpecs[zkspec_index];
 
-    printf("Generating proof for %zu attributes...\n", attrs_len);
-
-    // Generate proof
-    uint8_t* proof = nullptr;
+    uint8_t *proof = nullptr;
     size_t proof_len = 0;
-    
+
     auto result = run_mdoc_prover(
         circuit_data.data(), circuit_data.size(),
         mdoc_data.data(), mdoc_data.size(),
-        pkx_hex.c_str(), pky_hex.c_str(),
+        pkx_hex, pky_hex,
         transcript_bytes.data(), transcript_bytes.size(),
         attrs_ptr, attrs_len,
-        time_str.c_str(),
-        &proof, &proof_len, zk_spec
-    );
+        time_str,
+        &proof, &proof_len, zk_spec);
 
     if (result != MDOC_PROVER_SUCCESS) {
-        fprintf(stderr, "Proof generation failed with error code: %d\n", result);
-        return 10 + result;
-    }
-
-    // Create output JSON
-    json output_json;
-    output_json["proof_data_base64"] = bytes_to_base64(proof, proof_len);
-    output_json["public_key"] = mdoc_json["public_key"];
-    output_json["transcript"] = transcript_hex;
-    output_json["time"] = time_str;
-    output_json["doc_type"] = doc_type;
-    output_json["attributes"] = mdoc_json["attributes"];
-    output_json["zkspec"] = zkspec_index;
-
-    // Write to file
-    std::ofstream out(output_file);
-    if (!out) {
-        fprintf(stderr, "Failed to open output file: %s\n", output_file);
         free(proof);
-        return 4;
+        return buf_err(err_buf, err_len,
+                       "proof generation failed: error %d", result);
     }
 
-    out << output_json.dump(2);
-    out.close();
+    // Re-parse attrs_json for JSON output (preserves original form)
+    json output;
+    output["proof_data_hex"] = bytes_to_hex(proof, proof_len);
+    output["public_key"] = {{"x", pkx_hex}, {"y", pky_hex}};
+    output["transcript"] = transcript_hex;
+    output["time"] = time_str;
+    output["doc_type"] = doc_type;
+    output["zkspec"] = zkspec_index;
+    if (attrs_json && attrs_json[0]) {
+        try { output["attributes"] = json::parse(attrs_json); } catch (...) {}
+    }
 
     free(proof);
-    
-    printf("✓ Proof saved to: %s (%zu bytes)\n", output_file, proof_len);
+
+    safe_copy(out_buf, out_len, output.dump());
     return 0;
 }
 
-/**
- * Verify a proof from JSON files
- * 
- * @param circuit_file Path to circuit JSON file
- * @param proof_file Path to proof JSON file (contains all verification parameters)
- * @return 0 on success, error code otherwise
- * 
- * Example:
- *   wasm_verify_proof("circuit.json", "proof.json")
- */
-int wasm_verify_proof(const char* circuit_file, const char* proof_file) {
-    if (!circuit_file || !proof_file) {
-        fprintf(stderr, "Error: NULL arguments\n");
-        return 1;
+int longfellow_zk_verify_proof_tobuf(
+    const char *circuit_hex,
+    const char *proof_hex,
+    const char *pkx_hex,
+    const char *pky_hex,
+    const char *transcript_hex,
+    const char *time_str,
+    const char *doc_type,
+    int zkspec_index,
+    const char *attrs_json,
+    char *out_buf, size_t out_len,
+    char *err_buf, size_t err_len) {
+
+    // Validate required args
+    if (!circuit_hex || !proof_hex || !pkx_hex || !pky_hex ||
+        !transcript_hex || !time_str || !doc_type) {
+        return buf_err(err_buf, err_len, "missing required argument");
     }
 
-    // Read circuit file
-    std::ifstream circuit_in(circuit_file);
-    if (!circuit_in) {
-        fprintf(stderr, "Failed to open circuit file: %s\n", circuit_file);
-        return 2;
+    if (!is_hex(circuit_hex)) return buf_err(err_buf, err_len, "circuit_hex: not valid hex");
+    if (!is_hex(proof_hex)) return buf_err(err_buf, err_len, "proof_hex: not valid hex");
+    if (!is_hex(transcript_hex)) return buf_err(err_buf, err_len, "transcript_hex: not valid hex");
+
+    if (zkspec_index < 0 || zkspec_index >= kNumZkSpecs) {
+        return buf_err(err_buf, err_len,
+                       "invalid zkspec index %d", zkspec_index);
     }
-    json circuit_json;
-    circuit_in >> circuit_json;
-    circuit_in.close();
 
-    auto circuit_data = base64_to_bytes(
-        circuit_json["circuit_data_base64"].get<std::string>());
+    buf_ok(out_buf, out_len);
 
-    // Read proof file
-    std::ifstream proof_in(proof_file);
-    if (!proof_in) {
-        fprintf(stderr, "Failed to open proof file: %s\n", proof_file);
-        return 3;
-    }
-    json proof_json;
-    proof_in >> proof_json;
-    proof_in.close();
-
-    // Extract parameters
-    auto proof_data = base64_to_bytes(
-        proof_json["proof_data_base64"].get<std::string>());
-    
-    std::string pkx_hex = proof_json["public_key"]["x"].get<std::string>();
-    std::string pky_hex = proof_json["public_key"]["y"].get<std::string>();
-    std::string transcript_hex = proof_json["transcript"].get<std::string>();
-    std::string time_str = proof_json["time"].get<std::string>();
-    std::string doc_type = proof_json["doc_type"].get<std::string>();
-    int zkspec_index = proof_json["zkspec"].get<int>();
-
+    auto circuit_data = hex_to_bytes(circuit_hex);
+    auto proof_data = hex_to_bytes(proof_hex);
     auto transcript_bytes = hex_to_bytes(transcript_hex);
 
     // Parse attributes
     std::vector<RequestedAttribute> attrs;
-    if (proof_json.contains("attributes")) {
-        for (const auto& attr_json : proof_json["attributes"]) {
-            RequestedAttribute attr = {};
-            std::string ns = attr_json["namespace"];
-            std::string id = attr_json["id"];
-            std::string cbor_hex = attr_json["cbor_value"];
-            auto cbor_bytes = hex_to_bytes(cbor_hex);
+    if (!parse_attrs_json(attrs_json, attrs, err_buf, err_len)) return 1;
 
-            std::memcpy(attr.namespace_id, ns.c_str(), 
-                       std::min(ns.size(), sizeof(attr.namespace_id)));
-            std::memcpy(attr.id, id.c_str(), 
-                       std::min(id.size(), sizeof(attr.id)));
-            std::memcpy(attr.cbor_value, cbor_bytes.data(), 
-                       std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
-            attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
-            attr.id_len = std::min(id.size(), sizeof(attr.id));
-            attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
-
-            attrs.push_back(attr);
-        }
-    }
-
-    // Handle empty attributes case
     RequestedAttribute dummy_attr = {};
-    const RequestedAttribute* attrs_ptr = attrs.empty() ? &dummy_attr : attrs.data();
+    const RequestedAttribute *attrs_ptr = attrs.empty() ? &dummy_attr : attrs.data();
     size_t attrs_len = attrs.size();
 
-    const auto* zk_spec = &kZkSpecs[zkspec_index];
+    const auto *zk_spec = &kZkSpecs[zkspec_index];
 
-    printf("Verifying proof with %zu attributes...\n", attrs_len);
-
-    // Verify proof
     auto result = run_mdoc_verifier(
         circuit_data.data(), circuit_data.size(),
-        pkx_hex.c_str(), pky_hex.c_str(),
+        pkx_hex, pky_hex,
         transcript_bytes.data(), transcript_bytes.size(),
         attrs_ptr, attrs_len,
-        time_str.c_str(),
+        time_str,
         proof_data.data(), proof_data.size(),
-        doc_type.c_str(),
-        zk_spec
-    );
+        doc_type,
+        zk_spec);
 
     if (result != MDOC_VERIFIER_SUCCESS) {
-        fprintf(stderr, "✗ Verification failed with error code: %d\n", result);
-        return 10 + result;
+        return buf_err(err_buf, err_len,
+                       "verification failed: error %d", result);
     }
 
-    printf("✓ Proof verification successful!\n");
+    safe_copy(out_buf, out_len, "{\"result\":\"verification successful\"}");
     return 0;
 }
 
-} // extern "C"
+// -- compatibility wrappers (print to stdout) --------------------------
+// These match the original wasm_* API, now implemented via _tobuf.
+
+int wasm_generate_circuit(int zkspec_index) {
+    char out[4096] = {};
+    char err[2048] = {};
+    int rc = longfellow_zk_generate_circuit_tobuf(
+        zkspec_index, out, sizeof(out), err, sizeof(err));
+    if (rc == 0) fprintf(stdout, "%s\n", out);
+    else if (err[0]) fprintf(stderr, "%s\n", err);
+    return rc;
+}
+
+int wasm_generate_proof(const char *circuit_file, const char *mdoc_file,
+                        const char *output_file) {
+    (void)circuit_file; (void)mdoc_file; (void)output_file;
+    fprintf(stderr, "wasm_generate_proof: use longfellow_zk_generate_proof_tobuf instead\n");
+    return 1;
+}
+
+int wasm_verify_proof(const char *circuit_file, const char *proof_file) {
+    (void)circuit_file; (void)proof_file;
+    fprintf(stderr, "wasm_verify_proof: use longfellow_zk_verify_proof_tobuf instead\n");
+    return 1;
+}
+
+}  // extern "C"
