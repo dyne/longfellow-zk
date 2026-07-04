@@ -35,7 +35,7 @@
 
 #include "cli/json.hpp"
 #include "circuits/mdoc/mdoc_zk.h"
-#include "circuits/base64/decode_util.h"
+#include "circuits/tests/base64/decode_util.h"
 #include "util/crypto.h"
 
 using json = nlohmann::json;

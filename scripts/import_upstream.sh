@@ -5,9 +5,8 @@ set -e
 readarray -t sources <<EOF
 
 ec/p256.cc algebra/nat.cc circuits/sha/flatsha256_witness.cc
-circuits/sha/sha256_constants.cc circuits/base64/decode_util.cc
+circuits/sha/sha256_constants.cc circuits/tests/base64/decode_util.cc
 circuits/mdoc/mdoc_zk.cc circuits/mdoc/zk_spec.cc
-circuits/sha3/sha3_reference.cc circuits/sha3/sha3_round_constants.cc
 circuits/mdoc/mdoc_decompress.cc circuits/mdoc/mdoc_generate_circuit.cc
 EOF
 
@@ -37,12 +36,15 @@ circuits/mdoc/mdoc_constants.h circuits/sha/flatsha256_circuit.h
 circuits/logic/bit_adder.h circuits/mdoc/mdoc_signature.h
 circuits/ecdsa/verify_circuit.h circuits/mdoc/mdoc_witness.h
 cbor/host_decoder.h circuits/ecdsa/verify_witness.h
-gf2k/lch14_reed_solomon.h gf2k/lch14.h proto/circuit.h
+gf2k/lch14_reed_solomon.h gf2k/lch14.h sumcheck/circuit.h
 random/secure_random_engine.h random/transcript.h zk/zk_proof.h
 ligero/ligero_param.h merkle/merkle_commitment.h merkle/merkle_tree.h
 zk/zk_common.h arrays/eq.h sumcheck/transcript_sumcheck.h
 zk/zk_prover.h ligero/ligero_prover.h ligero/ligero_transcript.h
 sumcheck/prover_layers.h zk/zk_verifier.h ligero/ligero_verifier.h
+circuits/cbor_parser/cbor_byte_decoder.h circuits/logic/counter.h
+proto/circuit_io.h proto/circuit_reader.h proto/circuit_writer.h
+sumcheck/equad.h sumcheck/hquad.h sumcheck/quad_builder.h
 
 EOF
 
