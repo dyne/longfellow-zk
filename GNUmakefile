@@ -37,6 +37,8 @@ wasm:
 		-Wl,--no-entry -nostartfiles \
 		-Wl,--initial-memory=536870912 -Wl,--max-memory=4294967296 -Wl,--stack-first -Wl,-z,stack-size=16777216 \
 		-Wl,--export=wasm_generate_circuit \
+		-Wl,--export=malloc \
+		-Wl,--export=free \
 		-Wl,--export=longfellow_zk_generate_circuit_tobuf \
 		-Wl,--export=longfellow_zk_generate_proof_tobuf \
 		-Wl,--export=longfellow_zk_verify_proof_tobuf \

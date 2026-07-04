@@ -30,10 +30,18 @@ function makeWasiImports(memRef) {
     return {
         fd_write(fd, iovsPtr, iovsLen, nwrittenPtr) {
             const view = new DataView(buf());
+            const chunks = [];
             let total = 0;
             for (let i = 0; i < iovsLen; i++) {
+                const ptr = view.getUint32(iovsPtr + i * 8, true);
                 const len = view.getUint32(iovsPtr + i * 8 + 4, true);
+                chunks.push(new Uint8Array(buf(), ptr, len));
                 total += len;
+            }
+            if (fd === 1 || fd === 2) {
+                const output = decoder.decode(concatBytes(chunks, total));
+                if (fd === 1) memRef.stdout += output;
+                if (fd === 2) memRef.stderr += output;
             }
             view.setUint32(nwrittenPtr, total, true);
             return 0;
@@ -75,7 +83,7 @@ async function getModule() {
 
     // Use a mutable reference so WASI imports can access memory after instantiation
     // Store the memory object (not the buffer) so we always get the current buffer
-    const memRef = { memory: null };
+    const memRef = { memory: null, stdout: '', stderr: '' };
     const wasmInstance = await WebAssembly.instantiate(wasmModule, {
         wasi_snapshot_preview1: makeWasiImports(memRef),
     });
@@ -92,7 +100,7 @@ async function getModule() {
         _heapNext = getHeapBase(wasmInstance);
     }
 
-    _mod = { instance: wasmInstance, memory };
+    _mod = { instance: wasmInstance, memory, memRef };
     return _mod;
 }
 
@@ -100,6 +108,16 @@ async function getModule() {
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+function concatBytes(chunks, total) {
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+    }
+    return bytes;
+}
 
 function readCString(heap, ptr, maxLen) {
     for (let i = 0; i < maxLen; i++) {
@@ -129,7 +147,7 @@ function assertHex(label, value) {
  * @returns {{ result: string, logs: string }}
  */
 async function callBufferApi(funcName, argTypes, args, outBytes, errBytes) {
-    const { instance, memory } = await getModule();
+    const { instance, memory, memRef } = await getModule();
     const func = instance.exports[funcName];
     if (typeof func !== 'function') {
         throw new Error(`exported function not found: ${funcName}`);
@@ -152,7 +170,10 @@ async function callBufferApi(funcName, argTypes, args, outBytes, errBytes) {
         // Read results from CURRENT memory buffer (may have grown during call)
         const heap = new Uint8Array(memory.buffer);
         const result = readCString(heap, outPtr, outBytes);
-        const logs = readCString(heap, errPtr, errBytes);
+        const errText = readCString(heap, errPtr, errBytes);
+        const logs = [errText, memRef.stderr].filter(Boolean).join('\n');
+        memRef.stdout = '';
+        memRef.stderr = '';
 
         if (status !== 0) {
             const err = new Error(`${funcName} failed: ${logs || 'unknown error'}`);
