@@ -30,7 +30,7 @@ circuits/logic/compiler_backend.h circuits/logic/logic.h
 gf2k/gf2_128.h gf2k/gf2poly.h circuits/mac/mac_circuit.h
 circuits/mac/mac_reference.h random/random.h
 circuits/mac/mac_witness.h circuits/logic/bit_plucker_encoder.h
-circuits/mdoc/mdoc_examples.h circuits/mdoc/mdoc_hash.h
+circuits/mdoc/mdoc_hash.h
 circuits/logic/memcmp.h circuits/logic/routing.h
 circuits/mdoc/mdoc_constants.h circuits/sha/flatsha256_circuit.h
 circuits/logic/bit_adder.h circuits/mdoc/mdoc_signature.h
