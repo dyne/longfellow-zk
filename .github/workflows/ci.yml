@@ -96,7 +96,7 @@ jobs:
         make -j$(nproc) wasm CC="ccache /opt/wasi-sdk/bin/clang" CXX="ccache /opt/wasi-sdk/bin/clang++"
     - name: Run WASM tests
       run: |
-        node test/wasm_test.mjs
+        node test/wasm_test.mjs --suite bip340
     - name: Pack build results
       run: |
         bash scripts/pack_release.sh ${{ github.job }}

@@ -40,3 +40,18 @@
 :Tests: Run node test/wasm_test.mjs against the built WASM module.
 :Done when: CI logs include ms timings and compressed byte sizes for BIP340, circuit generation, proof generation, and proof verification paths.
 :END:
+
+* DONE [#A] Split WASM test suites
+:PROPERTIES:
+:Effort: S
+:Goal: Allow fast BIP340-only WASM testing without running the long mdoc proof path.
+:Notes: Keep mdoc available for explicit runs, but use BIP340 for this PR's focused WASM test.
+:END:
+
+** DONE [#A] Add suite selection
+:PROPERTIES:
+:Why: The current WASM runner always executes both BIP340 and mdoc tests, making focused BIP340 validation slow.
+:Change: Add a suite selector for bip340, mdoc, and all; update the WASM CI command to run bip340 only.
+:Tests: Run node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm.
+:Done when: BIP340-only execution skips mdoc work and still logs timing plus compressed circuit size.
+:END:
