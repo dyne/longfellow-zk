@@ -23,8 +23,7 @@
 #include "arrays/dense.h"
 #include "ec/p256k1.h"
 
-// OpenSSL for SHA-256 (already a project dependency).
-#include <openssl/sha.h>
+#include "util/crypto.h"
 
 namespace proofs {
 
@@ -267,19 +266,18 @@ class Bip340Witness {
 
     // Pre-hash the tag (BIP-340 tagged hash convention).
     uint8_t tag_hash[32];
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, tag, tag_len);
-    SHA256_Final(tag_hash, &ctx);
+    SHA256 tag_sha;
+    tag_sha.Update(reinterpret_cast<const uint8_t*>(tag), tag_len);
+    tag_sha.DigestData(tag_hash);
 
     // SHA256(tag_hash || tag_hash || R.x || P.x || msg)
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, tag_hash, 32);
-    SHA256_Update(&ctx, tag_hash, 32);
-    SHA256_Update(&ctx, r_bytes, 32);
-    SHA256_Update(&ctx, pk_bytes, 32);
-    SHA256_Update(&ctx, msg, msg_len);
-    SHA256_Final(hash, &ctx);
+    SHA256 challenge_sha;
+    challenge_sha.Update(tag_hash, 32);
+    challenge_sha.Update(tag_hash, 32);
+    challenge_sha.Update(r_bytes, 32);
+    challenge_sha.Update(pk_bytes, 32);
+    challenge_sha.Update(msg, msg_len);
+    challenge_sha.DigestData(hash);
   }
 
   /// Compute sqrt(y2) mod p, choosing the even root.
