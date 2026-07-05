@@ -40,7 +40,6 @@
 using json = nlohmann::json;
 
 enum : size_t {
-    kDefaultOutLen = 65536,
     kCircuitOutLen = 8388608,
 };
 
@@ -286,10 +285,8 @@ int longfellow_zk_generate_proof_tobuf(
     output["doc_type"] = doc_type;
     output["zkspec"] = zkspec_index;
     if (attrs_json && attrs_json[0]) {
-        if (attrs_json && attrs_json[0]) {
-            auto a = json::parse(attrs_json, nullptr, false);
-            if (!a.is_discarded()) output["attributes"] = a;
-        }
+        auto a = json::parse(attrs_json, nullptr, false);
+        if (!a.is_discarded()) output["attributes"] = a;
     }
 
     free(proof);
