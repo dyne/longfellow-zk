@@ -1,0 +1,34 @@
+#+TITLE: WASM BIP340 Metrics
+#+SUBTITLE: Exercise BIP340 in WASM and log elapsed time plus compressed byte sizes
+#+DATE: 2026-07-05
+#+KEYWORDS: wasm bip340 metrics ci tobuf
+
+* WIP [#A] Add WASM BIP340 smoke execution
+:PROPERTIES:
+:Effort: M
+:Goal: Ensure CI exercises the imported BIP340 circuit through the WASM module, not only through native tests.
+:Notes: Keep BIP340 semantic vectors in upstream longfellow-zk; dyne only needs import/build/runtime coverage.
+:END:
+
+** DONE [#A] Export BIP340 smoke through tobuf
+:PROPERTIES:
+:Why: The current WASM exports cover mdoc only, so BIP340 can compile natively while never being instantiated in WASM.
+:Change: Add a minimal BIP340 circuit compile smoke export, wire it into the WASM link exports, and expose it from the JS bindings.
+:Tests: Run make wasm and node test/wasm_test.mjs.
+:Done when: The WASM test suite can call the BIP340 export and fail loudly if the circuit cannot be built in WASM.
+:END:
+
+* TODO [#B] Log WASM step metrics
+:PROPERTIES:
+:Effort: S
+:Goal: Make CI logs show timing and compressed byte sizes for each WASM circuit/proof step.
+:Notes: Hex length is transport encoding size; report decoded byte length for circuit and proof payloads.
+:END:
+
+** TODO [#B] Add timing and compressed-size logs
+:PROPERTIES:
+:Why: Existing WASM logs print hex character counts and omit per-step elapsed time.
+:Change: Wrap each WASM execution step with millisecond timing and log compressed payload byte sizes for generated or consumed circuits/proofs.
+:Tests: Run node test/wasm_test.mjs against the built WASM module.
+:Done when: CI logs include ms timings and compressed byte sizes for BIP340, circuit generation, proof generation, and proof verification paths.
+:END:

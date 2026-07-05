@@ -32,9 +32,16 @@
 #include <string>
 #include <vector>
 
+#include "algebra/crt.h"
 #include "cli/json.hpp"
+#include "circuits/bip340/bip340_guard.h"
+#include "circuits/bip340/bip340_verify.h"
+#include "circuits/compiler/compiler.h"
+#include "circuits/logic/compiler_backend.h"
+#include "circuits/logic/logic.h"
 #include "circuits/mdoc/mdoc_zk.h"
 #include "circuits/tests/base64/decode_util.h"
+#include "ec/p256k1.h"
 #include "util/crypto.h"
 
 using json = nlohmann::json;
@@ -109,6 +116,52 @@ static int buf_copy_or_err(char *dst, size_t dst_len,
     return buf_err(err_buf, err_len,
                    "output buffer too small: need %zu bytes, got %zu",
                    src.size() + 1, dst_len);
+}
+
+static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
+    using Field = proofs::Fp256k1Base;
+    using EC = proofs::P256k1;
+    using Backend = proofs::CompilerBackend<Field>;
+    using LogicCircuit = proofs::Logic<Field, Backend>;
+    using Verify = proofs::Bip340Verify<LogicCircuit, Field, EC>;
+    using Crt = proofs::CRT256<Field>;
+
+    proofs::QuadCircuit<Field> q(proofs::p256k1_base);
+    const Backend backend(&q);
+    const LogicCircuit logic(&backend, proofs::p256k1_base);
+    Verify verify(logic, proofs::p256k1);
+
+    auto rx = logic.eltw_input();
+    auto px = logic.eltw_input();
+    auto e = logic.eltw_input();
+
+    typename Verify::Witness witness;
+    q.private_input();
+    witness.input(logic);
+    verify.assert_verify(rx, px, e, witness);
+
+    auto circuit = q.mkcircuit(1);
+    if (!circuit) {
+        return buf_err(err_buf, err_len, "BIP340 circuit build returned null");
+    }
+    if (circuit->npub_in == 0 || circuit->ninputs <= circuit->npub_in) {
+        return buf_err(err_buf, err_len,
+                       "BIP340 circuit has invalid input shape: public=%zu total=%zu",
+                       circuit->npub_in, circuit->ninputs);
+    }
+
+    size_t block_enc = circuit->ninputs - circuit->npub_in + q.nquad_terms_ + 1;
+    auto err = proofs::check_crt_block_enc<Crt>(block_enc);
+    if (!err.empty()) {
+        return buf_err(err_buf, err_len, "%s", err.c_str());
+    }
+
+    output["result"] = "bip340 smoke successful";
+    output["public_inputs"] = circuit->npub_in;
+    output["total_inputs"] = circuit->ninputs;
+    output["quad_terms"] = q.nquad_terms_;
+    output["crt_block_enc"] = block_enc;
+    return 0;
 }
 
 // -- attribute parsing ------------------------------------------------
@@ -355,6 +408,19 @@ int longfellow_zk_verify_proof_tobuf(
 
     return buf_copy_or_err(out_buf, out_len, err_buf, err_len,
                            "{\"result\":\"verification successful\"}");
+}
+
+int longfellow_zk_bip340_smoke_tobuf(
+    char *out_buf, size_t out_len,
+    char *err_buf, size_t err_len) {
+
+    buf_ok(out_buf, out_len);
+
+    json output;
+    int rc = run_bip340_smoke(output, err_buf, err_len);
+    if (rc != 0) return rc;
+
+    return buf_copy_or_err(out_buf, out_len, err_buf, err_len, output.dump());
 }
 
 // -- compatibility wrappers (print to stdout) --------------------------
