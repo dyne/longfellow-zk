@@ -26,14 +26,14 @@
 :Done when: Wasmtime `wasm_generate_circuit` returns parseable JSON or nonzero status with an error.
 :END:
 
-* TODO [#B] Tighten JS and attribute handling
+* WIP [#B] Tighten JS and attribute handling
 :PROPERTIES:
 :Effort: 1h
 :Goal: Remove leaks and reject malformed attribute payloads before crossing into domain code.
 :Notes: Keep changes minimal and dependency-free.
 :END:
 
-** TODO [#A] Free JS string arguments
+** DONE [#A] Free JS string arguments
 :PROPERTIES:
 :Why: JS bindings allocate string arguments in WASM memory and currently only free output buffers.
 :Change: Track allocated argument pointers and free them in `finally`.
@@ -41,7 +41,7 @@
 :Done when: String argument allocations are released after each call.
 :END:
 
-** TODO [#B] Validate attrs_json shape and hex
+** DONE [#B] Validate attrs_json shape and hex
 :PROPERTIES:
 :Why: Attribute JSON parsing accepts malformed structures and invalid CBOR hex, relying on downstream behavior.
 :Change: Require an array of objects with string fields, valid hex `cbor_value`, and lengths that fit `RequestedAttribute`.

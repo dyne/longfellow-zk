@@ -155,6 +155,7 @@ async function callBufferApi(funcName, argTypes, args, outBytes, errBytes) {
 
     const outPtr = malloc(instance, outBytes);
     const errPtr = malloc(instance, errBytes);
+    const argPtrs = [];
 
     try {
         // Zero out the buffers (must use fresh view each time)
@@ -162,7 +163,7 @@ async function callBufferApi(funcName, argTypes, args, outBytes, errBytes) {
         new Uint8Array(memory.buffer, errPtr, errBytes).fill(0);
 
         // Build call args: domain args + outPtr, outLen, errPtr, errLen
-        const callArgs = encodeArgs(instance, memory, argTypes, args);
+        const callArgs = encodeArgs(instance, memory, argTypes, args, argPtrs);
         callArgs.push(outPtr, outBytes, errPtr, errBytes);
 
         const status = func(...callArgs);
@@ -185,6 +186,9 @@ async function callBufferApi(funcName, argTypes, args, outBytes, errBytes) {
 
         return { result, logs };
     } finally {
+        for (const ptr of argPtrs) {
+            free(instance, ptr);
+        }
         free(instance, outPtr);
         free(instance, errPtr);
     }
@@ -239,7 +243,7 @@ function writeStr(instance, memory, s) {
 
 // -- argument encoding ------------------------------------------------
 
-function encodeArgs(instance, memory, types, values) {
+function encodeArgs(instance, memory, types, values, argPtrs) {
     const result = [];
     for (let i = 0; i < types.length; i++) {
         const type = types[i];
@@ -247,7 +251,9 @@ function encodeArgs(instance, memory, types, values) {
         if (type === 'number') {
             result.push(value);
         } else if (type === 'string') {
-            result.push(writeStr(instance, memory, value == null ? '' : String(value)));
+            const ptr = writeStr(instance, memory, value == null ? '' : String(value));
+            argPtrs.push(ptr);
+            result.push(ptr);
         } else {
             result.push(value);
         }

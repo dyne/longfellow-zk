@@ -123,22 +123,42 @@ static bool parse_attrs_json(const char *attrs_json,
         buf_err(err_buf, err_len, "failed to parse attrs_json");
         return false;
     }
+    if (!j.is_array()) {
+        buf_err(err_buf, err_len, "attrs_json must be an array");
+        return false;
+    }
     for (const auto &a : j) {
+        if (!a.is_object() ||
+            !a.contains("namespace") || !a["namespace"].is_string() ||
+            !a.contains("id") || !a["id"].is_string() ||
+            !a.contains("cbor_value") || !a["cbor_value"].is_string()) {
+            buf_err(err_buf, err_len,
+                    "attrs_json entries must include string namespace, id, and cbor_value");
+            return false;
+        }
+
         RequestedAttribute attr = {};
-        auto ns = a.value("namespace", "");
-        auto id = a.value("id", "");
-        auto cbor_hex = a.value("cbor_value", "");
+        auto ns = a["namespace"].get<std::string>();
+        auto id = a["id"].get<std::string>();
+        auto cbor_hex = a["cbor_value"].get<std::string>();
+        if (!is_hex(cbor_hex.c_str())) {
+            buf_err(err_buf, err_len, "attrs_json cbor_value must be valid hex");
+            return false;
+        }
+        if (ns.size() > sizeof(attr.namespace_id) ||
+            id.size() > sizeof(attr.id) ||
+            cbor_hex.size() / 2 > sizeof(attr.cbor_value)) {
+            buf_err(err_buf, err_len, "attrs_json entry exceeds RequestedAttribute capacity");
+            return false;
+        }
         auto cbor_bytes = hex_to_bytes(cbor_hex);
 
-        memcpy(attr.namespace_id, ns.c_str(),
-               std::min(ns.size(), sizeof(attr.namespace_id)));
-        memcpy(attr.id, id.c_str(),
-               std::min(id.size(), sizeof(attr.id)));
-        memcpy(attr.cbor_value, cbor_bytes.data(),
-               std::min(cbor_bytes.size(), sizeof(attr.cbor_value)));
-        attr.namespace_len = std::min(ns.size(), sizeof(attr.namespace_id));
-        attr.id_len = std::min(id.size(), sizeof(attr.id));
-        attr.cbor_value_len = std::min(cbor_bytes.size(), sizeof(attr.cbor_value));
+        memcpy(attr.namespace_id, ns.c_str(), ns.size());
+        memcpy(attr.id, id.c_str(), id.size());
+        memcpy(attr.cbor_value, cbor_bytes.data(), cbor_bytes.size());
+        attr.namespace_len = ns.size();
+        attr.id_len = id.size();
+        attr.cbor_value_len = cbor_bytes.size();
         attrs.push_back(attr);
     }
     return true;

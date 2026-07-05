@@ -240,6 +240,28 @@ try {
     ok('Rejects invalid hex input');
 }
 
+// Test 8: Invalid attribute CBOR hex
+if (circuitHex) {
+    try {
+        const mdoc = await loadMdoc('mdoc_00.json');
+        const mdocHex = bytesToHex(base64ToBytes(mdoc.mdoc_data_base64));
+        await generateProof({
+            circuitHex,
+            mdocHex,
+            pkxHex: mdoc.public_key.x,
+            pkyHex: mdoc.public_key.y,
+            transcriptHex: mdoc.transcript.replace(/^0x/, ''),
+            time: mdoc.time,
+            docType: mdoc.doc_type,
+            zkspecIndex: mdoc.zkspec,
+            attributes: [{ namespace: 'x', id: 'y', cbor_value: 'not-hex' }],
+        });
+        nok('Invalid attrs_json cbor_value — expected error, got success');
+    } catch (e) {
+        ok('Rejects invalid attrs_json cbor_value');
+    }
+}
+
 // -- summary -----------------------------------------------------------
 console.log(`\n${YELLOW}=== Results: ${GREEN}${pass} passed${NC}, ${RED}${fail} failed${NC} ${YELLOW}===${NC}`);
 exit(fail > 0 ? 1 : 0);
