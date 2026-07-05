@@ -60,6 +60,13 @@ circuits/bip340/bip340_guard.h
 
 EOF
 
+readarray -t optional_testdata <<EOF
+circuits/bip340/testdata/bip340_vectors.inc
+circuits/bip340/testdata/bip340_golden.inc
+circuits/bip340/testdata/bip340_test_vectors.csv
+
+EOF
+
 [ "$1" == "clean" ] && {
   for i in ${sources[@]}; do
     rm -f src/$i
@@ -72,6 +79,9 @@ EOF
   done
   for i in ${optional_headers[@]}; do
     rm -f src/$i
+  done
+  for i in ${optional_testdata[@]}; do
+    rm -f test/bip340/${i#circuits/bip340/}
   done
   exit 0
 }
@@ -126,6 +136,12 @@ for i in ${optional_headers[@]}; do
 	mkdir -p src/`dirname $i`
 	h="${1}/lib/${i}"
 	copy_optional "$h" src/"$i"
+done
+
+for i in ${optional_testdata[@]}; do
+	mkdir -p test/bip340/`dirname ${i#circuits/bip340/}`
+	h="${1}/lib/${i}"
+	copy_optional "$h" test/bip340/"${i#circuits/bip340/}"
 done
 
 if [ -r src/circuits/bip340/bip340_witness.h ]; then

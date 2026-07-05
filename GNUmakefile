@@ -31,8 +31,8 @@ wasm:
 	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CXXFLAGS)" CC="$(CC)" VERBOSE=1
 	@$(MAKE) -C src CXXFLAGS="-nostdlib -msimd128 $(CXXFLAGS) $(INCLUDES) -I../vendor/zstd/lib" CXX="$(CXX)"
 	/opt/wasi-sdk/bin/llvm-ranlib src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
-	$(CXX) ${CXXFLAGS} -Isrc -c -o src/cli/wasm.o src/cli/wasm.cc
-	/opt/wasi-sdk/bin/clang++ ${CXXFLAGS} --target=wasm32-wasi --sysroot=/opt/wasi-sdk/share/wasi-sysroot \
+	$(CXX) -msimd128 ${CXXFLAGS} -Isrc -c -o src/cli/wasm.o src/cli/wasm.cc
+	/opt/wasi-sdk/bin/clang++ -msimd128 ${CXXFLAGS} --target=wasm32-wasi --sysroot=/opt/wasi-sdk/share/wasi-sysroot \
 		-Wl,--no-entry -nostartfiles \
 		-Wl,--initial-memory=536870912 -Wl,--max-memory=4294967296 -Wl,--stack-first -Wl,-z,stack-size=16777216 \
 		-Wl,--export=wasm_generate_circuit \
