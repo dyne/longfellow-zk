@@ -116,3 +116,26 @@
 :Tests: Run ./test/bip340_test and node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm; inspect test/results/*.csv.
 :Done when: Release packaging includes the generated CSV files as part of the copied test directory.
 :END:
+
+* DONE [#A] Publish Release Metrics Visualization
+:PROPERTIES:
+:Effort: M
+:Goal: Merge per-job BIP340 metrics into a single website-loadable CSV and release chart.
+:Notes: Use a simple grouped bar PNG from gnuplot: target-phase elapsed milliseconds, with the CSV as the authoritative data source.
+:END:
+
+** DONE [#A] Aggregate metrics outside platform zips
+:PROPERTIES:
+:Why: Websites should be able to fetch one CSV release asset without unpacking build archives.
+:Change: Extract per-job metrics from downloaded artifacts, add source artifact metadata, and write one longfellow-zk_bip340_metrics.csv.
+:Tests: Run the aggregation script against locally packaged sample artifacts.
+:Done when: The merged CSV is emitted beside release zips and uploaded as its own CI/release artifact.
+:END:
+
+** DONE [#A] Render release chart with gnuplot
+:PROPERTIES:
+:Why: A visual preview in the release helps readers compare native and WASM phase timings immediately.
+:Change: Render a grouped bar chart PNG from the merged CSV and generate a Markdown release note that embeds the PNG release asset.
+:Tests: Run the aggregation script and verify both CSV and PNG exist.
+:Done when: The release job publishes CSV, PNG, and a release body linking the chart image.
+:END:

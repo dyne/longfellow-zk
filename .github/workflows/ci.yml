@@ -152,9 +152,42 @@ jobs:
         path: |
           longfellow-zk_${{ github.job }}.zip
 
+  bip340-metrics:
+    name: Render BIP340 metrics
+    needs: [posix-x86, wasm-wasi, apple-osx]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+    - name: Install metrics tooling
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gnuplot-nox unzip
+    - name: Download build artifacts
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        path: |
+          release
+    - name: Render BIP340 metrics
+      run: |
+        mkdir -p metrics-input release-metrics
+        find release -name '*.zip' -type f -exec unzip -q -d metrics-input {} \;
+        bash scripts/aggregate_bip340_metrics.sh \
+          metrics-input \
+          release-metrics \
+          "${{ needs.posix-x86.outputs.git_sha_short }}" \
+          "${{ github.repository }}"
+    - name: Upload BIP340 metrics artifacts
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: bip340-metrics
+        path: |
+          release-metrics/longfellow-zk_bip340_metrics.csv
+          release-metrics/longfellow-zk_bip340_metrics.png
+          release-metrics/bip340_metrics_release.md
+
   draft-binary-release:
     name: 📦 Pack
-    needs: [posix-x86, wasm-wasi, apple-osx]
+    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
@@ -164,7 +197,7 @@ jobs:
         path: |
           release
     - name: show directory structure
-      run: tree
+      run: find release -maxdepth 3 -print
     - name: list all files to release
       run: |
         find release -type f
@@ -175,7 +208,10 @@ jobs:
           release/posix-x86/*
           release/wasm-wasi/*
           release/apple-osx/*
+          release/bip340-metrics/longfellow-zk_bip340_metrics.csv
+          release/bip340-metrics/longfellow-zk_bip340_metrics.png
         tag_name: ${{ needs.posix-x86.outputs.git_sha_short }}
         draft: false
         prerelease: false
         generate_release_notes: true
+        body_path: release/bip340-metrics/bip340_metrics_release.md
