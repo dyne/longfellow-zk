@@ -4,7 +4,8 @@ set -e
 
 readarray -t sources <<EOF
 
-ec/p256.cc ec/p256k1.cc algebra/nat.cc circuits/sha/flatsha256_witness.cc
+ec/p256.cc ec/p256k1.cc algebra/nat.cc algebra/crt.cc
+circuits/sha/flatsha256_witness.cc
 circuits/sha/sha256_constants.cc circuits/tests/base64/decode_util.cc
 circuits/mdoc/mdoc_zk.cc circuits/mdoc/zk_spec.cc
 circuits/mdoc/mdoc_decompress.cc circuits/mdoc/mdoc_generate_circuit.cc
@@ -16,7 +17,8 @@ algebra/fp.h algebra/fp_generic.h util/serialization.h
 util/readbuffer.h algebra/static_string.h algebra/sysdep.h
 algebra/fp_p256.h algebra/fp_p256k1.h ec/elliptic_curve.h
 ec/p256k1.h util/ceildiv.h
-algebra/convolution.h algebra/blas.h algebra/fft.h
+algebra/convolution.h algebra/crt.h algebra/crt_convolution.h
+algebra/blas.h algebra/fft.h
 algebra/permutations.h algebra/twiddle.h algebra/rfft.h algebra/fp2.h
 algebra/reed_solomon.h algebra/utility.h arrays/dense.h algebra/poly.h
 arrays/affine.h circuits/compiler/circuit_dump.h
@@ -28,6 +30,7 @@ circuits/mdoc/mdoc_decompress.h circuits/mdoc/mdoc_attribute_ids.h
 circuits/logic/bit_plucker.h algebra/interpolation.h
 circuits/logic/bit_plucker_constants.h circuits/logic/polynomial.h
 circuits/logic/compiler_backend.h circuits/logic/logic.h
+circuits/logic/evaluation_backend.h
 gf2k/gf2_128.h gf2k/gf2poly.h circuits/mac/mac_circuit.h
 circuits/mac/mac_reference.h random/random.h
 circuits/mac/mac_witness.h circuits/logic/bit_plucker_encoder.h
@@ -95,6 +98,10 @@ for i in ${headers[@]}; do
 	h="${1}/lib/${i}"
 	cp "$h" src/"$i"
 done
+
+perl -0pi -e 's|// OpenSSL for SHA-256 \(already a project dependency\)\.\n#include <openssl/sha\.h>|#include "util/crypto.h"|' src/circuits/bip340/bip340_witness.h
+perl -0pi -e 's|uint8_t tag_hash\[32\];\n    SHA256_CTX ctx;\n    SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag, tag_len\);\n    SHA256_Final\(tag_hash, &ctx\);|uint8_t tag_hash[32];\n    SHA256 tag_sha;\n    tag_sha.Update(reinterpret_cast<const uint8_t*>(tag), tag_len);\n    tag_sha.DigestData(tag_hash);|' src/circuits/bip340/bip340_witness.h
+perl -0pi -e 's|SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, r_bytes, 32\);\n    SHA256_Update\(&ctx, pk_bytes, 32\);\n    SHA256_Update\(&ctx, msg, msg_len\);\n    SHA256_Final\(hash, &ctx\);|SHA256 challenge_sha;\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(r_bytes, 32);\n    challenge_sha.Update(pk_bytes, 32);\n    challenge_sha.Update(msg, msg_len);\n    challenge_sha.DigestData(hash);|' src/circuits/bip340/bip340_witness.h
 
 for i in ${testdata[@]}; do
 	mkdir -p test/bip340/`dirname ${i#circuits/bip340/}`
