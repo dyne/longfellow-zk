@@ -55,6 +55,14 @@ import-vendor:
 	$(info 🌉 Importing source from upstream)
 	@bash scripts/import_upstream.sh vendor/longfellow-zk
 
+.PHONY: bip340-test
+bip340-test: posix test/bip340_test
+	@./test/bip340_test
+
+test/bip340_test: test/bip340/bip340_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Itest/bip340 -Ivendor/zstd/lib -o $@ $< \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
 clean-vendor: clean
 	$(info 🌉 Clean up build and all imported vendor sources)
 	@bash scripts/import_upstream.sh clean
@@ -63,5 +71,6 @@ clean-vendor: clean
 clean:
 	rm -f *.a
 	rm -f longfellow-zk longfellow-zk.wasm
+	rm -f test/bip340_test
 	@$(MAKE) -C src clean
 	@$(MAKE) -C vendor/zstd clean

@@ -3,7 +3,7 @@
 #+DATE: 2026-07-05
 #+KEYWORDS: bip340 secp256k1 circuit integration vectors wasm ci
 
-* WIP [#A] Import and build BIP340 sources
+* DONE [#A] Import and build BIP340 sources
 :PROPERTIES:
 :Effort: 2h
 :Goal: Add the upstream BIP340 circuit and secp256k1 support files to longfellow-zk-dyne and make native/WASM builds compile them when needed.
@@ -18,7 +18,7 @@
 :Done when: All imported headers resolve locally without reaching outside src/ or test/.
 :END:
 
-** WIP [#A] Wire GNUmake and importer
+** DONE [#A] Wire GNUmake and importer
 :PROPERTIES:
 :Why: CI re-imports selected upstream files before building, so both sources.mk and scripts/import_upstream.sh must know about secp256k1 support.
 :Change: Add ec/p256k1.cc to the library source list, add BIP340/secp256k1 headers to the import allowlist, and ensure POSIX/macOS test builds link OpenSSL crypto for BIP340 tests.
@@ -26,14 +26,14 @@
 :Done when: Native and WASM builds complete with BIP340 files present.
 :END:
 
-* TODO [#A] Add BIP340 integration and vector coverage
+* WIP [#A] Add BIP340 integration and vector coverage
 :PROPERTIES:
 :Effort: 3h
 :Goal: Cover the BIP340 witness and circuit behavior using the Bitcoin vectors and at least one prover/verifier integration path.
 :Notes: Avoid gtest; use a small standalone C++ test binary invoked from Bats so existing CI runs it.
 :END:
 
-** TODO [#A] Add standalone BIP340 test binary
+** DONE [#A] Add standalone BIP340 test binary
 :PROPERTIES:
 :Why: longfellow-zk-dyne currently has Bats CLI tests, not a native C++ unit-test framework.
 :Change: Add test/bip340_test.cc with minimal assertion helpers, vector parsing, valid/invalid evaluation tests, semantic golden checks, circuit size checks, and one ZK prover/verifier round trip.
