@@ -51,7 +51,7 @@
 ** DONE [#A] Add suite selection
 :PROPERTIES:
 :Why: The current WASM runner always executes both BIP340 and mdoc tests, making focused BIP340 validation slow.
-:Change: Add a suite selector for bip340, mdoc, and all; update the WASM CI command to run bip340 only.
+:Change: Add a suite selector for bip340, mdoc, and all; keep CI running all suites while allowing local focused BIP340 runs.
 :Tests: Run node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm.
 :Done when: BIP340-only execution skips mdoc work and still logs timing plus compressed circuit size.
 :END:
@@ -69,4 +69,27 @@
 :Change: Generate a witness from Bitcoin vector 0, prove it, serialize and parse the proof, verify it, and return proof size metrics.
 :Tests: Run make wasm and node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm.
 :Done when: BIP340-only WASM logs circuit and proof compressed byte sizes and passes verification.
+:END:
+
+* DONE [#A] Correct CI and BIP340 phase logs
+:PROPERTIES:
+:Effort: S
+:Goal: Keep CI coverage broad while making BIP340 proof and verification phases visible in WASM logs.
+:Notes: The suite selector is for local focus; CI must exercise every WASM suite.
+:END:
+
+** DONE [#A] Run all WASM suites in CI
+:PROPERTIES:
+:Why: CI was narrowed to BIP340 during local debugging, dropping mdoc WASM coverage.
+:Change: Restore the CI command to run the default all-suite WASM test path.
+:Tests: Inspect workflow and run the focused BIP340 suite locally.
+:Done when: The workflow no longer passes --suite bip340 in CI.
+:END:
+
+** DONE [#A] Print BIP340 proof and verify phase metrics
+:PROPERTIES:
+:Why: The BIP340 smoke output showed one aggregate timing line, hiding proof generation and verification work.
+:Change: Return per-phase BIP340 timings from WASM and print separate log lines for circuit, witness, proof, serialization, and verification phases.
+:Tests: Run node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm.
+:Done when: BIP340 WASM logs include explicit proof generation and proof verification lines with ms and compressed byte sizes.
 :END:

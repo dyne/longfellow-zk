@@ -110,6 +110,20 @@ function verifyMetrics(circuitHexValue, proofHexValue) {
     return `compressed bytes: circuit=${compressedBytes(circuitHexValue)}, proof=${compressedBytes(proofHexValue)}`;
 }
 
+function stepMetrics(step) {
+    const metrics = [`${step.ms} ms`];
+    if (Number.isFinite(step.compressed_bytes)) {
+        metrics.push(`compressed bytes=${step.compressed_bytes}`);
+    }
+    return metricList(metrics);
+}
+
+function logBip340Steps(r) {
+    for (const step of r.steps || []) {
+        info(`BIP340 ${step.name}: ${stepMetrics(step)}`);
+    }
+}
+
 // -- tests -------------------------------------------------------------
 console.log(`${YELLOW}=== longfellow-zk WASM test suite (${suite}, tobuf API) ===${NC}\n`);
 
@@ -130,6 +144,7 @@ if (runBip340) {
         if (!r.result?.includes('successful')) throw new Error(`unexpected: ${result}`);
         if (!r.circuit_data_hex) throw new Error('missing BIP340 circuit_data_hex');
         if (!r.proof_data_hex) throw new Error('missing BIP340 proof_data_hex');
+        logBip340Steps(r);
         ok('Run BIP340 smoke in WASM');
     } catch (e) {
         nok(`Run BIP340 smoke in WASM — ${e.message}`);
