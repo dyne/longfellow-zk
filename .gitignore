@@ -9,3 +9,4 @@ vendor/facebook
 vendor/google
 sources.mk
 longfellow-zk
+test/bip340_test

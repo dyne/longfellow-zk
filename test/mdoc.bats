@@ -1,5 +1,14 @@
 load bats_setup
 
+@test "Run BIP340 circuit integration tests" {
+  run make -C "$R" test/bip340_test
+  assert_success
+
+  run "$R/test/bip340_test"
+  assert_success
+  assert_output --partial "bip340 tests passed"
+}
+
 # Test 1: Generate circuit for zkspec 0 (used by test mdocs)
 @test "Generate circuit for zkspec 0" {
   [[ -r "$T/circuit_0.json" ]] || {

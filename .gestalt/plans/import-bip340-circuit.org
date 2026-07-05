@@ -41,7 +41,7 @@
 :Done when: The binary exits nonzero on failures and reports the covered BIP340 cases on success.
 :END:
 
-** TODO [#A] Integrate BIP340 tests into CI suite
+** DONE [#A] Integrate BIP340 tests into CI suite
 :PROPERTIES:
 :Why: The new coverage must run in the existing CI paths without adding new framework dependencies.
 :Change: Add a Bats case that runs the BIP340 native test binary when present, and keep WASM tests compiling the imported code.
