@@ -11,6 +11,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { randomFillSync } from 'node:crypto';
+import { hrtime } from 'node:process';
 
 // -- module cache ------------------------------------------------------
 let _mod = null;
@@ -60,7 +61,11 @@ function makeWasiImports(memRef) {
         environ_get() { return 0; },
         args_sizes_get() { return 0; },
         args_get() { return 0; },
-        clock_time_get() { return 0; },
+        clock_time_get(clockId, precision, timePtr) {
+            const view = new DataView(buf());
+            view.setBigUint64(timePtr, hrtime.bigint(), true);
+            return 0;
+        },
         random_get(bufPtr, bufLen) {
             randomFillSync(new Uint8Array(buf(), bufPtr, bufLen));
             return 0;
