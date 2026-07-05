@@ -4,21 +4,22 @@ set -e
 
 readarray -t sources <<EOF
 
-ec/p256.cc ec/p256k1.cc algebra/nat.cc algebra/crt.cc
-circuits/sha/flatsha256_witness.cc
+ec/p256.cc algebra/nat.cc circuits/sha/flatsha256_witness.cc
 circuits/sha/sha256_constants.cc circuits/tests/base64/decode_util.cc
 circuits/mdoc/mdoc_zk.cc circuits/mdoc/zk_spec.cc
 circuits/mdoc/mdoc_decompress.cc circuits/mdoc/mdoc_generate_circuit.cc
+EOF
+
+readarray -t optional_sources <<EOF
+ec/p256k1.cc algebra/crt.cc
 EOF
 
 readarray -t headers <<EOF
 
 algebra/fp.h algebra/fp_generic.h util/serialization.h
 util/readbuffer.h algebra/static_string.h algebra/sysdep.h
-algebra/fp_p256.h algebra/fp_p256k1.h ec/elliptic_curve.h
-ec/p256k1.h util/ceildiv.h
-algebra/convolution.h algebra/crt.h algebra/crt_convolution.h
-algebra/blas.h algebra/fft.h
+algebra/fp_p256.h ec/elliptic_curve.h util/ceildiv.h
+algebra/convolution.h algebra/blas.h algebra/fft.h
 algebra/permutations.h algebra/twiddle.h algebra/rfft.h algebra/fp2.h
 algebra/reed_solomon.h algebra/utility.h arrays/dense.h algebra/poly.h
 arrays/affine.h circuits/compiler/circuit_dump.h
@@ -30,7 +31,6 @@ circuits/mdoc/mdoc_decompress.h circuits/mdoc/mdoc_attribute_ids.h
 circuits/logic/bit_plucker.h algebra/interpolation.h
 circuits/logic/bit_plucker_constants.h circuits/logic/polynomial.h
 circuits/logic/compiler_backend.h circuits/logic/logic.h
-circuits/logic/evaluation_backend.h
 gf2k/gf2_128.h gf2k/gf2poly.h circuits/mac/mac_circuit.h
 circuits/mac/mac_reference.h random/random.h
 circuits/mac/mac_witness.h circuits/logic/bit_plucker_encoder.h
@@ -49,6 +49,12 @@ sumcheck/prover_layers.h zk/zk_verifier.h ligero/ligero_verifier.h
 circuits/cbor_parser/cbor_byte_decoder.h circuits/logic/counter.h
 proto/circuit_io.h proto/circuit_reader.h proto/circuit_writer.h
 sumcheck/equad.h sumcheck/hquad.h sumcheck/quad_builder.h
+
+EOF
+
+readarray -t optional_headers <<EOF
+algebra/fp_p256k1.h algebra/crt.h algebra/crt_convolution.h
+ec/p256k1.h circuits/logic/evaluation_backend.h
 circuits/bip340/bip340_verify.h circuits/bip340/bip340_witness.h
 circuits/bip340/bip340_guard.h
 
@@ -64,7 +70,13 @@ EOF
   for i in ${sources[@]}; do
     rm -f src/$i
   done
+  for i in ${optional_sources[@]}; do
+    rm -f src/$i
+  done
   for i in ${headers[@]}; do
+    rm -f src/$i
+  done
+  for i in ${optional_headers[@]}; do
     rm -f src/$i
   done
   for i in ${testdata[@]}; do
@@ -83,6 +95,19 @@ EOF
 	exit 1
 }
 
+copy_optional() {
+	from="$1"
+	to="$2"
+	if [ -r "$from" ]; then
+		cp "$from" "$to"
+	elif [ -r "$to" ]; then
+		>&2 echo "keeping checked-in optional import: $to"
+	else
+		>&2 echo "optional upstream file missing and no checked-in copy: $from"
+		exit 1
+	fi
+}
+
 echo "SOURCES := \\" > src/sources.mk
 for i in ${sources[@]}; do
 	mkdir -p src/`dirname $i`
@@ -92,20 +117,35 @@ for i in ${sources[@]}; do
 	[ -r "$h" ] && cp "$h" "src/${i%.cc}.h"
 	echo "${i}.o \\" >> src/sources.mk
 done
+for i in ${optional_sources[@]}; do
+	mkdir -p src/`dirname $i`
+	cc="${1}/lib/${i}"
+	h="${cc%.cc}.h"
+	copy_optional "$cc" src/"$i"
+	[ -r "$h" ] && cp "$h" "src/${i%.cc}.h"
+	echo "${i}.o \\" >> src/sources.mk
+done
 
 for i in ${headers[@]}; do
 	mkdir -p src/`dirname $i`
 	h="${1}/lib/${i}"
 	cp "$h" src/"$i"
 done
+for i in ${optional_headers[@]}; do
+	mkdir -p src/`dirname $i`
+	h="${1}/lib/${i}"
+	copy_optional "$h" src/"$i"
+done
 
-perl -0pi -e 's|// OpenSSL for SHA-256 \(already a project dependency\)\.\n#include <openssl/sha\.h>|#include "util/crypto.h"|' src/circuits/bip340/bip340_witness.h
-perl -0pi -e 's|uint8_t tag_hash\[32\];\n    SHA256_CTX ctx;\n    SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag, tag_len\);\n    SHA256_Final\(tag_hash, &ctx\);|uint8_t tag_hash[32];\n    SHA256 tag_sha;\n    tag_sha.Update(reinterpret_cast<const uint8_t*>(tag), tag_len);\n    tag_sha.DigestData(tag_hash);|' src/circuits/bip340/bip340_witness.h
-perl -0pi -e 's|SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, r_bytes, 32\);\n    SHA256_Update\(&ctx, pk_bytes, 32\);\n    SHA256_Update\(&ctx, msg, msg_len\);\n    SHA256_Final\(hash, &ctx\);|SHA256 challenge_sha;\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(r_bytes, 32);\n    challenge_sha.Update(pk_bytes, 32);\n    challenge_sha.Update(msg, msg_len);\n    challenge_sha.DigestData(hash);|' src/circuits/bip340/bip340_witness.h
+if [ -r src/circuits/bip340/bip340_witness.h ]; then
+	perl -0pi -e 's|// OpenSSL for SHA-256 \(already a project dependency\)\.\n#include <openssl/sha\.h>|#include "util/crypto.h"|' src/circuits/bip340/bip340_witness.h
+	perl -0pi -e 's|uint8_t tag_hash\[32\];\n    SHA256_CTX ctx;\n    SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag, tag_len\);\n    SHA256_Final\(tag_hash, &ctx\);|uint8_t tag_hash[32];\n    SHA256 tag_sha;\n    tag_sha.Update(reinterpret_cast<const uint8_t*>(tag), tag_len);\n    tag_sha.DigestData(tag_hash);|' src/circuits/bip340/bip340_witness.h
+	perl -0pi -e 's|SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, r_bytes, 32\);\n    SHA256_Update\(&ctx, pk_bytes, 32\);\n    SHA256_Update\(&ctx, msg, msg_len\);\n    SHA256_Final\(hash, &ctx\);|SHA256 challenge_sha;\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(r_bytes, 32);\n    challenge_sha.Update(pk_bytes, 32);\n    challenge_sha.Update(msg, msg_len);\n    challenge_sha.DigestData(hash);|' src/circuits/bip340/bip340_witness.h
+fi
 
 for i in ${testdata[@]}; do
 	mkdir -p test/bip340/`dirname ${i#circuits/bip340/}`
-	cp "${1}/lib/${i}" "test/bip340/${i#circuits/bip340/}"
+	copy_optional "${1}/lib/${i}" "test/bip340/${i#circuits/bip340/}"
 done
 
 >&2 echo "🌉 Upstream source imported from $1"
