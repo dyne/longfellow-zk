@@ -4,7 +4,7 @@ set -e
 
 readarray -t sources <<EOF
 
-ec/p256.cc algebra/nat.cc circuits/sha/flatsha256_witness.cc
+ec/p256.cc ec/p256k1.cc algebra/nat.cc circuits/sha/flatsha256_witness.cc
 circuits/sha/sha256_constants.cc circuits/tests/base64/decode_util.cc
 circuits/mdoc/mdoc_zk.cc circuits/mdoc/zk_spec.cc
 circuits/mdoc/mdoc_decompress.cc circuits/mdoc/mdoc_generate_circuit.cc
@@ -14,7 +14,8 @@ readarray -t headers <<EOF
 
 algebra/fp.h algebra/fp_generic.h util/serialization.h
 util/readbuffer.h algebra/static_string.h algebra/sysdep.h
-algebra/fp_p256.h ec/elliptic_curve.h util/ceildiv.h
+algebra/fp_p256.h algebra/fp_p256k1.h ec/elliptic_curve.h
+ec/p256k1.h util/ceildiv.h
 algebra/convolution.h algebra/blas.h algebra/fft.h
 algebra/permutations.h algebra/twiddle.h algebra/rfft.h algebra/fp2.h
 algebra/reed_solomon.h algebra/utility.h arrays/dense.h algebra/poly.h
@@ -45,7 +46,15 @@ sumcheck/prover_layers.h zk/zk_verifier.h ligero/ligero_verifier.h
 circuits/cbor_parser/cbor_byte_decoder.h circuits/logic/counter.h
 proto/circuit_io.h proto/circuit_reader.h proto/circuit_writer.h
 sumcheck/equad.h sumcheck/hquad.h sumcheck/quad_builder.h
+circuits/bip340/bip340_verify.h circuits/bip340/bip340_witness.h
+circuits/bip340/bip340_guard.h
 
+EOF
+
+readarray -t testdata <<EOF
+circuits/bip340/testdata/bip340_vectors.inc
+circuits/bip340/testdata/bip340_golden.inc
+circuits/bip340/testdata/bip340_test_vectors.csv
 EOF
 
 [ "$1" == "clean" ] && {
@@ -54,6 +63,9 @@ EOF
   done
   for i in ${headers[@]}; do
     rm -f src/$i
+  done
+  for i in ${testdata[@]}; do
+    rm -f test/bip340/${i#circuits/bip340/}
   done
   exit 0
 }
@@ -77,16 +89,16 @@ for i in ${sources[@]}; do
 	[ -r "$h" ] && cp "$h" "src/${i%.cc}.h"
 	echo "${i}.o \\" >> src/sources.mk
 done
-echo "src/util/sha256.cc.o    \\" >> sources.mk
-echo "src/util/aes_ecb.cc.o    \\" >> sources.mk
-# echo "util/randombytes.cc.o \\" >> sources.mk
-
-echo >> sources.mk
 
 for i in ${headers[@]}; do
 	mkdir -p src/`dirname $i`
 	h="${1}/lib/${i}"
 	cp "$h" src/"$i"
+done
+
+for i in ${testdata[@]}; do
+	mkdir -p test/bip340/`dirname ${i#circuits/bip340/}`
+	cp "${1}/lib/${i}" "test/bip340/${i#circuits/bip340/}"
 done
 
 >&2 echo "🌉 Upstream source imported from $1"
