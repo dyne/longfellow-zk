@@ -8,7 +8,7 @@
  * Usage: node test/wasm_test.mjs [--suite bip340|mdoc|all] [path/to/longfellow-zk.wasm]
  */
 
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { exit, argv } from 'node:process';
 import { performance } from 'node:perf_hooks';
@@ -47,6 +47,7 @@ const NC = '\x1b[0m';
 
 let pass = 0;
 let fail = 0;
+const metricRows = [];
 
 function ok(msg)   { console.log(`  ${GREEN}✓${NC} ${msg}`); pass++; }
 function nok(msg)  { console.log(`  ${RED}✗${NC} ${msg}`); fail++; }
@@ -120,8 +121,39 @@ function stepMetrics(step) {
 
 function logBip340Steps(r) {
     for (const step of r.steps || []) {
-        info(`BIP340 ${step.name}: ${stepMetrics(step)}`);
+        info(`BIP340 ${step.phase}: ${stepMetrics(step)}`);
+        metricRows.push({
+            target: 'wasm',
+            circuit: 'bip340',
+            phase: step.phase,
+            ms: step.ms,
+            compressed_bytes: step.compressed_bytes || 0,
+            public_inputs: r.public_inputs,
+            total_inputs: r.total_inputs,
+            quad_terms: r.quad_terms,
+            crt_block_enc: r.crt_block_enc,
+        });
     }
+}
+
+function csvEscape(value) {
+    const s = String(value ?? '');
+    return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+}
+
+async function writeMetricsCsv(target) {
+    if (metricRows.length === 0) return;
+    const columns = [
+        'target', 'circuit', 'phase', 'ms', 'compressed_bytes',
+        'public_inputs', 'total_inputs', 'quad_terms', 'crt_block_enc',
+    ];
+    const lines = [
+        columns.join(','),
+        ...metricRows.map((row) => columns.map((c) => csvEscape(row[c])).join(',')),
+    ];
+    const outDir = join(testDir, 'results');
+    await mkdir(outDir, { recursive: true });
+    await writeFile(join(outDir, `${target}_bip340_metrics.csv`), `${lines.join('\n')}\n`);
 }
 
 // -- tests -------------------------------------------------------------
@@ -400,5 +432,6 @@ if (runMdoc) {
 }
 
 // -- summary -----------------------------------------------------------
+await writeMetricsCsv('wasm');
 console.log(`\n${YELLOW}=== Results: ${GREEN}${pass} passed${NC}, ${RED}${fail} failed${NC} ${YELLOW}===${NC}`);
 exit(fail > 0 ? 1 : 0);

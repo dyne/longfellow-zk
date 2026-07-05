@@ -5,15 +5,18 @@
 
 #include "circuits/bip340/bip340_verify.h"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 
 #include "algebra/crt.h"
@@ -28,6 +31,8 @@
 #include "circuits/logic/evaluation_backend.h"
 #include "circuits/logic/logic.h"
 #include "ec/p256k1.h"
+#include "proto/circuit_writer.h"
+#include "util/readbuffer.h"
 #include "random/secure_random_engine.h"
 #include "random/transcript.h"
 #include "util/log.h"
@@ -40,6 +45,7 @@ namespace {
 
 constexpr size_t kRate = 4;
 constexpr size_t kQueries = 128;
+using Clock = std::chrono::steady_clock;
 
 using Field = Fp256k1Base;
 using Nat = typename Field::N;
@@ -50,10 +56,25 @@ struct TestFailure : std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 
+struct MetricRow {
+  const char* phase;
+  long ms;
+  size_t compressed_bytes;
+  size_t public_inputs;
+  size_t total_inputs;
+  size_t quad_terms;
+  size_t crt_block_enc;
+};
+
 void Require(bool ok, const std::string& msg) {
   if (!ok) {
     throw TestFailure(msg);
   }
+}
+
+long ElapsedMs(Clock::time_point start, Clock::time_point finish) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(finish - start)
+      .count();
 }
 
 template <typename T>
@@ -383,21 +404,60 @@ void TestCircuitSize() {
   Require(err.empty(), err);
 }
 
-void TestZkProverVerifierVector0() {
+std::string ResultDir(const char* argv0) {
+  std::string path = argv0 ? argv0 : "";
+  auto slash = path.find_last_of('/');
+  if (slash == std::string::npos) {
+    return "test/results";
+  }
+  return path.substr(0, slash) + "/results";
+}
+
+void WriteMetricsCsv(const char* argv0, const std::vector<MetricRow>& rows) {
+  auto dir = ResultDir(argv0);
+  (void)mkdir(dir.c_str(), 0777);
+  std::ofstream out(dir + "/native_bip340_metrics.csv");
+  Require(out.good(), "failed to open native metrics CSV");
+  out << "target,circuit,phase,ms,compressed_bytes,public_inputs,total_inputs,"
+         "quad_terms,crt_block_enc\n";
+  for (const auto& row : rows) {
+    out << "native,bip340," << row.phase << ',' << row.ms << ','
+        << row.compressed_bytes << ',' << row.public_inputs << ','
+        << row.total_inputs << ',' << row.quad_terms << ','
+        << row.crt_block_enc << '\n';
+  }
+}
+
+void TestZkProverVerifierVector0(const char* argv0) {
   const Field& F = p256k1_base;
   const EC& ec = p256k1;
   const auto& tv = kRealVectors[0];
   auto pk = HexVec(tv.pk_hex);
   auto msg = HexVec(tv.msg_hex);
   auto sig = HexVec(tv.sig_hex);
+  std::vector<MetricRow> metrics;
 
+  auto phase_start = Clock::now();
+  QuadCircuit<Field> Q(F);
+  auto CIRCUIT = BuildCircuit(Q);
+  std::vector<uint8_t> circuit_bytes;
+  CircuitWriter<Field> circuit_writer(F, SECP_ID);
+  circuit_writer.to_bytes(*CIRCUIT, circuit_bytes);
+
+  using Crt = CRT256<Field>;
+  size_t block_enc = CIRCUIT->ninputs - CIRCUIT->npub_in + Q.nquad_terms_ + 1;
+  auto err = check_crt_block_enc<Crt>(block_enc);
+  Require(err.empty(), err);
+  auto phase_finish = Clock::now();
+  metrics.push_back({"build_serialize_circuit",
+                     ElapsedMs(phase_start, phase_finish),
+                     circuit_bytes.size(), CIRCUIT->npub_in, CIRCUIT->ninputs,
+                     Q.nquad_terms_, block_enc});
+
+  phase_start = Clock::now();
   Bip340Witness wit(ec);
   Require(wit.compute(sig.data(), pk.data(), msg.data(), msg.size()),
           "vector 0 witness compute failed");
-
-  QuadCircuit<Field> Q(F);
-  auto CIRCUIT = BuildCircuit(Q);
-
   auto W = std::make_unique<Dense<Field>>(1, CIRCUIT->ninputs);
   {
     DenseFiller<Field> filler(*W);
@@ -409,7 +469,6 @@ void TestZkProverVerifierVector0() {
     wit.fill_witness(filler);
   }
 
-  using Crt = CRT256<Field>;
   using ConvolutionFactory = CrtConvolutionFactory<Crt, Field>;
   using RSFactory = ReedSolomonFactory<Field, ConvolutionFactory>;
 
@@ -425,6 +484,19 @@ void TestZkProverVerifierVector0() {
   prover.commit(zkpr, *W, tp, rng);
   Require(prover.prove(zkpr, *W, tp), "prover failed");
 
+  std::vector<uint8_t> proof_bytes;
+  zkpr.write(proof_bytes, F);
+  phase_finish = Clock::now();
+  metrics.push_back({"witness_prove_serialize",
+                     ElapsedMs(phase_start, phase_finish),
+                     proof_bytes.size(), CIRCUIT->npub_in, CIRCUIT->ninputs,
+                     Q.nquad_terms_, block_enc});
+
+  phase_start = Clock::now();
+  ReadBuffer proof_rb(proof_bytes.data(), proof_bytes.size());
+  ZkProof<Field> parsed_proof(*CIRCUIT, kRate, kQueries);
+  Require(parsed_proof.read(proof_rb, F), "proof parse failed");
+
   Transcript trv(reinterpret_cast<uint8_t*>(const_cast<char*>("bip340 vec0")),
                  11);
   Dense<Field> pub(1, CIRCUIT->npub_in);
@@ -438,8 +510,14 @@ void TestZkProverVerifierVector0() {
   }
 
   ZkVerifier<Field, RSFactory> verifier(*CIRCUIT, rsf, kRate, kQueries, F);
-  verifier.recv_commitment(zkpr, trv);
-  Require(verifier.verify(zkpr, pub, trv), "verifier rejected proof");
+  verifier.recv_commitment(parsed_proof, trv);
+  Require(verifier.verify(parsed_proof, pub, trv), "verifier rejected proof");
+  phase_finish = Clock::now();
+  metrics.push_back({"deserialize_verify_proof",
+                     ElapsedMs(phase_start, phase_finish),
+                     proof_bytes.size(), CIRCUIT->npub_in, CIRCUIT->ninputs,
+                     Q.nquad_terms_, block_enc});
+  WriteMetricsCsv(argv0, metrics);
 }
 
 void Run(const char* name, const std::function<void()>& fn) {
@@ -450,8 +528,9 @@ void Run(const char* name, const std::function<void()>& fn) {
 }  // namespace
 }  // namespace proofs
 
-int main() {
+int main(int argc, char** argv) {
   try {
+    const char* argv0 = argc > 0 ? argv[0] : "test/bip340_test";
     proofs::set_log_level(proofs::ERROR);
     proofs::Run("hex parser rejects malformed input", proofs::TestHexParser);
     proofs::Run("scalar evaluation accepts and rejects witnesses",
@@ -462,7 +541,7 @@ int main() {
                 proofs::TestGoldenFacts);
     proofs::Run("compiled circuit has expected shape", proofs::TestCircuitSize);
     proofs::Run("zk prover/verifier accepts bitcoin vector 0",
-                proofs::TestZkProverVerifierVector0);
+                [&]() { proofs::TestZkProverVerifierVector0(argv0); });
   } catch (const std::exception& e) {
     std::cerr << "not ok - " << e.what() << '\n';
     return 1;
