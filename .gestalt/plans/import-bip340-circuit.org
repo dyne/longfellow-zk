@@ -26,7 +26,7 @@
 :Done when: Native and WASM builds complete with BIP340 files present.
 :END:
 
-* WIP [#A] Add BIP340 integration and vector coverage
+* DONE [#A] Add BIP340 integration and vector coverage
 :PROPERTIES:
 :Effort: 3h
 :Goal: Cover the BIP340 witness and circuit behavior using the Bitcoin vectors and at least one prover/verifier integration path.
