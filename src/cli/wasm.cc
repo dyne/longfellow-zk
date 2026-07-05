@@ -42,7 +42,10 @@
 #include "circuits/mdoc/mdoc_zk.h"
 #include "circuits/tests/base64/decode_util.h"
 #include "ec/p256k1.h"
+#include "proto/circuit_reader.h"
+#include "proto/circuit_writer.h"
 #include "util/crypto.h"
+#include "util/readbuffer.h"
 
 using json = nlohmann::json;
 
@@ -156,7 +159,21 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
         return buf_err(err_buf, err_len, "%s", err.c_str());
     }
 
+    std::vector<uint8_t> circuit_bytes;
+    proofs::CircuitWriter<Field> writer(proofs::p256k1_base, proofs::SECP_ID);
+    writer.to_bytes(*circuit, circuit_bytes);
+
+    proofs::ReadBuffer rb(circuit_bytes.data(), circuit_bytes.size());
+    proofs::CircuitReader<Field> reader(proofs::p256k1_base, proofs::SECP_ID);
+    auto decoded = reader.from_bytes(rb, true);
+    if (!decoded) {
+        return buf_err(err_buf, err_len,
+                       "BIP340 serialized circuit failed round-trip decode");
+    }
+
     output["result"] = "bip340 smoke successful";
+    output["circuit_data_hex"] = bytes_to_hex(circuit_bytes.data(), circuit_bytes.size());
+    output["_circuit_size"] = circuit_bytes.size();
     output["public_inputs"] = circuit->npub_in;
     output["total_inputs"] = circuit->ninputs;
     output["quad_terms"] = q.nquad_terms_;
