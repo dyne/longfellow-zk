@@ -280,6 +280,21 @@ export async function generateCircuit(zkspecIndex) {
 }
 
 /**
+ * Compile the imported BIP340 circuit inside WASM as a smoke test.
+ *
+ * @returns {Promise<{result: string, logs: string}>} result is JSON string
+ */
+export async function bip340Smoke() {
+    return callBufferApi(
+        'longfellow_zk_bip340_smoke_tobuf',
+        [],
+        [],
+        DEFAULT_STDOUT,
+        DEFAULT_STDERR
+    );
+}
+
+/**
  * Generate a ZK proof.
  *
  * @param {object} params

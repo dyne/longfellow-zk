@@ -41,6 +41,7 @@ wasm:
 		-Wl,--export=longfellow_zk_generate_circuit_tobuf \
 		-Wl,--export=longfellow_zk_generate_proof_tobuf \
 		-Wl,--export=longfellow_zk_verify_proof_tobuf \
+		-Wl,--export=longfellow_zk_bip340_smoke_tobuf \
     -o longfellow-zk.wasm src/cli/wasm.o \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
