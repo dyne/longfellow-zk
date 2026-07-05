@@ -289,7 +289,7 @@ export async function bip340Smoke() {
         'longfellow_zk_bip340_smoke_tobuf',
         [],
         [],
-        DEFAULT_STDOUT,
+        CIRCUIT_STDOUT,
         DEFAULT_STDERR
     );
 }

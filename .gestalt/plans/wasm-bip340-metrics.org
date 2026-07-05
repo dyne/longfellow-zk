@@ -18,6 +18,14 @@
 :Done when: The WASM test suite can call the BIP340 export and fail loudly if the circuit cannot be built in WASM.
 :END:
 
+** DONE [#A] Serialize BIP340 circuit artifact
+:PROPERTIES:
+:Why: Building the BIP340 circuit in memory does not exercise the artifact path used by other WASM circuit flows.
+:Change: Serialize the BIP340 circuit with the secp256k1 field id, read it back once, and return the serialized bytes as hex from the WASM smoke export.
+:Tests: Run make wasm and node test/wasm_test.mjs.
+:Done when: The BIP340 WASM test logs a real compressed circuit byte size from circuit_data_hex.
+:END:
+
 * DONE [#B] Log WASM step metrics
 :PROPERTIES:
 :Effort: S
