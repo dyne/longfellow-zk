@@ -20,16 +20,16 @@ jobs:
         compiler:
           - { cc: clang, cxx: clang++ }
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         fetch-depth: 0
         submodules: recursive
     - name: short SHA of current commit
       id: sha
       run: echo "git_sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-    - uses: hendrikmuhs/ccache-action@v1.2
+    - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
     - name: Cache APT packages
-      uses: awalsh128/cache-apt-pkgs-action@latest
+      uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
       with:
         packages: "build-essential g++ clang make jq xxd"
     - name: Import upstream longfellow-zk
@@ -58,7 +58,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ${{ github.job }}
         path: |
@@ -72,17 +72,17 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         fetch-depth: 0
         submodules: recursive
-    - uses: hendrikmuhs/ccache-action@v1.2
+    - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
     - name: Cache APT packages
-      uses: awalsh128/cache-apt-pkgs-action@latest
+      uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
       with:
         packages: "build-essential make jq xxd g++"
     - name: Install WASI SDK
-      uses: konsumer/install-wasi-sdk@v1
+      uses: konsumer/install-wasi-sdk@d728b7abb7ef7db1610039d9798a8270e23f56f8 # v1.0.0
       with:
         version: "33"   # specify WASI SDK version
         install-path: "/opt/wasi-sdk"
@@ -101,7 +101,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ${{ github.job }}
         path: |
@@ -111,11 +111,11 @@ jobs:
     name: Build & Test on Apple OSX 15 ARM64
     runs-on: macos-15
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         fetch-depth: 0
         submodules: recursive
-    - uses: hendrikmuhs/ccache-action@v1.2
+    - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
     - name: Install latest Bash via Homebrew
       run: |
         brew install bash
@@ -146,7 +146,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ${{ github.job }}
         path: |
@@ -159,7 +159,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
     - name: download binary artifacts
-      uses: actions/download-artifact@v8
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
         path: |
           release
@@ -169,7 +169,7 @@ jobs:
       run: |
         find release -type f
     - name: release all binary artifacts
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
       with:
         files: |
           release/posix-x86/*
