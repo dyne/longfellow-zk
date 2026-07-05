@@ -29,23 +29,34 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "algebra/crt.h"
+#include "algebra/crt_convolution.h"
+#include "algebra/reed_solomon.h"
+#include "arrays/dense.h"
 #include "cli/json.hpp"
 #include "circuits/bip340/bip340_guard.h"
 #include "circuits/bip340/bip340_verify.h"
+#include "circuits/bip340/bip340_witness.h"
 #include "circuits/compiler/compiler.h"
 #include "circuits/logic/compiler_backend.h"
+#include "circuits/logic/evaluation_backend.h"
 #include "circuits/logic/logic.h"
 #include "circuits/mdoc/mdoc_zk.h"
 #include "circuits/tests/base64/decode_util.h"
 #include "ec/p256k1.h"
 #include "proto/circuit_reader.h"
 #include "proto/circuit_writer.h"
+#include "random/secure_random_engine.h"
+#include "random/transcript.h"
 #include "util/crypto.h"
 #include "util/readbuffer.h"
+#include "zk/zk_proof.h"
+#include "zk/zk_prover.h"
+#include "zk/zk_verifier.h"
 
 using json = nlohmann::json;
 
@@ -72,12 +83,21 @@ static int buf_err(char *buf, size_t buf_len, const char *fmt, ...) {
 
 // -- hex <-> bytes -----------------------------------------------------
 
+static int hex_value(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return -1;
+}
+
 static std::vector<uint8_t> hex_to_bytes(const std::string &hex) {
     std::vector<uint8_t> bytes;
     bytes.reserve(hex.length() / 2);
     for (size_t i = 0; i + 1 < hex.length(); i += 2) {
-        char byte_str[3] = {hex[i], hex[i + 1], '\0'};
-        bytes.push_back(static_cast<uint8_t>(strtol(byte_str, nullptr, 16)));
+        int hi = hex_value(hex[i]);
+        int lo = hex_value(hex[i + 1]);
+        if (hi < 0 || lo < 0) return {};
+        bytes.push_back(static_cast<uint8_t>((hi << 4) | lo));
     }
     return bytes;
 }
@@ -122,26 +142,30 @@ static int buf_copy_or_err(char *dst, size_t dst_len,
 }
 
 static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
+    constexpr size_t kRate = 4;
+    constexpr size_t kQueries = 128;
     using Field = proofs::Fp256k1Base;
     using EC = proofs::P256k1;
     using Backend = proofs::CompilerBackend<Field>;
     using LogicCircuit = proofs::Logic<Field, Backend>;
     using Verify = proofs::Bip340Verify<LogicCircuit, Field, EC>;
     using Crt = proofs::CRT256<Field>;
+    using ConvolutionFactory = proofs::CrtConvolutionFactory<Crt, Field>;
+    using RSFactory = proofs::ReedSolomonFactory<Field, ConvolutionFactory>;
 
     proofs::QuadCircuit<Field> q(proofs::p256k1_base);
     const Backend backend(&q);
     const LogicCircuit logic(&backend, proofs::p256k1_base);
     Verify verify(logic, proofs::p256k1);
 
-    auto rx = logic.eltw_input();
-    auto px = logic.eltw_input();
-    auto e = logic.eltw_input();
+    auto rx_wire = logic.eltw_input();
+    auto px_wire = logic.eltw_input();
+    auto e_wire = logic.eltw_input();
 
-    typename Verify::Witness witness;
+    typename Verify::Witness circuit_witness;
     q.private_input();
-    witness.input(logic);
-    verify.assert_verify(rx, px, e, witness);
+    circuit_witness.input(logic);
+    verify.assert_verify(rx_wire, px_wire, e_wire, circuit_witness);
 
     auto circuit = q.mkcircuit(1);
     if (!circuit) {
@@ -171,9 +195,119 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
                        "BIP340 serialized circuit failed round-trip decode");
     }
 
+    auto pub = std::make_unique<proofs::Dense<Field>>(1, decoded->npub_in);
+    auto witness_values = std::make_unique<proofs::Dense<Field>>(1, decoded->ninputs);
+
+    auto pk = hex_to_bytes(
+        "F9308A019258C31049344F85F89D5229B531C845836F99B08601F113BCE036F9");
+    auto msg = hex_to_bytes(
+        "0000000000000000000000000000000000000000000000000000000000000000");
+    auto sig = hex_to_bytes(
+        "E907831F80848D1069A5371B402410364BDF1C5F8307B0084C55F1CE2DCA8215"
+        "25F66A4A85EA8B71E482A74F382D2CE5EBEEE8FDB2172F477DF4900D310536C0");
+    if (pk.size() != 32 || msg.size() != 32 || sig.size() != 64) {
+        return buf_err(err_buf, err_len, "BIP340 integration fixture malformed");
+    }
+
+    proofs::Bip340Witness bip340_witness(proofs::p256k1);
+    if (!bip340_witness.compute(sig.data(), pk.data(), msg.data(), msg.size())) {
+        return buf_err(err_buf, err_len, "BIP340 fixture witness generation failed");
+    }
+
+    auto rx = proofs::p256k1_base.to_montgomery(
+        proofs::Bip340Witness::nat_from_be_bytes(sig.data()));
+    auto px = proofs::p256k1_base.to_montgomery(
+        proofs::Bip340Witness::nat_from_be_bytes(pk.data()));
+
+    {
+        proofs::DenseFiller<Field> filler(*witness_values);
+        filler.push_back(proofs::p256k1_base.one());
+        filler.push_back(rx);
+        filler.push_back(px);
+        filler.push_back(bip340_witness.e_);
+        bip340_witness.fill_witness(filler);
+    }
+    {
+        proofs::DenseFiller<Field> filler(*pub);
+        filler.push_back(proofs::p256k1_base.one());
+        filler.push_back(rx);
+        filler.push_back(px);
+        filler.push_back(bip340_witness.e_);
+    }
+
+    {
+        using EvalBackend = proofs::EvaluationBackend<Field>;
+        using EvalLogic = proofs::Logic<Field, EvalBackend>;
+        using EvalVerify = proofs::Bip340Verify<EvalLogic, Field, EC>;
+
+        const EvalBackend eval_backend(proofs::p256k1_base, false);
+        const EvalLogic eval_logic(&eval_backend, proofs::p256k1_base);
+        EvalVerify eval_verify(eval_logic, proofs::p256k1);
+
+        typename EvalVerify::Witness eval_witness;
+        for (size_t i = 0; i < proofs::Bip340Witness::kBits; ++i) {
+            eval_witness.bits_s[i] = eval_logic.konst(bip340_witness.bits_s_[i]);
+            eval_witness.bits_e[i] = eval_logic.konst(bip340_witness.bits_e_[i]);
+            eval_witness.bits_ry[i] = eval_logic.konst(bip340_witness.bits_ry_[i]);
+            if (i < proofs::Bip340Witness::kBits - 1) {
+                eval_witness.int_sx[i] = eval_logic.konst(bip340_witness.int_sx_[i]);
+                eval_witness.int_sy[i] = eval_logic.konst(bip340_witness.int_sy_[i]);
+                eval_witness.int_sz[i] = eval_logic.konst(bip340_witness.int_sz_[i]);
+                eval_witness.int_ex[i] = eval_logic.konst(bip340_witness.int_ex_[i]);
+                eval_witness.int_ey[i] = eval_logic.konst(bip340_witness.int_ey_[i]);
+                eval_witness.int_ez[i] = eval_logic.konst(bip340_witness.int_ez_[i]);
+            }
+        }
+        eval_witness.py = eval_logic.konst(bip340_witness.py_);
+        eval_witness.ry = eval_logic.konst(bip340_witness.ry_);
+        eval_witness.rz_inv = eval_logic.konst(bip340_witness.rz_inv_);
+
+        eval_verify.assert_verify(eval_logic.konst(rx),
+                                  eval_logic.konst(px),
+                                  eval_logic.konst(bip340_witness.e_),
+                                  eval_witness);
+        if (eval_backend.assertion_failed()) {
+            return buf_err(err_buf, err_len,
+                           "BIP340 fixture witness failed direct evaluation");
+        }
+    }
+
+    ConvolutionFactory factory(proofs::p256k1_base);
+    RSFactory rsf(factory, proofs::p256k1_base);
+    proofs::SecureRandomEngine rng;
+
+    uint8_t transcript_label[] = "bip340 wasm proof";
+    proofs::Transcript tp(transcript_label, sizeof(transcript_label) - 1);
+
+    proofs::ZkProof<Field> proof(*decoded, kRate, kQueries, block_enc);
+    proofs::ZkProver<Field, RSFactory> prover(*decoded, proofs::p256k1_base, rsf);
+    prover.commit(proof, *witness_values, tp, rng);
+    if (!prover.prove(proof, *witness_values, tp)) {
+        return buf_err(err_buf, err_len, "BIP340 proof generation failed");
+    }
+
+    std::vector<uint8_t> proof_bytes;
+    proof.write(proof_bytes, proofs::p256k1_base);
+
+    proofs::ReadBuffer proof_rb(proof_bytes.data(), proof_bytes.size());
+    proofs::ZkProof<Field> parsed_proof(*decoded, kRate, kQueries, block_enc);
+    if (!parsed_proof.read(proof_rb, proofs::p256k1_base)) {
+        return buf_err(err_buf, err_len, "BIP340 serialized proof failed decode");
+    }
+
+    proofs::Transcript tv(transcript_label, sizeof(transcript_label) - 1);
+    proofs::ZkVerifier<Field, RSFactory> verifier(*decoded, rsf, kRate, kQueries,
+                                                  block_enc, proofs::p256k1_base);
+    verifier.recv_commitment(parsed_proof, tv);
+    if (!verifier.verify(parsed_proof, *pub, tv)) {
+        return buf_err(err_buf, err_len, "BIP340 verifier rejected proof");
+    }
+
     output["result"] = "bip340 smoke successful";
     output["circuit_data_hex"] = bytes_to_hex(circuit_bytes.data(), circuit_bytes.size());
+    output["proof_data_hex"] = bytes_to_hex(proof_bytes.data(), proof_bytes.size());
     output["_circuit_size"] = circuit_bytes.size();
+    output["_proof_size"] = proof_bytes.size();
     output["public_inputs"] = circuit->npub_in;
     output["total_inputs"] = circuit->ninputs;
     output["quad_terms"] = q.nquad_terms_;

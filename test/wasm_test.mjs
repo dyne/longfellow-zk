@@ -123,12 +123,13 @@ if (runBip340) {
             () => bip340Smoke(),
             ({ result }) => {
                 const r = JSON.parse(result);
-                return `${circuitMetrics(r.circuit_data_hex)}, public inputs=${r.public_inputs}, total inputs=${r.total_inputs}, quad terms=${r.quad_terms}`;
+                return `${verifyMetrics(r.circuit_data_hex, r.proof_data_hex)}, public inputs=${r.public_inputs}, total inputs=${r.total_inputs}, quad terms=${r.quad_terms}`;
             }
         );
         const r = JSON.parse(result);
         if (!r.result?.includes('successful')) throw new Error(`unexpected: ${result}`);
         if (!r.circuit_data_hex) throw new Error('missing BIP340 circuit_data_hex');
+        if (!r.proof_data_hex) throw new Error('missing BIP340 proof_data_hex');
         ok('Run BIP340 smoke in WASM');
     } catch (e) {
         nok(`Run BIP340 smoke in WASM — ${e.message}`);

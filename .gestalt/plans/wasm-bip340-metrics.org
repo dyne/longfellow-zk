@@ -55,3 +55,18 @@
 :Tests: Run node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm.
 :Done when: BIP340-only execution skips mdoc work and still logs timing plus compressed circuit size.
 :END:
+
+* DONE [#A] Complete BIP340 WASM proof flow
+:PROPERTIES:
+:Effort: M
+:Goal: Make the BIP340 WASM suite exercise circuit serialization, proof generation, proof serialization, proof parsing, and verification.
+:Notes: Use Bitcoin BIP-340 vector 0 in WASM so the platform test exercises the imported real-vector path end to end.
+:END:
+
+** DONE [#A] Prove and verify BIP340 in WASM
+:PROPERTIES:
+:Why: The BIP340 WASM path currently serializes only the circuit artifact and does not prove or verify.
+:Change: Generate a witness from Bitcoin vector 0, prove it, serialize and parse the proof, verify it, and return proof size metrics.
+:Tests: Run make wasm and node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm.
+:Done when: BIP340-only WASM logs circuit and proof compressed byte sizes and passes verification.
+:END:
