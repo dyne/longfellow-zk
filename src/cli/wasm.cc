@@ -160,7 +160,7 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
     using RSFactory = proofs::ReedSolomonFactory<Field, ConvolutionFactory>;
 
     json steps = json::array();
-    auto step_start = Clock::now();
+    auto phase_start = Clock::now();
 
     proofs::QuadCircuit<Field> q(proofs::p256k1_base);
     std::unique_ptr<proofs::Circuit<Field>> circuit;
@@ -180,9 +180,6 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
 
         circuit = q.mkcircuit(1);
     }
-    auto step_finish = Clock::now();
-    steps.push_back({{"name", "build circuit"}, {"ms", elapsed_ms(step_start, step_finish)}});
-
     if (!circuit) {
         return buf_err(err_buf, err_len, "BIP340 circuit build returned null");
     }
@@ -198,7 +195,6 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
         return buf_err(err_buf, err_len, "%s", err.c_str());
     }
 
-    step_start = Clock::now();
     std::vector<uint8_t> circuit_bytes;
     proofs::CircuitWriter<Field> writer(proofs::p256k1_base, proofs::SECP_ID);
     writer.to_bytes(*circuit, circuit_bytes);
@@ -210,9 +206,9 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
         return buf_err(err_buf, err_len,
                        "BIP340 serialized circuit failed round-trip decode");
     }
-    step_finish = Clock::now();
-    steps.push_back({{"name", "serialize circuit"},
-                     {"ms", elapsed_ms(step_start, step_finish)},
+    auto phase_finish = Clock::now();
+    steps.push_back({{"phase", "build_serialize_circuit"},
+                     {"ms", elapsed_ms(phase_start, phase_finish)},
                      {"compressed_bytes", circuit_bytes.size()}});
 
     auto pub = std::make_unique<proofs::Dense<Field>>(1, decoded->npub_in);
@@ -229,7 +225,7 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
         return buf_err(err_buf, err_len, "BIP340 integration fixture malformed");
     }
 
-    step_start = Clock::now();
+    phase_start = Clock::now();
     proofs::Bip340Witness bip340_witness(proofs::p256k1);
     if (!bip340_witness.compute(sig.data(), pk.data(), msg.data(), msg.size())) {
         return buf_err(err_buf, err_len, "BIP340 fixture witness generation failed");
@@ -255,11 +251,7 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
         filler.push_back(px);
         filler.push_back(bip340_witness.e_);
     }
-    step_finish = Clock::now();
-    steps.push_back({{"name", "build witness"},
-                     {"ms", elapsed_ms(step_start, step_finish)}});
 
-    step_start = Clock::now();
     {
         using EvalBackend = proofs::EvaluationBackend<Field>;
         using EvalLogic = proofs::Logic<Field, EvalBackend>;
@@ -296,9 +288,6 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
                            "BIP340 fixture witness failed direct evaluation");
         }
     }
-    step_finish = Clock::now();
-    steps.push_back({{"name", "evaluate witness"},
-                     {"ms", elapsed_ms(step_start, step_finish)}});
 
     ConvolutionFactory factory(proofs::p256k1_base);
     RSFactory rsf(factory, proofs::p256k1_base);
@@ -307,32 +296,27 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
     uint8_t transcript_label[] = "bip340 wasm proof";
     proofs::Transcript tp(transcript_label, sizeof(transcript_label) - 1);
 
-    step_start = Clock::now();
     proofs::ZkProof<Field> proof(*decoded, kRate, kQueries, block_enc);
     proofs::ZkProver<Field, RSFactory> prover(*decoded, proofs::p256k1_base, rsf);
     prover.commit(proof, *witness_values, tp, rng);
     if (!prover.prove(proof, *witness_values, tp)) {
         return buf_err(err_buf, err_len, "BIP340 proof generation failed");
     }
-    step_finish = Clock::now();
-    steps.push_back({{"name", "generate proof"},
-                     {"ms", elapsed_ms(step_start, step_finish)}});
 
-    step_start = Clock::now();
     std::vector<uint8_t> proof_bytes;
     proof.write(proof_bytes, proofs::p256k1_base);
+    phase_finish = Clock::now();
+    steps.push_back({{"phase", "witness_prove_serialize"},
+                     {"ms", elapsed_ms(phase_start, phase_finish)},
+                     {"compressed_bytes", proof_bytes.size()}});
 
+    phase_start = Clock::now();
     proofs::ReadBuffer proof_rb(proof_bytes.data(), proof_bytes.size());
     proofs::ZkProof<Field> parsed_proof(*decoded, kRate, kQueries, block_enc);
     if (!parsed_proof.read(proof_rb, proofs::p256k1_base)) {
         return buf_err(err_buf, err_len, "BIP340 serialized proof failed decode");
     }
-    step_finish = Clock::now();
-    steps.push_back({{"name", "serialize proof"},
-                     {"ms", elapsed_ms(step_start, step_finish)},
-                     {"compressed_bytes", proof_bytes.size()}});
 
-    step_start = Clock::now();
     proofs::Transcript tv(transcript_label, sizeof(transcript_label) - 1);
     proofs::ZkVerifier<Field, RSFactory> verifier(*decoded, rsf, kRate, kQueries,
                                                   block_enc, proofs::p256k1_base);
@@ -340,9 +324,9 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
     if (!verifier.verify(parsed_proof, *pub, tv)) {
         return buf_err(err_buf, err_len, "BIP340 verifier rejected proof");
     }
-    step_finish = Clock::now();
-    steps.push_back({{"name", "verify proof"},
-                     {"ms", elapsed_ms(step_start, step_finish)},
+    phase_finish = Clock::now();
+    steps.push_back({{"phase", "deserialize_verify_proof"},
+                     {"ms", elapsed_ms(phase_start, phase_finish)},
                      {"compressed_bytes", proof_bytes.size()}});
 
     output["result"] = "bip340 smoke successful";

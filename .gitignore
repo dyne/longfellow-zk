@@ -5,6 +5,7 @@
 *.bin
 test/*.txt
 test/*.log
+test/results/*.csv
 vendor/facebook
 vendor/google
 sources.mk

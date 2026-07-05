@@ -13,7 +13,8 @@ mkdir -p ${DST}
 [[ -r src/liblongfellow-zk.a ]] && cp src/liblongfellow-zk.a ${DST}/
 cp README.md ${DST}/
 cp -r test   ${DST}/
-cat <<EOF >  ${DST}/GNUmakefile
+mkdir -p ${DST}/test/results
+cat <<'EOF' >  ${DST}/GNUmakefile
 all:
 	$(info Running Longfellow-zk tests)
 	cd test && ./bats/bin/bats .

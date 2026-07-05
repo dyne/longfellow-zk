@@ -93,3 +93,26 @@
 :Tests: Run node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm.
 :Done when: BIP340 WASM logs include explicit proof generation and proof verification lines with ms and compressed byte sizes.
 :END:
+
+* DONE [#A] Emit Graphable BIP340 Metrics
+:PROPERTIES:
+:Effort: M
+:Goal: Save native and WASM BIP340 phase timings in a release artifact that graph tools can read directly.
+:Notes: Use tidy CSV rows: one target-phase observation per row, with bytes and circuit shape metadata repeated for easy plotting.
+:END:
+
+** DONE [#A] Condense BIP340 phases to three rows
+:PROPERTIES:
+:Why: The current WASM logs split serialization and verification into too many operational details.
+:Change: Report exactly three phases: build_serialize_circuit; witness_prove_serialize; deserialize_verify_proof.
+:Tests: Run node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm.
+:Done when: Logs and CSV use the three requested phase names.
+:END:
+
+** DONE [#A] Save metrics for native and WASM release artifacts
+:PROPERTIES:
+:Why: CI logs are hard for graph generators to parse reliably.
+:Change: Write native and WASM metrics as CSV under test/results and keep that directory in packaged releases.
+:Tests: Run ./test/bip340_test and node test/wasm_test.mjs --suite bip340 ./longfellow-zk.wasm; inspect test/results/*.csv.
+:Done when: Release packaging includes the generated CSV files as part of the copied test directory.
+:END:
