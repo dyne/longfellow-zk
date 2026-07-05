@@ -10,7 +10,7 @@
 :Notes: Keep the import narrow: no new dependencies beyond the existing OpenSSL usage already required by the upstream witness header.
 :END:
 
-** WIP [#A] Copy required upstream files
+** DONE [#A] Copy required upstream files
 :PROPERTIES:
 :Why: The BIP340 circuit depends on the new circuit headers plus secp256k1 field and curve definitions that are absent from dyne.
 :Change: Import circuits/bip340 headers, algebra/fp_p256k1.h, ec/p256k1.{h,cc}, and test vector include data.
@@ -18,7 +18,7 @@
 :Done when: All imported headers resolve locally without reaching outside src/ or test/.
 :END:
 
-** TODO [#A] Wire GNUmake and importer
+** WIP [#A] Wire GNUmake and importer
 :PROPERTIES:
 :Why: CI re-imports selected upstream files before building, so both sources.mk and scripts/import_upstream.sh must know about secp256k1 support.
 :Change: Add ec/p256k1.cc to the library source list, add BIP340/secp256k1 headers to the import allowlist, and ensure POSIX/macOS test builds link OpenSSL crypto for BIP340 tests.
