@@ -3,7 +3,7 @@
 #+DATE: 2026-07-05
 #+KEYWORDS: wasm bip340 metrics ci tobuf
 
-* WIP [#A] Add WASM BIP340 smoke execution
+* DONE [#A] Add WASM BIP340 smoke execution
 :PROPERTIES:
 :Effort: M
 :Goal: Ensure CI exercises the imported BIP340 circuit through the WASM module, not only through native tests.
@@ -18,14 +18,14 @@
 :Done when: The WASM test suite can call the BIP340 export and fail loudly if the circuit cannot be built in WASM.
 :END:
 
-* TODO [#B] Log WASM step metrics
+* DONE [#B] Log WASM step metrics
 :PROPERTIES:
 :Effort: S
 :Goal: Make CI logs show timing and compressed byte sizes for each WASM circuit/proof step.
 :Notes: Hex length is transport encoding size; report decoded byte length for circuit and proof payloads.
 :END:
 
-** TODO [#B] Add timing and compressed-size logs
+** DONE [#B] Add timing and compressed-size logs
 :PROPERTIES:
 :Why: Existing WASM logs print hex character counts and omit per-step elapsed time.
 :Change: Wrap each WASM execution step with millisecond timing and log compressed payload byte sizes for generated or consumed circuits/proofs.

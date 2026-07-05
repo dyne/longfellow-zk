@@ -11,7 +11,8 @@
 import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { exit, argv } from 'node:process';
-import { generateCircuit, generateProof, verifyProof, setWasmPath } from '../bindings/javascript/longfellow_zk.mjs';
+import { performance } from 'node:perf_hooks';
+import { bip340Smoke, generateCircuit, generateProof, verifyProof, setWasmPath } from '../bindings/javascript/longfellow_zk.mjs';
 
 // -- configure WASM binary path ---------------------------------------
 const wasmPath = argv[2] || 'longfellow-zk.wasm';
@@ -46,8 +47,69 @@ function bytesToHex(bytes) {
     return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+function compressedBytes(hex) {
+    return hex ? hex.length / 2 : 0;
+}
+
+function metricList(metrics) {
+    return metrics.filter(Boolean).join(', ');
+}
+
+async function wasmStep(label, fn, metricsFn = () => '') {
+    const started = performance.now();
+    try {
+        const value = await fn();
+        const elapsed = Math.round(performance.now() - started);
+        const metrics = metricList([`${elapsed} ms`, metricsFn(value)]);
+        info(`${label}: ${metrics}`);
+        return value;
+    } catch (e) {
+        const elapsed = Math.round(performance.now() - started);
+        let sizeMetrics = '';
+        try {
+            sizeMetrics = metricsFn();
+        } catch {
+            sizeMetrics = '';
+        }
+        const metrics = metricList([`${elapsed} ms`, sizeMetrics, 'failed']);
+        info(`${label}: ${metrics}`);
+        throw e;
+    }
+}
+
+function circuitMetrics(hex) {
+    return `compressed bytes: circuit=${compressedBytes(hex)}`;
+}
+
+function proofMetrics(hex) {
+    return `compressed bytes: proof=${compressedBytes(hex)}`;
+}
+
+function verifyMetrics(circuitHexValue, proofHexValue) {
+    return `compressed bytes: circuit=${compressedBytes(circuitHexValue)}, proof=${compressedBytes(proofHexValue)}`;
+}
+
 // -- tests -------------------------------------------------------------
 console.log(`${YELLOW}=== longfellow-zk WASM test suite (tobuf API) ===${NC}\n`);
+
+// Test 0: BIP340 smoke path
+console.log('--- BIP340 circuit smoke ---');
+
+try {
+    const { result } = await wasmStep(
+        'BIP340 smoke',
+        () => bip340Smoke(),
+        ({ result }) => {
+            const r = JSON.parse(result);
+            return `compressed bytes: n/a (no serialized artifact), public inputs=${r.public_inputs}, total inputs=${r.total_inputs}, quad terms=${r.quad_terms}`;
+        }
+    );
+    const r = JSON.parse(result);
+    if (!r.result?.includes('successful')) throw new Error(`unexpected: ${result}`);
+    ok('Run BIP340 smoke in WASM');
+} catch (e) {
+    nok(`Run BIP340 smoke in WASM — ${e.message}`);
+}
 
 // Test 1: Generate circuit
 console.log('--- Circuit generation ---');
@@ -56,12 +118,15 @@ let circuitHex = '';
 let circuitJson = null;
 
 try {
-    const { result } = await generateCircuit(0);
+    const { result } = await wasmStep(
+        'Generate circuit zkspec 0',
+        () => generateCircuit(0),
+        ({ result }) => circuitMetrics(JSON.parse(result).circuit_data_hex)
+    );
     circuitJson = JSON.parse(result);
     circuitHex = circuitJson.circuit_data_hex;
     if (!circuitHex) throw new Error('missing circuit_data_hex');
     ok('Generate circuit for zkspec 0');
-    info(`circuit hex length: ${circuitHex.length} chars (${circuitJson._circuit_size} bytes)`);
 } catch (e) {
     nok(`Generate circuit for zkspec 0 — ${e.message}`);
 }
@@ -69,7 +134,11 @@ try {
 // Test 2: Generate circuit for zkspec 1
 let circuit1Hex = '';
 try {
-    const { result } = await generateCircuit(1);
+    const { result } = await wasmStep(
+        'Generate circuit zkspec 1',
+        () => generateCircuit(1),
+        ({ result }) => circuitMetrics(JSON.parse(result).circuit_data_hex)
+    );
     const c = JSON.parse(result);
     circuit1Hex = c.circuit_data_hex;
     if (c._zkspec?.index !== 1) throw new Error(`wrong zkspec: ${c._zkspec?.index}`);
@@ -93,22 +162,25 @@ try {
         cbor_value: a.cbor_value.replace(/^0x/, ''),
     }));
 
-    const { result } = await generateProof({
-        circuitHex,
-        mdocHex,
-        pkxHex: mdoc.public_key.x,
-        pkyHex: mdoc.public_key.y,
-        transcriptHex,
-        time: mdoc.time,
-        docType: mdoc.doc_type,
-        zkspecIndex: mdoc.zkspec,
-        attributes: attrs,
-    });
+    const { result } = await wasmStep(
+        'Generate proof mdoc_00',
+        () => generateProof({
+            circuitHex,
+            mdocHex,
+            pkxHex: mdoc.public_key.x,
+            pkyHex: mdoc.public_key.y,
+            transcriptHex,
+            time: mdoc.time,
+            docType: mdoc.doc_type,
+            zkspecIndex: mdoc.zkspec,
+            attributes: attrs,
+        }),
+        ({ result }) => proofMetrics(JSON.parse(result).proof_data_hex)
+    );
 
     proof00 = JSON.parse(result);
     if (!proof00.proof_data_hex) throw new Error('missing proof_data_hex');
     ok('Generate proof with mdoc_00');
-    info(`proof hex length: ${proof00.proof_data_hex.length} chars`);
 } catch (e) {
     nok(`Generate proof with mdoc_00 — ${e.message}`);
 }
@@ -127,17 +199,21 @@ if (proof00) {
             cbor_value: a.cbor_value.replace(/^0x/, ''),
         }));
 
-        const { result } = await verifyProof({
-            circuitHex,
-            proofHex: proof00.proof_data_hex,
-            pkxHex: mdoc.public_key.x,
-            pkyHex: mdoc.public_key.y,
-            transcriptHex,
-            time: mdoc.time,
-            docType: mdoc.doc_type,
-            zkspecIndex: mdoc.zkspec,
-            attributes: attrs,
-        });
+        const { result } = await wasmStep(
+            'Verify proof mdoc_00',
+            () => verifyProof({
+                circuitHex,
+                proofHex: proof00.proof_data_hex,
+                pkxHex: mdoc.public_key.x,
+                pkyHex: mdoc.public_key.y,
+                transcriptHex,
+                time: mdoc.time,
+                docType: mdoc.doc_type,
+                zkspecIndex: mdoc.zkspec,
+                attributes: attrs,
+            }),
+            () => verifyMetrics(circuitHex, proof00.proof_data_hex)
+        );
 
         const vr = JSON.parse(result);
         if (!vr.result?.includes('successful')) throw new Error(`unexpected: ${result}`);
@@ -156,40 +232,48 @@ try {
     const mdocHex = bytesToHex(base64ToBytes(mdoc.mdoc_data_base64));
     const transcriptHex = mdoc.transcript.replace(/^0x/, '');
 
-    const { result } = await generateProof({
-        circuitHex,
-        mdocHex,
-        pkxHex: mdoc.public_key.x,
-        pkyHex: mdoc.public_key.y,
-        transcriptHex,
-        time: mdoc.time,
-        docType: mdoc.doc_type,
-        zkspecIndex: mdoc.zkspec,
-        attributes: (mdoc.attributes || []).map(a => ({
-            namespace: a.namespace,
-            id: a.id,
-            cbor_value: a.cbor_value.replace(/^0x/, ''),
-        })),
-    });
+    const { result } = await wasmStep(
+        'Generate proof mdoc_01',
+        () => generateProof({
+            circuitHex,
+            mdocHex,
+            pkxHex: mdoc.public_key.x,
+            pkyHex: mdoc.public_key.y,
+            transcriptHex,
+            time: mdoc.time,
+            docType: mdoc.doc_type,
+            zkspecIndex: mdoc.zkspec,
+            attributes: (mdoc.attributes || []).map(a => ({
+                namespace: a.namespace,
+                id: a.id,
+                cbor_value: a.cbor_value.replace(/^0x/, ''),
+            })),
+        }),
+        ({ result }) => proofMetrics(JSON.parse(result).proof_data_hex)
+    );
 
     proof01 = JSON.parse(result);
     ok('Generate proof with mdoc_01');
 
-    const { result: vr } = await verifyProof({
-        circuitHex,
-        proofHex: proof01.proof_data_hex,
-        pkxHex: mdoc.public_key.x,
-        pkyHex: mdoc.public_key.y,
-        transcriptHex,
-        time: mdoc.time,
-        docType: mdoc.doc_type,
-        zkspecIndex: mdoc.zkspec,
-        attributes: (mdoc.attributes || []).map(a => ({
-            namespace: a.namespace,
-            id: a.id,
-            cbor_value: a.cbor_value.replace(/^0x/, ''),
-        })),
-    });
+    const { result: vr } = await wasmStep(
+        'Verify proof mdoc_01',
+        () => verifyProof({
+            circuitHex,
+            proofHex: proof01.proof_data_hex,
+            pkxHex: mdoc.public_key.x,
+            pkyHex: mdoc.public_key.y,
+            transcriptHex,
+            time: mdoc.time,
+            docType: mdoc.doc_type,
+            zkspecIndex: mdoc.zkspec,
+            attributes: (mdoc.attributes || []).map(a => ({
+                namespace: a.namespace,
+                id: a.id,
+                cbor_value: a.cbor_value.replace(/^0x/, ''),
+            })),
+        }),
+        () => verifyMetrics(circuitHex, proof01.proof_data_hex)
+    );
 
     const parsed = JSON.parse(vr);
     if (!parsed.result?.includes('successful')) throw new Error(`unexpected: ${vr}`);
@@ -205,17 +289,21 @@ if (proof00 && circuit1Hex) {
     try {
         const mdoc = await loadMdoc('mdoc_00.json');
         const transcriptHex = mdoc.transcript.replace(/^0x/, '');
-        await verifyProof({
-            circuitHex: circuit1Hex,
-            proofHex: proof00.proof_data_hex,
-            pkxHex: mdoc.public_key.x,
-            pkyHex: mdoc.public_key.y,
-            transcriptHex,
-            time: mdoc.time,
-            docType: mdoc.doc_type,
-            zkspecIndex: mdoc.zkspec,
-            attributes: [],
-        });
+        await wasmStep(
+            'Verify proof with wrong zkspec',
+            () => verifyProof({
+                circuitHex: circuit1Hex,
+                proofHex: proof00.proof_data_hex,
+                pkxHex: mdoc.public_key.x,
+                pkyHex: mdoc.public_key.y,
+                transcriptHex,
+                time: mdoc.time,
+                docType: mdoc.doc_type,
+                zkspecIndex: mdoc.zkspec,
+                attributes: [],
+            }),
+            () => verifyMetrics(circuit1Hex, proof00.proof_data_hex)
+        );
         nok('Verify fails with wrong zkspec — expected error, got success');
     } catch (e) {
         ok('Verify fails with wrong zkspec circuit');
@@ -224,17 +312,21 @@ if (proof00 && circuit1Hex) {
 
 // Test 7: Invalid hex input
 try {
-    await generateProof({
-        circuitHex: 'not-hex!',
-        mdocHex: 'aa',
-        pkxHex: 'aa',
-        pkyHex: 'aa',
-        transcriptHex: 'aa',
-        time: 'now',
-        docType: 'x',
-        zkspecIndex: 0,
-        attributes: [],
-    });
+    await wasmStep(
+        'Generate proof with invalid hex',
+        () => generateProof({
+            circuitHex: 'not-hex!',
+            mdocHex: 'aa',
+            pkxHex: 'aa',
+            pkyHex: 'aa',
+            transcriptHex: 'aa',
+            time: 'now',
+            docType: 'x',
+            zkspecIndex: 0,
+            attributes: [],
+        }),
+        () => 'compressed bytes: n/a (invalid input)'
+    );
     nok('Invalid hex input — expected error, got success');
 } catch (e) {
     ok('Rejects invalid hex input');
@@ -245,17 +337,21 @@ if (circuitHex) {
     try {
         const mdoc = await loadMdoc('mdoc_00.json');
         const mdocHex = bytesToHex(base64ToBytes(mdoc.mdoc_data_base64));
-        await generateProof({
-            circuitHex,
-            mdocHex,
-            pkxHex: mdoc.public_key.x,
-            pkyHex: mdoc.public_key.y,
-            transcriptHex: mdoc.transcript.replace(/^0x/, ''),
-            time: mdoc.time,
-            docType: mdoc.doc_type,
-            zkspecIndex: mdoc.zkspec,
-            attributes: [{ namespace: 'x', id: 'y', cbor_value: 'not-hex' }],
-        });
+        await wasmStep(
+            'Generate proof with invalid attrs_json cbor_value',
+            () => generateProof({
+                circuitHex,
+                mdocHex,
+                pkxHex: mdoc.public_key.x,
+                pkyHex: mdoc.public_key.y,
+                transcriptHex: mdoc.transcript.replace(/^0x/, ''),
+                time: mdoc.time,
+                docType: mdoc.doc_type,
+                zkspecIndex: mdoc.zkspec,
+                attributes: [{ namespace: 'x', id: 'y', cbor_value: 'not-hex' }],
+            }),
+            () => circuitMetrics(circuitHex)
+        );
         nok('Invalid attrs_json cbor_value — expected error, got success');
     } catch (e) {
         ok('Rejects invalid attrs_json cbor_value');
