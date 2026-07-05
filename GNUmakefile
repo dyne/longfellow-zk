@@ -56,7 +56,7 @@ import-vendor:
 	@bash scripts/import_upstream.sh vendor/longfellow-zk
 
 .PHONY: bip340-test
-bip340-test: posix test/bip340_test
+bip340-test: test/bip340_test
 	@./test/bip340_test
 
 test/bip340_test: test/bip340/bip340_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
