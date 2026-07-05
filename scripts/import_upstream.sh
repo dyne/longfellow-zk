@@ -60,12 +60,6 @@ circuits/bip340/bip340_guard.h
 
 EOF
 
-readarray -t testdata <<EOF
-circuits/bip340/testdata/bip340_vectors.inc
-circuits/bip340/testdata/bip340_golden.inc
-circuits/bip340/testdata/bip340_test_vectors.csv
-EOF
-
 [ "$1" == "clean" ] && {
   for i in ${sources[@]}; do
     rm -f src/$i
@@ -78,9 +72,6 @@ EOF
   done
   for i in ${optional_headers[@]}; do
     rm -f src/$i
-  done
-  for i in ${testdata[@]}; do
-    rm -f test/bip340/${i#circuits/bip340/}
   done
   exit 0
 }
@@ -142,11 +133,6 @@ if [ -r src/circuits/bip340/bip340_witness.h ]; then
 	perl -0pi -e 's|uint8_t tag_hash\[32\];\n    SHA256_CTX ctx;\n    SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag, tag_len\);\n    SHA256_Final\(tag_hash, &ctx\);|uint8_t tag_hash[32];\n    SHA256 tag_sha;\n    tag_sha.Update(reinterpret_cast<const uint8_t*>(tag), tag_len);\n    tag_sha.DigestData(tag_hash);|' src/circuits/bip340/bip340_witness.h
 	perl -0pi -e 's|SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, r_bytes, 32\);\n    SHA256_Update\(&ctx, pk_bytes, 32\);\n    SHA256_Update\(&ctx, msg, msg_len\);\n    SHA256_Final\(hash, &ctx\);|SHA256 challenge_sha;\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(r_bytes, 32);\n    challenge_sha.Update(pk_bytes, 32);\n    challenge_sha.Update(msg, msg_len);\n    challenge_sha.DigestData(hash);|' src/circuits/bip340/bip340_witness.h
 fi
-
-for i in ${testdata[@]}; do
-	mkdir -p test/bip340/`dirname ${i#circuits/bip340/}`
-	copy_optional "${1}/lib/${i}" "test/bip340/${i#circuits/bip340/}"
-done
 
 >&2 echo "🌉 Upstream source imported from $1"
 exit 0

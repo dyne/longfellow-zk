@@ -1,0 +1,19 @@
+#+TITLE: Trim BIP340 Tests
+#+SUBTITLE: Keep dyne coverage focused on imported build and Bats execution
+#+DATE: 2026-07-05
+#+KEYWORDS: bip340 tests bats upstream duplication
+
+* DONE [#A] Replace duplicated BIP340 coverage with dyne smoke coverage
+:PROPERTIES:
+:Effort: S
+:Goal: Keep only the BIP340 test coverage that proves the dyne import/build path works.
+:Notes: Upstream longfellow-zk owns vector, golden, witness, and full prover/verifier BIP340 semantics tests.
+:END:
+
+** DONE [#A] Trim native BIP340 test binary
+:PROPERTIES:
+:Why: The current dyne test duplicates upstream BIP340 semantic coverage and checked-in vector data.
+:Change: Replace the native test with a small circuit compile/link smoke test and remove dyne-local BIP340 vector/golden testdata.
+:Tests: Run make -C . test/bip340_test and test/mdoc.bats.
+:Done when: Bats still runs the BIP340 path, while dyne no longer carries upstream vector/golden coverage.
+:END:
