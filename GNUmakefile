@@ -75,6 +75,10 @@ blindzap-spec-test:
 	@python3 scripts/check_blindzap_spec.py
 	@python3 scripts/generate_blindzap_vectors.py | cmp -s - test/blindzap/testdata/blindzap_vectors.json
 
+.PHONY: blindzap-key-ownership-test
+blindzap-key-ownership-test: test/blindzap/key_ownership_test
+	@./test/blindzap/key_ownership_test
+
 BIP340_DEPS := $(wildcard src/circuits/bip340/*.h) \
 	$(wildcard src/circuits/secp256k1/*.h) \
 	$(wildcard test/bip340/testdata/*)
@@ -89,6 +93,10 @@ test/bip340_test: test/bip340/bip340_test.cc $(BIP340_DEPS) \
 
 test/secp256k1/ec_gadget_test: test/secp256k1/ec_gadget_test.cc $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/secp256k1
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+test/blindzap/key_ownership_test: test/blindzap/key_ownership_test.cc $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/blindzap
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 clean-vendor: clean
