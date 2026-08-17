@@ -263,16 +263,16 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
 
         typename EvalVerify::Witness eval_witness;
         for (size_t i = 0; i < proofs::Bip340Witness::kBits; ++i) {
-            eval_witness.bits_s[i] = eval_logic.konst(bip340_witness.bits_s_[i]);
-            eval_witness.bits_e[i] = eval_logic.konst(bip340_witness.bits_e_[i]);
+            eval_witness.s_mult.bits[i] = eval_logic.konst(bip340_witness.s_mult_.bits[i]);
+            eval_witness.e_mult.bits[i] = eval_logic.konst(bip340_witness.e_mult_.bits[i]);
             eval_witness.bits_ry[i] = eval_logic.konst(bip340_witness.bits_ry_[i]);
             if (i < proofs::Bip340Witness::kBits - 1) {
-                eval_witness.int_sx[i] = eval_logic.konst(bip340_witness.int_sx_[i]);
-                eval_witness.int_sy[i] = eval_logic.konst(bip340_witness.int_sy_[i]);
-                eval_witness.int_sz[i] = eval_logic.konst(bip340_witness.int_sz_[i]);
-                eval_witness.int_ex[i] = eval_logic.konst(bip340_witness.int_ex_[i]);
-                eval_witness.int_ey[i] = eval_logic.konst(bip340_witness.int_ey_[i]);
-                eval_witness.int_ez[i] = eval_logic.konst(bip340_witness.int_ez_[i]);
+                eval_witness.s_mult.int_x[i] = eval_logic.konst(bip340_witness.s_mult_.int_x[i]);
+                eval_witness.s_mult.int_y[i] = eval_logic.konst(bip340_witness.s_mult_.int_y[i]);
+                eval_witness.s_mult.int_z[i] = eval_logic.konst(bip340_witness.s_mult_.int_z[i]);
+                eval_witness.e_mult.int_x[i] = eval_logic.konst(bip340_witness.e_mult_.int_x[i]);
+                eval_witness.e_mult.int_y[i] = eval_logic.konst(bip340_witness.e_mult_.int_y[i]);
+                eval_witness.e_mult.int_z[i] = eval_logic.konst(bip340_witness.e_mult_.int_z[i]);
             }
         }
         eval_witness.py = eval_logic.konst(bip340_witness.py_);

@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "arrays/dense.h"
+#include "circuits/secp256k1/ec_witness.h"
 #include "ec/p256k1.h"
 
 #include "util/crypto.h"
@@ -51,6 +52,7 @@ class Bip340Witness {
   using Elt = typename Field::Elt;
   using Nat = typename Field::N;
   using EC = P256k1;
+  using ScalarMultWitness = Secp256k1ScalarMultWitness<Field, EC>;
 
  public:
   static constexpr size_t kBits = EC::kBits;  // 256
@@ -58,16 +60,10 @@ class Bip340Witness {
   const EC& ec_;
 
   // s-bit decomposition and s*G intermediate points.
-  Elt bits_s_[kBits];
-  Elt int_sx_[kBits];
-  Elt int_sy_[kBits];
-  Elt int_sz_[kBits];
+  ScalarMultWitness s_mult_;
 
   // e-bit decomposition and e*P intermediate points.
-  Elt bits_e_[kBits];
-  Elt int_ex_[kBits];
-  Elt int_ey_[kBits];
-  Elt int_ez_[kBits];
+  ScalarMultWitness e_mult_;
 
   // P.y (the even square root of px^3 + b).
   Elt py_;
@@ -95,12 +91,10 @@ class Bip340Witness {
     py_ = py;
 
     auto G = ec_.generator();
-    compute_scalar_mult_witness(bits_s_, int_sx_, int_sy_, int_sz_, G,
-                                s_nat);
+    compute_scalar_mult_witness(s_mult_, G, s_nat);
 
     typename EC::ECPoint P = {px, py, F.one()};
-    compute_scalar_mult_witness(bits_e_, int_ex_, int_ey_, int_ez_, P,
-                                e_nat);
+    compute_scalar_mult_witness(e_mult_, P, e_nat);
 
     // Compute R = sG - eP and derive ry, rz_inv, bits_ry.
     compute_ry_witness();
@@ -164,13 +158,11 @@ class Bip340Witness {
 
     // -- Compute s*G witness ---------------------------------------------
     auto G = ec_.generator();
-    compute_scalar_mult_witness(bits_s_, int_sx_, int_sy_, int_sz_, G,
-                                s_nat);
+    compute_scalar_mult_witness(s_mult_, G, s_nat);
 
     // -- Compute e*P witness ---------------------------------------------
     typename EC::ECPoint P = {px, py_, one};
-    compute_scalar_mult_witness(bits_e_, int_ex_, int_ey_, int_ez_, P,
-                                e_nat);
+    compute_scalar_mult_witness(e_mult_, P, e_nat);
 
     // -- Compute R = sG - eP, derive ry, rz_inv, bits_ry ----------------
     compute_ry_witness();
@@ -191,20 +183,20 @@ class Bip340Witness {
   void fill_witness(DenseFiller<Field>& filler) const {
     // s*G: bits + intermediates (all but last for intermediates)
     for (size_t i = 0; i < kBits; ++i) {
-      filler.push_back(bits_s_[i]);
+      filler.push_back(s_mult_.bits[i]);
       if (i < kBits - 1) {
-        filler.push_back(int_sx_[i]);
-        filler.push_back(int_sy_[i]);
-        filler.push_back(int_sz_[i]);
+        filler.push_back(s_mult_.int_x[i]);
+        filler.push_back(s_mult_.int_y[i]);
+        filler.push_back(s_mult_.int_z[i]);
       }
     }
     // e*P: bits + intermediates (all but last for intermediates)
     for (size_t i = 0; i < kBits; ++i) {
-      filler.push_back(bits_e_[i]);
+      filler.push_back(e_mult_.bits[i]);
       if (i < kBits - 1) {
-        filler.push_back(int_ex_[i]);
-        filler.push_back(int_ey_[i]);
-        filler.push_back(int_ez_[i]);
+        filler.push_back(e_mult_.int_x[i]);
+        filler.push_back(e_mult_.int_y[i]);
+        filler.push_back(e_mult_.int_z[i]);
       }
     }
     // P.y
@@ -236,10 +228,12 @@ class Bip340Witness {
     const Field& F = ec_.f_;
 
     // sG and eP are in int_s*_[kBits-1] and int_e*_[kBits-1].
-    typename EC::ECPoint sG_pt = {int_sx_[kBits-1], int_sy_[kBits-1],
-                                   int_sz_[kBits-1]};
-    typename EC::ECPoint eP_pt = {int_ex_[kBits-1], int_ey_[kBits-1],
-                                   int_ez_[kBits-1]};
+    typename EC::ECPoint sG_pt = {s_mult_.int_x[kBits-1],
+                                   s_mult_.int_y[kBits-1],
+                                   s_mult_.int_z[kBits-1]};
+    typename EC::ECPoint eP_pt = {e_mult_.int_x[kBits-1],
+                                   e_mult_.int_y[kBits-1],
+                                   e_mult_.int_z[kBits-1]};
 
     // R = sG - eP.
     auto neg_eP = typename EC::ECPoint{eP_pt.x, F.negf(eP_pt.y), eP_pt.z};
@@ -304,33 +298,10 @@ class Bip340Witness {
   }
 
   /// Compute intermediate points for scalar multiplication Q = k * P.
-  void compute_scalar_mult_witness(
-      Elt bits[kBits], Elt int_x[kBits], Elt int_y[kBits], Elt int_z[kBits],
-      const typename EC::ECPoint& P, const Nat& k) const {
-    const Field& F = ec_.f_;
-    const Elt one = F.one();
-    const Elt zero = F.zero();
-
-    Elt aX = zero, aY = one, aZ = zero;
-
-    for (size_t i = 0; i < kBits; ++i) {
-      // MSB to LSB (same convention as pk_circuit.h).
-      size_t bit_idx = kBits - 1 - i;
-      int bit = k.bit(bit_idx);
-      bits[i] = F.of_scalar(bit);
-
-      ec_.doubleE(aX, aY, aZ, aX, aY, aZ);
-
-      if (bit == 1) {
-        ec_.addE(aX, aY, aZ, aX, aY, aZ, P.x, P.y, P.z);
-      } else {
-        ec_.addE(aX, aY, aZ, aX, aY, aZ, zero, one, zero);
-      }
-
-      int_x[i] = aX;
-      int_y[i] = aY;
-      int_z[i] = aZ;
-    }
+  void compute_scalar_mult_witness(ScalarMultWitness& witness,
+                                   const typename EC::ECPoint& point,
+                                   const Nat& scalar) const {
+    compute_secp256k1_scalar_mult_witness(witness, ec_, point, scalar);
   }
 
   /// Return the secp256k1 curve order as a Nat.
