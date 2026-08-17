@@ -126,16 +126,16 @@ typename VerifyC::Witness MakeEvalWitness(const LogicType& l,
                                           const Bip340Witness& wit) {
   typename VerifyC::Witness w;
   for (size_t i = 0; i < Bip340Witness::kBits; ++i) {
-    w.bits_s[i] = l.konst(wit.bits_s_[i]);
-    w.bits_e[i] = l.konst(wit.bits_e_[i]);
+    w.s_mult.bits[i] = l.konst(wit.s_mult_.bits[i]);
+    w.e_mult.bits[i] = l.konst(wit.e_mult_.bits[i]);
     w.bits_ry[i] = l.konst(wit.bits_ry_[i]);
     if (i < Bip340Witness::kBits - 1) {
-      w.int_sx[i] = l.konst(wit.int_sx_[i]);
-      w.int_sy[i] = l.konst(wit.int_sy_[i]);
-      w.int_sz[i] = l.konst(wit.int_sz_[i]);
-      w.int_ex[i] = l.konst(wit.int_ex_[i]);
-      w.int_ey[i] = l.konst(wit.int_ey_[i]);
-      w.int_ez[i] = l.konst(wit.int_ez_[i]);
+      w.s_mult.int_x[i] = l.konst(wit.s_mult_.int_x[i]);
+      w.s_mult.int_y[i] = l.konst(wit.s_mult_.int_y[i]);
+      w.s_mult.int_z[i] = l.konst(wit.s_mult_.int_z[i]);
+      w.e_mult.int_x[i] = l.konst(wit.e_mult_.int_x[i]);
+      w.e_mult.int_y[i] = l.konst(wit.e_mult_.int_y[i]);
+      w.e_mult.int_z[i] = l.konst(wit.e_mult_.int_z[i]);
     }
   }
   w.py = l.konst(wit.py_);
@@ -345,21 +345,21 @@ void TestSoundnessRegressions() {
 
   expect_rejected("flipped s bit", rx, P.x, wit.e_,
                   [&](auto& w, const auto& l) {
-                    w.bits_s[10] =
-                        l.konst(F.subf(F.one(), wit.bits_s_[10]));
+                    w.s_mult.bits[10] =
+                        l.konst(F.subf(F.one(), wit.s_mult_.bits[10]));
                   });
   expect_rejected("flipped e bit", rx, P.x, wit.e_,
                   [&](auto& w, const auto& l) {
-                    w.bits_e[20] =
-                        l.konst(F.subf(F.one(), wit.bits_e_[20]));
+                    w.e_mult.bits[20] =
+                        l.konst(F.subf(F.one(), wit.e_mult_.bits[20]));
                   });
   expect_rejected("corrupt s trace", rx, P.x, wit.e_,
                   [&](auto& w, const auto& l) {
-                    w.int_sx[254] = l.konst(F.zero());
+                    w.s_mult.int_x[254] = l.konst(F.zero());
                   });
   expect_rejected("corrupt e trace", rx, P.x, wit.e_,
                   [&](auto& w, const auto& l) {
-                    w.int_ey[254] = l.konst(F.zero());
+                    w.e_mult.int_y[254] = l.konst(F.zero());
                   });
   expect_rejected("zero R.z inverse", rx, P.x, wit.e_,
                   [&](auto& w, const auto& l) {

@@ -66,12 +66,17 @@ import-bip340:
 bip340-test: test/bip340_test
 	@./test/bip340_test
 
+.PHONY: secp256k1-ec-gadget-test
+secp256k1-ec-gadget-test: test/secp256k1/ec_gadget_test
+	@./test/secp256k1/ec_gadget_test
+
 .PHONY: blindzap-spec-test
 blindzap-spec-test:
 	@python3 scripts/check_blindzap_spec.py
 	@python3 scripts/generate_blindzap_vectors.py | cmp -s - test/blindzap/testdata/blindzap_vectors.json
 
 BIP340_DEPS := $(wildcard src/circuits/bip340/*.h) \
+	$(wildcard src/circuits/secp256k1/*.h) \
 	$(wildcard test/bip340/testdata/*)
 
 src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a:
@@ -81,6 +86,10 @@ test/bip340_test: test/bip340/bip340_test.cc $(BIP340_DEPS) \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Itest/bip340 -Ivendor/zstd/lib -o $@ $< \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+test/secp256k1/ec_gadget_test: test/secp256k1/ec_gadget_test.cc $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/secp256k1
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 clean-vendor: clean
 	$(info 🌉 Clean up build and all imported vendor sources)
