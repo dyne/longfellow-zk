@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -Eeuo pipefail
 
 readarray -t sources <<EOF
 
@@ -55,19 +55,24 @@ EOF
 readarray -t optional_headers <<EOF
 algebra/fp_p256k1.h algebra/crt.h algebra/crt_convolution.h
 ec/p256k1.h circuits/logic/evaluation_backend.h
-circuits/bip340/bip340_verify.h circuits/bip340/bip340_witness.h
-circuits/bip340/bip340_guard.h
 
 EOF
 
-readarray -t optional_testdata <<EOF
-circuits/bip340/testdata/bip340_vectors.inc
-circuits/bip340/testdata/bip340_golden.inc
-circuits/bip340/testdata/bip340_test_vectors.csv
+readarray -t bip340_headers <<EOF
+bip340_verify.h
+bip340_witness.h
+bip340_guard.h
 
 EOF
 
-[ "$1" == "clean" ] && {
+readarray -t bip340_testdata <<EOF
+bip340_vectors.inc
+bip340_golden.inc
+bip340_test_vectors.csv
+
+EOF
+
+[[ "${1:-}" == "clean" ]] && {
   for i in ${sources[@]}; do
     rm -f src/$i
   done
@@ -80,34 +85,93 @@ EOF
   for i in ${optional_headers[@]}; do
     rm -f src/$i
   done
-  for i in ${optional_testdata[@]}; do
-    rm -f test/bip340/${i#circuits/bip340/}
+  for i in "${bip340_headers[@]}"; do
+    [[ -z "$i" ]] || rm -f "src/circuits/bip340/$i"
+  done
+  for i in "${bip340_testdata[@]}"; do
+    [[ -z "$i" ]] || rm -f "test/bip340/testdata/$i"
   done
   exit 0
 }
 
-[ "$1" == "" ] && {
-	>&2 echo "usage: $0 path/to/longfellow-zk"
+[[ -z "${1:-}" ]] && {
+	>&2 echo "usage: $0 [bip340] path/to/longfellow-zk"
 	exit 1
 }
 
-[ -d "$1/lib/ligero" ] || {
+bip340_only=false
+if [[ "$1" == "bip340" ]]; then
+	bip340_only=true
+	shift
+fi
+
+[[ -z "${1:-}" ]] && {
+	>&2 echo "usage: $0 [bip340] path/to/longfellow-zk"
+	exit 1
+}
+
+[[ -d "$1/lib/ligero" ]] || {
 	>&2 echo "not found: $1"
 	exit 1
 }
 
 copy_optional() {
-	from="$1"
-	to="$2"
-	if [ -r "$from" ]; then
+	local from="$1"
+	local to="$2"
+	if [[ -r "$from" ]]; then
 		cp "$from" "$to"
-	elif [ -r "$to" ]; then
+	elif [[ -r "$to" ]]; then
 		>&2 echo "keeping checked-in optional import: $to"
 	else
 		>&2 echo "optional upstream file missing and no checked-in copy: $from"
 		exit 1
 	fi
 }
+
+if [[ -d "$1/lib/circuits/tests/contrib/bip340" ]]; then
+	bip340_upstream="$1/lib/circuits/tests/contrib/bip340"
+elif [[ -d "$1/lib/circuits/bip340" ]]; then
+	# Compatibility with the circuit's pre-contribution layout.
+	bip340_upstream="$1/lib/circuits/bip340"
+else
+	bip340_upstream=""
+	if $bip340_only; then
+		>&2 echo "BIP-340 upstream source not found below $1/lib/circuits"
+		exit 1
+	fi
+fi
+
+import_bip340() {
+	if [[ -z "$bip340_upstream" ]]; then
+		>&2 echo "keeping checked-in BIP-340 import (not present upstream)"
+		return
+	fi
+	for i in "${bip340_headers[@]}"; do
+		[[ -z "$i" ]] && continue
+		mkdir -p src/circuits/bip340
+		copy_optional "$bip340_upstream/$i" "src/circuits/bip340/$i"
+		perl -pi -e 's/CIRCUITS_TESTS_CONTRIB_BIP340/CIRCUITS_BIP340/g' \
+			"src/circuits/bip340/$i"
+	done
+
+	for i in "${bip340_testdata[@]}"; do
+		[[ -z "$i" ]] && continue
+		mkdir -p test/bip340/testdata
+		copy_optional "$bip340_upstream/testdata/$i" "test/bip340/testdata/$i"
+	done
+
+	# This distribution supplies its portable SHA-256 adapter instead of
+	# linking the contributed circuit directly to OpenSSL.
+	perl -0pi -e 's|// OpenSSL for SHA-256 \(already a project dependency\)\.\n#include <openssl/sha\.h>|#include "util/crypto.h"|' src/circuits/bip340/bip340_witness.h
+	perl -0pi -e 's|uint8_t tag_hash\[32\];\n    SHA256_CTX ctx;\n    SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag, tag_len\);\n    SHA256_Final\(tag_hash, &ctx\);|uint8_t tag_hash[32];\n    SHA256 tag_sha;\n    tag_sha.Update(reinterpret_cast<const uint8_t*>(tag), tag_len);\n    tag_sha.DigestData(tag_hash);|' src/circuits/bip340/bip340_witness.h
+	perl -0pi -e 's|SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, r_bytes, 32\);\n    SHA256_Update\(&ctx, pk_bytes, 32\);\n    SHA256_Update\(&ctx, msg, msg_len\);\n    SHA256_Final\(hash, &ctx\);|SHA256 challenge_sha;\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(r_bytes, 32);\n    challenge_sha.Update(pk_bytes, 32);\n    challenge_sha.Update(msg, msg_len);\n    challenge_sha.DigestData(hash);|' src/circuits/bip340/bip340_witness.h
+}
+
+if $bip340_only; then
+	import_bip340
+	>&2 echo "🌉 BIP-340 imported from $bip340_upstream"
+	exit 0
+fi
 
 echo "SOURCES := \\" > src/sources.mk
 for i in ${sources[@]}; do
@@ -138,17 +202,7 @@ for i in ${optional_headers[@]}; do
 	copy_optional "$h" src/"$i"
 done
 
-for i in ${optional_testdata[@]}; do
-	mkdir -p test/bip340/`dirname ${i#circuits/bip340/}`
-	h="${1}/lib/${i}"
-	copy_optional "$h" test/bip340/"${i#circuits/bip340/}"
-done
-
-if [ -r src/circuits/bip340/bip340_witness.h ]; then
-	perl -0pi -e 's|// OpenSSL for SHA-256 \(already a project dependency\)\.\n#include <openssl/sha\.h>|#include "util/crypto.h"|' src/circuits/bip340/bip340_witness.h
-	perl -0pi -e 's|uint8_t tag_hash\[32\];\n    SHA256_CTX ctx;\n    SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag, tag_len\);\n    SHA256_Final\(tag_hash, &ctx\);|uint8_t tag_hash[32];\n    SHA256 tag_sha;\n    tag_sha.Update(reinterpret_cast<const uint8_t*>(tag), tag_len);\n    tag_sha.DigestData(tag_hash);|' src/circuits/bip340/bip340_witness.h
-	perl -0pi -e 's|SHA256_Init\(&ctx\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, tag_hash, 32\);\n    SHA256_Update\(&ctx, r_bytes, 32\);\n    SHA256_Update\(&ctx, pk_bytes, 32\);\n    SHA256_Update\(&ctx, msg, msg_len\);\n    SHA256_Final\(hash, &ctx\);|SHA256 challenge_sha;\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(tag_hash, 32);\n    challenge_sha.Update(r_bytes, 32);\n    challenge_sha.Update(pk_bytes, 32);\n    challenge_sha.Update(msg, msg_len);\n    challenge_sha.DigestData(hash);|' src/circuits/bip340/bip340_witness.h
-fi
+import_bip340
 
 >&2 echo "🌉 Upstream source imported from $1"
 exit 0

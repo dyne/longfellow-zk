@@ -23,13 +23,13 @@
 
 namespace proofs {
 
-/// Returns the smallest power of two >= n.
+// Returns the smallest power of two that is at least n.
 inline size_t next_pow2(size_t n) {
-  size_t p = 1;
-  while (p < n) {
-    p *= 2;
+  size_t result = 1;
+  while (result < n) {
+    result *= 2;
   }
-  return p;
+  return result;
 }
 
 /// Guard: checks that the block_enc parameter for a CRT-backed secp256k1

@@ -22,6 +22,23 @@ This distribution is at an early stage and includes all upstream primitives for 
 
 For now, just like the upstream code, this is a demonstrator at TRL 4 and we just focus on portability and test environment, but we also devleoping a [language (DSL) to design longfellow-zk circuits](https://github.com/dyne/Zenroom/pull/1143) which will soon be ready to ease the customization of circuits fitting EUDI standard formats.
 
+### BIP-340 circuit
+
+The secp256k1 Schnorr circuit is synchronized from Google's contributed
+`lib/circuits/tests/contrib/bip340` implementation while retaining this
+distribution's portable SHA-256 adapter and standalone test harness. To update
+only that circuit from a Longfellow checkout:
+
+```sh
+make import-bip340 BIP340_UPSTREAM=../google-longfellow-zk
+make bip340-test
+```
+
+The focused test exercises all 19 Bitcoin Core vectors, semantic golden facts,
+the scalar-canonicality and even-`R.y` constraints, private/public mutation
+rejection, CRT capacity boundaries, proof generation and verification, and
+serialized-proof tampering.
+
 ## References
 - [Anonymous credentials from ECDSA](https://eprint.iacr.org/2024/2010)
 - [libzk: A C++ Library for Zero-Knowledge Proofs](https://datatracker.ietf.org/doc/draft-google-cfrg-libzk/)
