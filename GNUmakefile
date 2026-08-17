@@ -56,11 +56,24 @@ import-vendor:
 	$(info 🌉 Importing source from upstream)
 	@bash scripts/import_upstream.sh vendor/longfellow-zk
 
+BIP340_UPSTREAM ?= vendor/longfellow-zk
+.PHONY: import-bip340
+import-bip340:
+	$(info 🌉 Importing BIP-340 from $(BIP340_UPSTREAM))
+	@bash scripts/import_upstream.sh bip340 "$(BIP340_UPSTREAM)"
+
 .PHONY: bip340-test
 bip340-test: test/bip340_test
 	@./test/bip340_test
 
-test/bip340_test: test/bip340/bip340_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+BIP340_DEPS := $(wildcard src/circuits/bip340/*.h) \
+	$(wildcard test/bip340/testdata/*)
+
+src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a:
+	@$(MAKE) posix
+
+test/bip340_test: test/bip340/bip340_test.cc $(BIP340_DEPS) \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Itest/bip340 -Ivendor/zstd/lib -o $@ $< \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 

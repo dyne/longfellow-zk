@@ -287,6 +287,104 @@ void TestScalarEvaluation() {
   CheckVerify(s_nat, e_nat, P.x, wrong_py, wrong_point_rx, false);
 }
 
+void TestSoundnessRegressions() {
+  using EvalBackend = EvaluationBackend<Field>;
+  using LogicType = Logic<Field, EvalBackend>;
+  using VerifyC = Bip340Verify<LogicType, Field, EC>;
+
+  const Field& F = p256k1_base;
+  const EC& ec = p256k1;
+  auto P = ec.scalar_multf(ec.generator(), Nat(1ull));
+  ec.normalize(P);
+
+  const Nat s_nat(2ull);
+  const Nat e_nat(1ull);
+  Elt py;
+  Elt rx = ComputeRx(F, ec, s_nat, e_nat, P.x, py);
+
+  Bip340Witness wit(ec);
+  Require(wit.compute_from_scalars(s_nat, e_nat, P.x, py),
+          "soundness witness compute failed");
+
+  auto expect_rejected = [&](const char* name, Elt public_rx, Elt public_px,
+                             Elt public_e,
+                             const std::function<void(
+                                 typename VerifyC::Witness&,
+                                 const LogicType&)>& mutate) {
+    const EvalBackend ebk(F, false);
+    const LogicType l(&ebk, F);
+    VerifyC circuit(l, ec);
+    auto w = MakeEvalWitness<LogicType, VerifyC>(l, wit);
+    mutate(w, l);
+    circuit.assert_verify(l.konst(public_rx), l.konst(public_px),
+                          l.konst(public_e), w);
+    Require(ebk.assertion_failed(),
+            std::string("soundness mutation accepted: ") + name);
+  };
+
+  auto no_mutation = [](typename VerifyC::Witness&, const LogicType&) {};
+  expect_rejected("wrong public rx", F.negf(rx), P.x, wit.e_, no_mutation);
+  expect_rejected("wrong public px", rx, F.negf(P.x), wit.e_, no_mutation);
+  expect_rejected("wrong public challenge", rx, P.x,
+                  F.addf(wit.e_, F.one()), no_mutation);
+
+  expect_rejected("odd R.y with even decomposition", rx, P.x, wit.e_,
+                  [&](auto& w, const auto& l) {
+                    w.ry = l.konst(F.negf(wit.ry_));
+                  });
+  expect_rejected("odd R.y with matching decomposition", rx, P.x, wit.e_,
+                  [&](auto& w, const auto& l) {
+                    Elt odd_ry = F.negf(wit.ry_);
+                    w.ry = l.konst(odd_ry);
+                    Nat odd_ry_nat = F.from_montgomery(odd_ry);
+                    for (size_t i = 0; i < Bip340Witness::kBits; ++i) {
+                      w.bits_ry[i] =
+                          l.konst(F.of_scalar(odd_ry_nat.bit(255 - i)));
+                    }
+                  });
+
+  expect_rejected("flipped s bit", rx, P.x, wit.e_,
+                  [&](auto& w, const auto& l) {
+                    w.bits_s[10] =
+                        l.konst(F.subf(F.one(), wit.bits_s_[10]));
+                  });
+  expect_rejected("flipped e bit", rx, P.x, wit.e_,
+                  [&](auto& w, const auto& l) {
+                    w.bits_e[20] =
+                        l.konst(F.subf(F.one(), wit.bits_e_[20]));
+                  });
+  expect_rejected("corrupt s trace", rx, P.x, wit.e_,
+                  [&](auto& w, const auto& l) {
+                    w.int_sx[254] = l.konst(F.zero());
+                  });
+  expect_rejected("corrupt e trace", rx, P.x, wit.e_,
+                  [&](auto& w, const auto& l) {
+                    w.int_ey[254] = l.konst(F.zero());
+                  });
+  expect_rejected("zero R.z inverse", rx, P.x, wit.e_,
+                  [&](auto& w, const auto& l) {
+                    w.rz_inv = l.konst(F.zero());
+                  });
+
+  // n + 2 has the same group action as 2, but is not a canonical BIP-340
+  // response scalar.  This specifically exercises the in-circuit s < n
+  // constraint added by the accepted implementation.
+  Nat s_plus_n(
+      "0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364143");
+  Bip340Witness noncanonical(ec);
+  Require(noncanonical.compute_from_scalars(s_plus_n, e_nat, P.x, py),
+          "non-canonical scalar witness compute failed");
+  {
+    const EvalBackend ebk(F, false);
+    const LogicType l(&ebk, F);
+    VerifyC circuit(l, ec);
+    auto w = MakeEvalWitness<LogicType, VerifyC>(l, noncanonical);
+    circuit.assert_verify(l.konst(rx), l.konst(P.x),
+                          l.konst(noncanonical.e_), w);
+    Require(ebk.assertion_failed(), "scalar s >= n was accepted");
+  }
+}
+
 void TestVectorsEvaluate() {
   using EvalBackend = EvaluationBackend<Field>;
   using LogicType = Logic<Field, EvalBackend>;
@@ -404,6 +502,18 @@ void TestCircuitSize() {
   Require(err.empty(), err);
 }
 
+void TestCrtGuardBoundaries() {
+  using Crt = CRT256<Field>;
+  Require(check_crt_block_enc<Crt>(1024).empty(),
+          "CRT guard rejected a small transform");
+  Require(check_crt_block_enc<Crt>(1ull << 22).empty(),
+          "CRT guard rejected its documented maximum transform");
+  auto err = check_crt_block_enc<Crt>((1ull << 22) + 1);
+  Require(!err.empty(), "CRT guard accepted an oversized transform");
+  Require(err.find("exceeds") != std::string::npos,
+          "CRT guard returned an unexpected oversized-transform error");
+}
+
 std::string ResultDir(const char* argv0) {
   std::string path = argv0 ? argv0 : "";
   auto slash = path.find_last_of('/');
@@ -512,6 +622,24 @@ void TestZkProverVerifierVector0(const char* argv0) {
   ZkVerifier<Field, RSFactory> verifier(*CIRCUIT, rsf, kRate, kQueries, F);
   verifier.recv_commitment(parsed_proof, trv);
   Require(verifier.verify(parsed_proof, pub, trv), "verifier rejected proof");
+
+  // The accepted suite also checks that serialized proof corruption cannot
+  // survive verification.  Keep that regression in the portable harness.
+  auto tampered_bytes = proof_bytes;
+  Require(tampered_bytes.size() >= 20, "proof too small to tamper");
+  tampered_bytes[10] ^= 0xff;
+  ReadBuffer tampered_rb(tampered_bytes.data(), tampered_bytes.size());
+  ZkProof<Field> tampered_proof(*CIRCUIT, kRate, kQueries);
+  Require(tampered_proof.read(tampered_rb, F),
+          "failed to parse structurally valid tampered proof");
+  Transcript tampered_transcript(
+      reinterpret_cast<uint8_t*>(const_cast<char*>("bip340 vec0")), 11);
+  ZkVerifier<Field, RSFactory> tampered_verifier(*CIRCUIT, rsf, kRate,
+                                                 kQueries, F);
+  tampered_verifier.recv_commitment(tampered_proof, tampered_transcript);
+  Require(!tampered_verifier.verify(tampered_proof, pub,
+                                    tampered_transcript),
+          "verifier accepted a tampered proof");
   phase_finish = Clock::now();
   metrics.push_back({"deserialize_verify_proof",
                      ElapsedMs(phase_start, phase_finish),
@@ -535,11 +663,15 @@ int main(int argc, char** argv) {
     proofs::Run("hex parser rejects malformed input", proofs::TestHexParser);
     proofs::Run("scalar evaluation accepts and rejects witnesses",
                 proofs::TestScalarEvaluation);
+    proofs::Run("accepted circuit soundness regressions",
+                proofs::TestSoundnessRegressions);
     proofs::Run("bitcoin vectors evaluate through circuit",
                 proofs::TestVectorsEvaluate);
     proofs::Run("witness semantic facts match golden vectors",
                 proofs::TestGoldenFacts);
     proofs::Run("compiled circuit has expected shape", proofs::TestCircuitSize);
+    proofs::Run("CRT guard accepts and rejects boundary sizes",
+                proofs::TestCrtGuardBoundaries);
     proofs::Run("zk prover/verifier accepts bitcoin vector 0",
                 [&]() { proofs::TestZkProverVerifierVector0(argv0); });
   } catch (const std::exception& e) {
