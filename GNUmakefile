@@ -66,6 +66,11 @@ import-bip340:
 bip340-test: test/bip340_test
 	@./test/bip340_test
 
+.PHONY: blindzap-spec-test
+blindzap-spec-test:
+	@python3 scripts/check_blindzap_spec.py
+	@python3 scripts/generate_blindzap_vectors.py | cmp -s - test/blindzap/testdata/blindzap_vectors.json
+
 BIP340_DEPS := $(wildcard src/circuits/bip340/*.h) \
 	$(wildcard test/bip340/testdata/*)
 
