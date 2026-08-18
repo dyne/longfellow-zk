@@ -232,6 +232,14 @@ class FlatSHA256Circuit {
   // prover knows a preimage that hashes to the desired e.
   void assert_hash(size_t max, const v256& e, const v8& nb,
                    const BlockWitness bw[/*max*/]) const {
+    l_.vassert_eq(message_hash(max, nb, bw), e);
+  }
+
+  // Returns the digest selected by nb from already-constrained block
+  // witnesses.  Callers that keep a digest private can use this after
+  // assert_message() without allocating a separate target input.
+  v256 message_hash(size_t max, const v8& nb,
+                    const BlockWitness bw[/*max*/]) const {
     packed_v32 x[8];
     for (size_t b = 0; b < max; ++b) {
       auto bt = l_.veq(nb, b + 1); /* b is zero-indexed */
@@ -256,7 +264,7 @@ class FlatSHA256Circuit {
         mm[((7 - j) * 32 + k)] = hj[k];
       }
     }
-    l_.vassert_eq(mm, e);
+    return mm;
   }
 
   // Checks that the padding bytes of the input, i.e., any bytes that are
