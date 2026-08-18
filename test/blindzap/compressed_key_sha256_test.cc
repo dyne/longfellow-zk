@@ -9,6 +9,8 @@
 #include "circuits/blindzap/compressed_key_sha256_witness.h"
 #include "circuits/blindzap/key_ownership.h"
 #include "circuits/blindzap/key_ownership_witness.h"
+#include "circuits/blindzap/hash160.h"
+#include "circuits/ripemd160/ripemd160.h"
 #include "circuits/bip340/bip340_guard.h"
 #include "circuits/compiler/compiler.h"
 #include "circuits/logic/bit_plucker_encoder.h"
@@ -29,6 +31,7 @@ using Ownership = KeyOwnershipCircuit<Circuit, Field, EC>;
 using OwnershipNative = KeyOwnershipWitness<Field, EC>;
 using Sha = CompressedKeySha256Circuit<Circuit>;
 using Flat = FlatSHA256Circuit<Circuit, BitPlucker<Circuit, 4>>;
+using Hash160 = Hash160Circuit<Circuit>;
 
 void Require(bool value, const char* message) {
   if (!value) throw std::runtime_error(message);
@@ -184,6 +187,20 @@ void CheckCompilerPrivacy() {
   Require(compiled->ninputs > compiled->npub_in, "SHA witness missing");
 }
 
+void CheckHash160Composition() {
+  OwnershipNative ownership_native;
+  ownership_native.compute(p256k1, Field::N(1));
+  CompressedKeySha256Witness sha_native; sha_native.compute(Sec(ownership_native));
+  const auto expected = Ripemd160::digest(sha_native.digest);
+  const Backend backend(p256k1_base, false); const Circuit circuit(&backend, p256k1_base);
+  const Ownership ownership(circuit, p256k1); const Hash160 hash160(circuit);
+  std::array<Circuit::v8, 20> target;
+  for (size_t i=0;i<target.size();++i) target[i] = circuit.template vbit<8>(expected[i]);
+  Hash160::Witness witness; witness.sha = WireSha(circuit, sha_native, 0);
+  (void)hash160.assert_hash160(ownership.derive(WireOwnership(circuit, ownership_native, 0)), witness, target);
+  Require(!backend.assertion_failed(), "valid HASH160 relation rejected");
+}
+
 struct Metrics {
   size_t milliseconds;
   size_t public_inputs;
@@ -255,6 +272,7 @@ int main() {
     proofs::CheckBlindZap(proofs::Field::N("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364140"), "fbd27dbb9e7f471bf3de3704a35e884e37d35c676dc2cc8c3cc574c3962376d2");
     for (int mutation = 1; mutation <= 3; ++mutation) proofs::CheckBlindZap(proofs::Field::N(3), "eae10cdd2f289bdad44615809cb422d2fabe9622ed706ad5d9d3ffd2cdd1c001", mutation);
     proofs::CheckCompilerPrivacy();
+    proofs::CheckHash160Composition();
     proofs::CheckCompositionMetrics();
   } catch (const std::exception& error) {
     std::cerr << "not ok - " << error.what() << '\n';

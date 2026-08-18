@@ -83,6 +83,10 @@ blindzap-key-ownership-test: test/blindzap/key_ownership_test
 blindzap-sha256-test: test/blindzap/compressed_key_sha256_test
 	@./test/blindzap/compressed_key_sha256_test
 
+.PHONY: blindzap-ripemd160-test
+blindzap-ripemd160-test: test/blindzap/ripemd160_test
+	@./test/blindzap/ripemd160_test
+
 BIP340_DEPS := $(wildcard src/circuits/bip340/*.h) \
 	$(wildcard src/circuits/secp256k1/*.h) \
 	$(wildcard test/bip340/testdata/*)
@@ -104,6 +108,10 @@ test/blindzap/key_ownership_test: test/blindzap/key_ownership_test.cc $(wildcard
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/compressed_key_sha256_test: test/blindzap/compressed_key_sha256_test.cc $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/secp256k1/*.h) $(wildcard src/circuits/sha/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/blindzap
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+test/blindzap/ripemd160_test: test/blindzap/ripemd160_test.cc $(wildcard src/circuits/ripemd160/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
