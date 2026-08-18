@@ -19,7 +19,13 @@ class Secp256k1Encoding {
     EltW bits[kBits];
     void input(const LogicCircuit& lc) { for (auto& bit : bits) bit = lc.eltw_input(); }
   };
-  struct CompressedKey { std::array<EltW, 33> bytes; };
+  struct CompressedKey {
+    std::array<EltW, 33> bytes;
+    // Retain the constrained bit representation for downstream hash gadgets.
+    // Coordinate bits are MSB first; parity is the least-significant Y bit.
+    std::array<EltW, kBits> x_bits;
+    EltW parity;
+  };
 
   explicit Secp256k1Encoding(const LogicCircuit& lc) : lc_(lc), modulus_bits_(modulus_bits(lc)) {}
 
@@ -59,6 +65,8 @@ class Secp256k1Encoding {
     key.bytes[0] = lc_.add(lc_.konst(2), y.bits[kBits - 1]);
     const auto x_bytes = bytes(x);
     for (size_t i = 0; i < x_bytes.size(); ++i) key.bytes[i + 1] = x_bytes[i];
+    for (size_t i = 0; i < kBits; ++i) key.x_bits[i] = x.bits[i];
+    key.parity = y.bits[kBits - 1];
     return key;
   }
 
