@@ -95,6 +95,16 @@ blindzap-test: test/blindzap/blindzap_test
 blindzap-protocol-test: test/blindzap/protocol_test
 	@./test/blindzap/protocol_test
 
+.PHONY: blindzap-integration-test
+blindzap-integration-test: test/blindzap/integration_test
+	@./test/blindzap/integration_test
+
+.PHONY: blindzap-cli
+blindzap-cli: blindzap
+
+blindzap: src/cli/blindzap_main.cc $(wildcard src/blindzap/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
 BIP340_DEPS := $(wildcard src/circuits/bip340/*.h) \
 	$(wildcard src/circuits/secp256k1/*.h) \
 	$(wildcard test/bip340/testdata/*)
@@ -128,6 +138,10 @@ test/blindzap/blindzap_test: test/blindzap/blindzap_test.cc $(wildcard src/circu
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/protocol_test: test/blindzap/protocol_test.cc $(wildcard src/blindzap/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/blindzap
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+test/blindzap/integration_test: test/blindzap/integration_test.cc $(wildcard src/blindzap/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
