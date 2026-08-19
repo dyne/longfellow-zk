@@ -33,10 +33,15 @@ void TestHashesAndEnvelope() {
   e.proof.bytes.assign(48 * 1024 * 1024, 0xa5); Require(EncodeBlindzapEnvelope(e, &bytes), "rejected current-proof-scale envelope"); Require(DecodeBlindzapEnvelope(bytes, &parsed) && parsed.proof.bytes == e.proof.bytes, "failed current-proof-scale envelope round trip");
   e.proof.bytes.assign(kBlindzapMaxProofBytes + 1, 0); Require(!EncodeBlindzapEnvelope(e, &bytes), "accepted proof over allocation limit");
 }
+void TestMultiClaimAndBridgeBinding() {
+  auto s=Statement(); std::vector<std::array<uint8_t,20>> programs; Require(BlindzapDistinctPrograms(s,&programs) && programs.size()==2,"distinct program grouping");
+  s.claims.push_back(s.claims[0]); Require(!BlindzapStatementValid(s),"duplicate outpoint accepted"); s=Statement(); s.claims[1].program=s.claims[0].program; Require(BlindzapDistinctPrograms(s,&programs) && programs.size()==1,"shared program grouping");
+  s=Statement(); s.has_bridge_binding=true; s.bridge.destination_network=BlindzapNetwork::kTestnet; s.bridge.destination_commitment[0]=4; s.bridge.asset_id="asset"; s.bridge.lock_id[0]=5; std::vector<uint8_t> wire; Require(EncodeBlindzapStatement(s,&wire),"bridge encode"); BlindzapStatementV1 decoded; Require(DecodeBlindzapStatement(wire,&decoded) && decoded.bridge.asset_id=="asset","bridge round trip"); std::array<uint8_t,32> one,two; Require(BlindzapStatementDigest(s,&one),"bridge digest"); s.bridge.lock_id[0]^=1; Require(BlindzapStatementDigest(s,&two) && one!=two,"bridge lock not transcript bound");
+}
 void TestReplayPolicy() {
   auto s = Statement(); BlindzapReplayPolicy policy; policy.now = 150; policy.max_lifetime = 200; policy.verifier = s.verifier; policy.purpose = s.purpose; bool consumed = false; policy.nonce_seen = [&](const std::array<uint8_t,32>&) { return consumed; }; policy.consume_nonce = [&](const std::array<uint8_t,32>&) { if (consumed) return false; consumed = true; return true; };
   Require(BlindzapCheckPolicy(s, policy, true) == BlindzapAuthorization::kPendingReplayCheck, "fresh nonce not pending"); Require(BlindzapConsumeNonce(s, policy) == BlindzapAuthorization::kAuthorized, "fresh nonce not consumed"); Require(BlindzapCheckPolicy(s, policy, true) == BlindzapAuthorization::kReplayRejected, "replay accepted"); consumed = false; Require(BlindzapCheckPolicy(s, policy, false) == BlindzapAuthorization::kPolicyRejected && !consumed, "invalid proof consumed nonce"); s.expires_at = 149; Require(BlindzapCheckPolicy(s, policy, true) == BlindzapAuthorization::kPolicyRejected, "expired statement accepted");
 }
 }  // namespace
 }  // namespace proofs
-int main() { try { proofs::TestStatement(); proofs::TestHashesAndEnvelope(); proofs::TestReplayPolicy(); } catch (const std::exception& e) { std::cerr << "not ok - " << e.what() << '\n'; return 1; } std::cout << "BlindZap protocol tests passed\n"; }
+int main() { try { proofs::TestStatement(); proofs::TestHashesAndEnvelope(); proofs::TestMultiClaimAndBridgeBinding(); proofs::TestReplayPolicy(); } catch (const std::exception& e) { std::cerr << "not ok - " << e.what() << '\n'; return 1; } std::cout << "BlindZap protocol tests passed\n"; }

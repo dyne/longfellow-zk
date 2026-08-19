@@ -2,9 +2,9 @@
 
 Status: normative. The product rationale is in [BLINDZAP.md](../BLINDZAP.md).
 An implementation MUST follow this document exactly. BlindZap v1 is an
-off-chain proof of control for one native P2WPKH output. It neither spends nor
-locks Bitcoin and does not change consensus. P2SH-wrapped P2WPKH, P2WSH,
-multisig, P2TR, batching, and bridge authorization are unsupported.
+off-chain proof of control for a bounded set of native P2WPKH outputs. It
+neither spends nor locks Bitcoin and does not change consensus. P2SH-wrapped
+P2WPKH, P2WSH, multisig, and P2TR are unsupported.
 
 ## 1. Conventions and constants
 
@@ -45,12 +45,11 @@ checks are defense in depth and MUST NOT be the only enforcement.
 ## 2. Circuit input layout
 
 The Longfellow witness/public vector begins with its mandatory constant-one
-slot. The public input layout, in order, is: (1) constant one; (2) the 20
-individual program bytes, indices 0 through 19; and (3) `statement_digest`,
-32 individual bytes, indices 0 through 31. All bytes are constrained to
-`[0,255]`. No scalar bit, point coordinate, parity, SEC byte, or SHA-256
-intermediate digest is public. Changing this layout requires a new circuit
-digest and protocol version.
+slot, followed by 20 byte-shaped inputs for every distinct program. The
+supported circuit family contains exactly 1 or 2 ownership relations;
+the selected relation count is committed by the circuit digest. No inactive
+padding relation exists. All bytes are constrained to `[0,255]`; scalar bits,
+point coordinates, parity, SEC bytes, and hash intermediates stay private.
 
 ## 3. Protocol statement
 
@@ -71,27 +70,31 @@ Fiat-Shamir transcript together with the circuit digest and public inputs.
 | purpose | length-prefixed UTF-8, exactly `proof-of-control` or `proof-of-funds` |
 | issue time | `u64_be`, Unix seconds |
 | expiry time | `u64_be`, strictly greater than issue time |
-| claim count | one byte, exactly `01` |
+| claim count | `u16_be`, 1 through 16 |
 | outpoint txid | 32 bytes in Bitcoin RPC/display byte order |
 | outpoint vout | `u32_be` |
 | amount | `u64_be`, 1..2,100,000,000,000,000 satoshis |
 | scriptPubKey | one-byte length (`16`) followed by exactly `00 14 || program` |
 
-There are no destination fields in v1. A decoder MUST reject trailing bytes,
-an empty nonce, duplicate outpoints (in rejected non-v1 counts), an unknown
-version/network, zero or excess claims, amount overflow, wrong script
-length/opcodes/program, or destination data for either v1 purpose.
+Claims are sorted strictly by `(txid, vout)` and duplicate outpoints are
+rejected. Distinct 20-byte programs are sorted lexicographically and derived
+again by the verifier from the public claims; each claim maps to exactly one
+such relation. More than two distinct programs is rejected before circuit
+allocation. A statement may carry an optional bridge binding containing a
+destination network, 32-byte destination commitment, UTF-8 asset ID, and
+32-byte lock identifier. These fields and the statement nonce are transcript
+bound; they do not establish that the Bitcoin output is locked.
 
 | malformed or boundary input | required result |
 | --- | --- |
 | empty or all-zero nonce | `malformed_statement` |
-| duplicate outpoint in a non-v1 multi-claim encoding | `malformed_statement` |
+| duplicate outpoint or noncanonical claim order | `malformed_statement` |
 | unsupported network or version | `unsupported` |
-| zero claims or claim count greater than one | `malformed_statement` |
+| zero claims, more than 16 claims, or more than 2 distinct programs | `malformed_statement` |
 | expiry at or before issue time | `malformed_statement` |
 | amount zero, overflow, or above the Bitcoin monetary maximum | `malformed_statement` |
 | script length other than 22, or bytes other than `00 14 || program` | `malformed_statement` |
-| destination field for either v1 purpose | `unsupported` |
+| malformed bridge destination, asset, or lock identifier | `malformed_statement` |
 
 BlindZap's BIP-322 companion is named `blindzap-pof-v1`. It reuses the
 `BIP0322-signed-message` tagged message digest and Proof-of-Funds workflow for
@@ -103,7 +106,8 @@ expected to accept it.
 
 The verifier returns exactly one enum, never a success boolean:
 `invalid_proof`, `malformed_statement`, `unsupported`, `state_inconclusive`,
-`spent_at_snapshot`, `stale_snapshot`, `valid_historical`, or `valid_current`.
+`spent_at_snapshot`, `stale_snapshot`, `bridge_rejected`, `valid_historical`,
+or `valid_current`.
 
 Validation is ordered:
 
@@ -120,7 +124,11 @@ Validation is ordered:
    `state_inconclusive`.
 6. Evidence of spending at the snapshot is `spent_at_snapshot`; an output
    unspent then but spent later is `valid_historical`.
-7. A freshness/finality policy failure is `stale_snapshot`; a currently
+7. Sum exact chain-checked satoshi values with checked `uint64_t` arithmetic
+   and apply an optional public minimum threshold.
+8. A bridge statement additionally requires an independent lock/custody and
+   one-time-mint callback; missing or failed evidence is `bridge_rejected`.
+9. A freshness/finality policy failure is `stale_snapshot`; a currently
    unspent exact match is `valid_current`.
 
 An earlier step wins. In particular, malformed input is never sent to a chain

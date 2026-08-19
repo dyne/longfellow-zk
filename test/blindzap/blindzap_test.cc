@@ -11,6 +11,7 @@
 #include "circuits/blindzap/blindzap_circuit.h"
 #include "circuits/blindzap/blindzap_witness.h"
 #include "blindzap/proof.h"
+#include "blindzap/prover.h"
 #include "circuits/bip340/bip340_guard.h"
 #include "circuits/compiler/compiler.h"
 #include "circuits/logic/compiler_backend.h"
@@ -86,6 +87,35 @@ void TestStableLayoutAndDigest() {
     Require(digest_one[i] == digest_two[i], "BlindZap circuit digest is not deterministic");
 }
 
+template <size_t Keys>
+std::unique_ptr<Circuit<Field>> BuildMultiCircuit(QuadCircuit<Field>& q) {
+  const CompileBackend backend(&q); const CompileLogic logic(&backend, p256k1_base);
+  BlindzapMultiCircuitV1<CompileLogic, Field, EC, Keys> relation(logic, p256k1);
+  std::array<std::array<CompileLogic::EltW, 20>, Keys> programs;
+  for (auto& program : programs) for (auto& byte : program) byte = logic.eltw_input();
+  q.private_input(); std::array<Relation::Witness, Keys> witnesses; for (auto& witness : witnesses) witness.input(logic);
+  relation.assert_programs(programs, witnesses); return q.mkcircuit(1);
+}
+void TestMultiKeyLayouts() {
+  QuadCircuit<Field> q1(p256k1_base), q2(p256k1_base);
+  auto one=BuildMultiCircuit<1>(q1); auto two=BuildMultiCircuit<2>(q2);
+  Require(one->npub_in==21 && two->npub_in==41,"multi public layout");
+  Require(one->ninputs < two->ninputs,"multi ownership relations not composed");
+  Require(BlindzapCircuitDigest(*one,p256k1_base,SECP_ID)!=BlindzapCircuitDigest(*two,p256k1_base,SECP_ID),"key count absent from circuit identity");
+  Require(check_crt_block_enc<CRT256<Field>>(two->ninputs-two->npub_in+q2.nquad_terms_+1).empty(),"maximum circuit CRT guard");
+}
+void TestMaximumMultiKeyProofRoundTrip() {
+  std::array<uint8_t,32> one{}, n_minus_one = {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xfe,0xba,0xae,0xdc,0xe6,0xaf,0x48,0xa0,0x3b,0xbf,0xd2,0x5e,0x8c,0xd0,0x36,0x41,0x40}; one[31]=1;
+  BlindzapWitnessV1<Field,EC> first, second; Require(first.compute(p256k1,one.data(),one.size()) && second.compute(p256k1,n_minus_one.data(),n_minus_one.size()),"multi witness compute");
+  BlindzapStatementV1 s; s.network=BlindzapNetwork::kRegtest; s.verifier="multi-test"; s.purpose="proof-of-funds"; s.expires_at=1;
+  BlindzapClaimV1 a,b; a.txid[0]=1; a.amount_sats=1; a.program=first.program(); b.txid[0]=2; b.amount_sats=2; b.program=second.program(); s.claims={a,b};
+  BlindzapEnvelopeV1 envelope; Require(BlindzapProveKeys<2>({one,n_minus_one},s,&envelope),"maximum multi-key prove"); std::vector<uint8_t> wire; Require(EncodeBlindzapEnvelope(envelope,&wire),"maximum multi-key encode"); BlindzapEnvelopeV1 parsed; Require(DecodeBlindzapEnvelope(wire,&parsed) && BlindzapVerifyProof(parsed),"maximum multi-key verify");
+  auto mutated_program=parsed; mutated_program.statement.claims[0].program[0]^=1; Require(!BlindzapVerifyProof(mutated_program),"mutated program accepted");
+  auto mutated_claims=s; std::swap(mutated_claims.claims[0],mutated_claims.claims[1]); Require(!BlindzapProveKeys<2>({one,n_minus_one},mutated_claims,&envelope),"reordered claims accepted"); mutated_claims=s; mutated_claims.claims[1]=mutated_claims.claims[0]; Require(!BlindzapProveKeys<2>({one,n_minus_one},mutated_claims,&envelope),"duplicate claim accepted"); Require(!BlindzapProveKeys<2>({one},s,&envelope),"omitted relation accepted"); Require(!BlindzapProveKeys<2>({one,n_minus_one,one},s,&envelope),"extra relation accepted"); Require(!BlindzapProveKeys<2>({one,one},s,&envelope),"mutated key accepted");
+  auto too_many=s; BlindzapClaimV1 c=b; c.txid[0]=3; c.program[0]^=1; too_many.claims.push_back(c); std::vector<std::array<uint8_t,20>> too_many_programs; Require(!BlindzapDistinctPrograms(too_many,&too_many_programs),"three program grouping accepted");
+  auto shared=s; shared.claims[1].program=shared.claims[0].program; std::vector<std::array<uint8_t,20>> grouped; Require(BlindzapDistinctPrograms(shared,&grouped) && grouped.size()==1,"shared-key mapping rejected");
+}
+
 void TestWitnessInputValidation() {
   BlindzapWitnessV1<Field, EC> witness;
   std::array<uint8_t, 32> one{};
@@ -128,6 +158,8 @@ void TestProofRoundTrip(const std::array<uint8_t, 32>& secret) {
 int main() {
   try {
     proofs::TestStableLayoutAndDigest();
+    proofs::TestMultiKeyLayouts();
+    proofs::TestMaximumMultiKeyProofRoundTrip();
     proofs::TestWitnessInputValidation();
     std::array<uint8_t, 32> one{}; one[31] = 1;
     proofs::TestProofRoundTrip(one);
