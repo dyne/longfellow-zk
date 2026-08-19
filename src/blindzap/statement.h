@@ -18,7 +18,13 @@ namespace proofs {
 // This is a protocol object, not a Bitcoin transaction or BIP-322 witness.
 enum class BlindzapNetwork : uint8_t { kMainnet = 0, kTestnet = 1, kRegtest = 2 };
 constexpr size_t kBlindzapMaxTextBytes = 1024;
-constexpr size_t kBlindzapMaxClaims = 64;
+// v1 multi-claim uses a small circuit family (1, 2, or 4 ownership
+// relations).  These are protocol limits, not merely parser limits: changing
+// either changes the circuit identity carried by a proof.
+constexpr size_t kBlindzapMaxClaims = 16;
+// Four relations exceed the CRT block-encoding guard on the supported native
+// parameters.  Two is the largest measured safe member of this v1 family.
+constexpr size_t kBlindzapMaxKeys = 2;
 
 struct BlindzapClaimV1 {
   std::array<uint8_t, 32> txid{};  // Bitcoin wire-order txid bytes.
@@ -34,6 +40,13 @@ struct BlindzapClaimV1 {
   }
 };
 
+struct BlindzapBridgeBindingV1 {
+  BlindzapNetwork destination_network = BlindzapNetwork::kMainnet;
+  std::array<uint8_t, 32> destination_commitment{};
+  std::string asset_id;
+  std::array<uint8_t, 32> lock_id{};
+};
+
 struct BlindzapStatementV1 {
   BlindzapNetwork network = BlindzapNetwork::kMainnet;
   std::string verifier;
@@ -44,8 +57,30 @@ struct BlindzapStatementV1 {
   uint64_t expires_at = 0;
   bool has_snapshot = false;
   std::array<uint8_t, 32> snapshot{};
+  bool has_bridge_binding = false;
+  BlindzapBridgeBindingV1 bridge;
   std::vector<BlindzapClaimV1> claims;
 };
+
+inline bool BlindzapStatementValid(const BlindzapStatementV1& statement);
+
+inline bool BlindzapProgramLess(const std::array<uint8_t, 20>& a,
+                                const std::array<uint8_t, 20>& b) {
+  return std::memcmp(a.data(), b.data(), a.size()) < 0;
+}
+
+// The claim-to-key mapping is intentionally derived from public claims.  It
+// is therefore reproducible by the verifier and cannot depend on a prover
+// supplied deduplication table.  The returned programs are sorted and unique.
+inline bool BlindzapDistinctPrograms(const BlindzapStatementV1& statement,
+                                     std::vector<std::array<uint8_t, 20>>* out) {
+  if (!out || !BlindzapStatementValid(statement)) return false;
+  out->clear();
+  for (const auto& claim : statement.claims) out->push_back(claim.program);
+  std::sort(out->begin(), out->end(), BlindzapProgramLess);
+  out->erase(std::unique(out->begin(), out->end()), out->end());
+  return !out->empty() && out->size() <= kBlindzapMaxKeys;
+}
 
 inline void BlindzapAppendU16(std::vector<uint8_t>* out, uint16_t value) {
   out->push_back(static_cast<uint8_t>(value >> 8)); out->push_back(static_cast<uint8_t>(value));
@@ -72,7 +107,8 @@ inline bool BlindzapStatementValid(const BlindzapStatementV1& statement) {
   if (static_cast<uint8_t>(statement.network) > static_cast<uint8_t>(BlindzapNetwork::kRegtest) ||
       statement.verifier.empty() || statement.purpose.empty() || statement.verifier.size() > kBlindzapMaxTextBytes ||
       statement.purpose.size() > kBlindzapMaxTextBytes || !BlindzapUtf8(statement.verifier) || !BlindzapUtf8(statement.purpose) ||
-      statement.not_before > statement.expires_at || statement.claims.empty() || statement.claims.size() > kBlindzapMaxClaims) return false;
+      statement.not_before > statement.expires_at || statement.claims.empty() || statement.claims.size() > kBlindzapMaxClaims ||
+      (statement.has_bridge_binding && (static_cast<uint8_t>(statement.bridge.destination_network) > static_cast<uint8_t>(BlindzapNetwork::kRegtest) || statement.bridge.asset_id.empty() || statement.bridge.asset_id.size() > kBlindzapMaxTextBytes || !BlindzapUtf8(statement.bridge.asset_id)))) return false;
   for (size_t i = 1; i < statement.claims.size(); ++i) if (!(statement.claims[i - 1] < statement.claims[i])) return false;
   return true;
 }
@@ -84,6 +120,8 @@ inline bool EncodeBlindzapStatement(const BlindzapStatementV1& statement, std::v
   out->insert(out->end(), statement.nonce.begin(), statement.nonce.end()); out->insert(out->end(), statement.bip322_message_hash.begin(), statement.bip322_message_hash.end());
   BlindzapAppendU64(out, statement.not_before); BlindzapAppendU64(out, statement.expires_at); out->push_back(statement.has_snapshot ? 1 : 0);
   if (statement.has_snapshot) out->insert(out->end(), statement.snapshot.begin(), statement.snapshot.end());
+  out->push_back(statement.has_bridge_binding ? 1 : 0);
+  if (statement.has_bridge_binding) { out->push_back(static_cast<uint8_t>(statement.bridge.destination_network)); out->insert(out->end(), statement.bridge.destination_commitment.begin(), statement.bridge.destination_commitment.end()); BlindzapAppendU16(out, static_cast<uint16_t>(statement.bridge.asset_id.size())); out->insert(out->end(), statement.bridge.asset_id.begin(), statement.bridge.asset_id.end()); out->insert(out->end(), statement.bridge.lock_id.begin(), statement.bridge.lock_id.end()); }
   BlindzapAppendU16(out, static_cast<uint16_t>(statement.claims.size()));
   for (const auto& claim : statement.claims) { out->insert(out->end(), claim.txid.begin(), claim.txid.end()); BlindzapAppendU32(out, claim.vout); BlindzapAppendU64(out, claim.amount_sats); out->insert(out->end(), claim.program.begin(), claim.program.end()); }
   return true;
@@ -108,6 +146,7 @@ inline bool DecodeBlindzapStatement(const std::vector<uint8_t>& bytes, BlindzapS
   BlindzapStatementV1 out; out.network = static_cast<BlindzapNetwork>(network);
   if (!r.text(&out.verifier) || !r.text(&out.purpose) || !r.bytes(out.nonce.data(), 32) || !r.bytes(out.bip322_message_hash.data(), 32) || !r.u64(&out.not_before) || !r.u64(&out.expires_at)) return false;
   uint8_t present; if (!r.u8(&present) || present > 1) return false; out.has_snapshot = present == 1; if (out.has_snapshot && !r.bytes(out.snapshot.data(), 32)) return false;
+  if (!r.u8(&present) || present > 1) return false; out.has_bridge_binding = present == 1; if (out.has_bridge_binding) { uint8_t network; if (!r.u8(&network) || network > 2 || !r.bytes(out.bridge.destination_commitment.data(), 32) || !r.text(&out.bridge.asset_id) || !r.bytes(out.bridge.lock_id.data(), 32)) return false; out.bridge.destination_network=static_cast<BlindzapNetwork>(network); }
   uint16_t count; if (!r.u16(&count) || !count || count > kBlindzapMaxClaims) return false; out.claims.resize(count);
   for (auto& claim : out.claims) if (!r.bytes(claim.txid.data(), 32) || !r.u32(&claim.vout) || !r.u64(&claim.amount_sats) || !r.bytes(claim.program.data(), 20)) return false;
   if (r.left() || !BlindzapStatementValid(out)) return false; *statement = std::move(out); return true;

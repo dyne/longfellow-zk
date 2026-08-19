@@ -8,10 +8,10 @@
 #include "blindzap/statement.h"
 
 namespace proofs {
-// The v1 native BlindZap proof measured 46,879,xxx bytes.  Keep a fixed 64
-// MiB parsing ceiling: it admits that representation with about 17 MiB of
-// headroom, while retaining a finite allocation limit at the wire boundary.
-constexpr size_t kBlindzapMaxProofBytes = 64 * 1024 * 1024;
+// The maximum supported two-key relation measures about 88 MiB. Keep a fixed
+// 128 MiB parsing ceiling: it admits the bounded v1 circuit family with
+// headroom while retaining a finite allocation limit at the wire boundary.
+constexpr size_t kBlindzapMaxProofBytes = 128 * 1024 * 1024;
 struct BlindzapEnvelopeV1 { BlindzapStatementV1 statement; BlindzapProofV1 proof; };
 
 inline bool EncodeBlindzapEnvelope(const BlindzapEnvelopeV1& envelope, std::vector<uint8_t>* out) {

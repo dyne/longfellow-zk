@@ -4,11 +4,11 @@
 #include "blindzap/chain_state.h"
 #include "blindzap/envelope.h"
 namespace proofs {
-enum class BlindzapVerifyResult { kInvalidProof, kMalformedStatement, kUnsupported, kStateInconclusive, kSpentAtSnapshot, kStaleSnapshot, kValidHistorical, kValidCurrent };
-inline const char* BlindzapVerifyResultName(BlindzapVerifyResult r) { switch(r) { case BlindzapVerifyResult::kInvalidProof:return "invalid_proof"; case BlindzapVerifyResult::kMalformedStatement:return "malformed_statement"; case BlindzapVerifyResult::kUnsupported:return "unsupported"; case BlindzapVerifyResult::kStateInconclusive:return "state_inconclusive"; case BlindzapVerifyResult::kSpentAtSnapshot:return "spent_at_snapshot"; case BlindzapVerifyResult::kStaleSnapshot:return "stale_snapshot"; case BlindzapVerifyResult::kValidHistorical:return "valid_historical"; case BlindzapVerifyResult::kValidCurrent:return "valid_current"; } return "invalid_proof"; }
-inline int BlindzapVerifyExitCode(BlindzapVerifyResult r) { switch(r) { case BlindzapVerifyResult::kValidCurrent: return 0; case BlindzapVerifyResult::kValidHistorical: return 1; case BlindzapVerifyResult::kSpentAtSnapshot: return 3; case BlindzapVerifyResult::kStaleSnapshot: return 4; case BlindzapVerifyResult::kStateInconclusive: return 5; case BlindzapVerifyResult::kMalformedStatement: return 65; case BlindzapVerifyResult::kUnsupported: return 66; case BlindzapVerifyResult::kInvalidProof: return 67; } return 67; }
-struct BlindzapVerification { BlindzapVerifyResult result = BlindzapVerifyResult::kMalformedStatement; std::vector<BlindzapChainEvidence> claims; };
-struct BlindzapVerifierConfig { BlindzapReplayPolicy policy; std::function<bool(const BlindzapEnvelopeV1&)> verify_proof; std::function<bool(const BlindzapEnvelopeV1&)> supports; BlindzapChainProvider* provider = nullptr; uint64_t min_confirmations = 0; };
+enum class BlindzapVerifyResult { kInvalidProof, kMalformedStatement, kUnsupported, kStateInconclusive, kSpentAtSnapshot, kStaleSnapshot, kBridgeRejected, kValidHistorical, kValidCurrent };
+inline const char* BlindzapVerifyResultName(BlindzapVerifyResult r) { switch(r) { case BlindzapVerifyResult::kInvalidProof:return "invalid_proof"; case BlindzapVerifyResult::kMalformedStatement:return "malformed_statement"; case BlindzapVerifyResult::kUnsupported:return "unsupported"; case BlindzapVerifyResult::kStateInconclusive:return "state_inconclusive"; case BlindzapVerifyResult::kSpentAtSnapshot:return "spent_at_snapshot"; case BlindzapVerifyResult::kStaleSnapshot:return "stale_snapshot"; case BlindzapVerifyResult::kBridgeRejected:return "bridge_rejected"; case BlindzapVerifyResult::kValidHistorical:return "valid_historical"; case BlindzapVerifyResult::kValidCurrent:return "valid_current"; } return "invalid_proof"; }
+inline int BlindzapVerifyExitCode(BlindzapVerifyResult r) { switch(r) { case BlindzapVerifyResult::kValidCurrent: return 0; case BlindzapVerifyResult::kValidHistorical: return 1; case BlindzapVerifyResult::kSpentAtSnapshot: return 3; case BlindzapVerifyResult::kStaleSnapshot: return 4; case BlindzapVerifyResult::kStateInconclusive: return 5; case BlindzapVerifyResult::kBridgeRejected: return 6; case BlindzapVerifyResult::kMalformedStatement: return 65; case BlindzapVerifyResult::kUnsupported: return 66; case BlindzapVerifyResult::kInvalidProof: return 67; } return 67; }
+struct BlindzapVerification { BlindzapVerifyResult result = BlindzapVerifyResult::kMalformedStatement; std::vector<BlindzapChainEvidence> claims; uint64_t total_sats = 0; };
+struct BlindzapVerifierConfig { BlindzapReplayPolicy policy; std::function<bool(const BlindzapEnvelopeV1&)> verify_proof; std::function<bool(const BlindzapEnvelopeV1&)> supports; std::function<bool(const BlindzapStatementV1&)> bridge_authorized; BlindzapChainProvider* provider = nullptr; uint64_t min_confirmations = 0; uint64_t minimum_total_sats = 0; };
 inline BlindzapVerification VerifyBlindzap(const std::vector<uint8_t>& bytes, const BlindzapVerifierConfig& config) {
   BlindzapEnvelopeV1 envelope; if (!DecodeBlindzapEnvelope(bytes, &envelope)) return {};
   if (config.supports && !config.supports(envelope)) return {BlindzapVerifyResult::kUnsupported, {}};
@@ -23,7 +23,11 @@ inline BlindzapVerification VerifyBlindzap(const std::vector<uint8_t>& bytes, co
     if (state == BlindzapChainStatus::kSpent) { out.result = BlindzapVerifyResult::kSpentAtSnapshot; return out; }
     if (state != BlindzapChainStatus::kUnspent) { out.result = BlindzapVerifyResult::kStateInconclusive; return out; }
     if (evidence.confirmations < config.min_confirmations) { out.result = BlindzapVerifyResult::kStaleSnapshot; return out; }
+    if (claim.amount_sats > std::numeric_limits<uint64_t>::max() - out.total_sats) { out.result = BlindzapVerifyResult::kStateInconclusive; return out; }
+    out.total_sats += claim.amount_sats;
   }
+  if (out.total_sats < config.minimum_total_sats) { out.result = BlindzapVerifyResult::kStateInconclusive; return out; }
+  if (envelope.statement.has_bridge_binding && (!config.bridge_authorized || !config.bridge_authorized(envelope.statement))) { out.result = BlindzapVerifyResult::kBridgeRejected; return out; }
   if (BlindzapConsumeNonce(envelope.statement, config.policy) != BlindzapAuthorization::kAuthorized) return {BlindzapVerifyResult::kInvalidProof, out.claims};
   out.result = historical ? BlindzapVerifyResult::kValidHistorical : BlindzapVerifyResult::kValidCurrent; return out;
 }
