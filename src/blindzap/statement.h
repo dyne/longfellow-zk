@@ -141,15 +141,30 @@ class BlindzapReader {
 };
 
 inline bool DecodeBlindzapStatement(const std::vector<uint8_t>& bytes, BlindzapStatementV1* statement) {
-  if (!statement || bytes.size() < 6) return false; BlindzapReader r(bytes); uint8_t magic[4], version, network;
+  if (!statement || bytes.size() < 6) return false;
+  BlindzapReader r(bytes);
+  uint8_t magic[4], version, network;
   if (!r.bytes(magic, 4) || std::memcmp(magic, "BZP1", 4) || !r.u8(&version) || version != 1 || !r.u8(&network) || network > 2) return false;
   BlindzapStatementV1 out; out.network = static_cast<BlindzapNetwork>(network);
   if (!r.text(&out.verifier) || !r.text(&out.purpose) || !r.bytes(out.nonce.data(), 32) || !r.bytes(out.bip322_message_hash.data(), 32) || !r.u64(&out.not_before) || !r.u64(&out.expires_at)) return false;
-  uint8_t present; if (!r.u8(&present) || present > 1) return false; out.has_snapshot = present == 1; if (out.has_snapshot && !r.bytes(out.snapshot.data(), 32)) return false;
-  if (!r.u8(&present) || present > 1) return false; out.has_bridge_binding = present == 1; if (out.has_bridge_binding) { uint8_t network; if (!r.u8(&network) || network > 2 || !r.bytes(out.bridge.destination_commitment.data(), 32) || !r.text(&out.bridge.asset_id) || !r.bytes(out.bridge.lock_id.data(), 32)) return false; out.bridge.destination_network=static_cast<BlindzapNetwork>(network); }
+  uint8_t present;
+  if (!r.u8(&present) || present > 1) return false;
+  out.has_snapshot = present == 1;
+  if (out.has_snapshot && !r.bytes(out.snapshot.data(), 32)) return false;
+  if (!r.u8(&present) || present > 1) return false;
+  out.has_bridge_binding = present == 1;
+  if (out.has_bridge_binding) {
+    uint8_t destination_network;
+    if (!r.u8(&destination_network) || destination_network > 2 ||
+        !r.bytes(out.bridge.destination_commitment.data(), 32) ||
+        !r.text(&out.bridge.asset_id) || !r.bytes(out.bridge.lock_id.data(), 32)) return false;
+    out.bridge.destination_network = static_cast<BlindzapNetwork>(destination_network);
+  }
   uint16_t count; if (!r.u16(&count) || !count || count > kBlindzapMaxClaims) return false; out.claims.resize(count);
   for (auto& claim : out.claims) if (!r.bytes(claim.txid.data(), 32) || !r.u32(&claim.vout) || !r.u64(&claim.amount_sats) || !r.bytes(claim.program.data(), 20)) return false;
-  if (r.left() || !BlindzapStatementValid(out)) return false; *statement = std::move(out); return true;
+  if (r.left() || !BlindzapStatementValid(out)) return false;
+  *statement = std::move(out);
+  return true;
 }
 
 inline std::array<uint8_t, 32> BlindzapTaggedHash(const char* tag, const uint8_t* data, size_t size) {

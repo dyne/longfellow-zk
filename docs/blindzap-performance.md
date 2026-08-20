@@ -1,15 +1,35 @@
-# BlindZap v1 batch limits
+# BlindZap v1 performance and portability
 
-The native v1 circuit family supports at most 16 public claims and two
-distinct witness programs. Claims sharing a program reuse one ownership
-relation; claims with more than two distinct programs are rejected before
-circuit allocation. Four relations were measured to exceed Longfellow's CRT
-block-encoding guard, so they are deliberately unsupported.
+BlindZap v1 has two fixed native circuit shapes: one or two distinct P2WPKH
+witness programs.  A statement may contain up to 16 public claims, but claims
+sharing a program reuse its relation; more than two distinct programs are
+rejected before circuit allocation.  Four relations exceed Longfellow's CRT
+block-encoding guard and are deliberately unsupported.
 
-The real native regression (`test/blindzap/blindzap_test`) completed in
-4:14.15 with a 1,719,100 KiB peak resident set on the recorded environment.
-It exercises the actual proof/verify path and writes circuit/proof metrics to
-`test/results/native_blindzap_metrics.csv`. Operators should batch no more
-than two distinct programs per proof and use separate proofs for larger sets.
-The bounded envelope parser accepts proof payloads up to 128 MiB, which covers
-the measured two-key proof while retaining a hard allocation ceiling.
+## Reproducing native metrics
+
+Run `make blindzap-test` twice on an otherwise idle machine.  Each run writes
+`test/results/native_blindzap_metrics.csv` with one row per real
+prove/verify round:
+
+```
+target,circuit,build_ms,prove_ms,verify_ms,proof_bytes,public_inputs,total_inputs,quad_terms,crt_block_enc
+```
+
+The values are descriptive, not timing thresholds.  Record the commit SHA,
+compiler/version and flags, CPU/OS, elapsed wall time and peak resident memory
+next to a release candidate.  The deterministic columns (`proof_bytes`, input
+and term counts, CRT block encoding) must agree across the two runs; the
+timing columns are expected to vary.  The circuit digest is independently
+checked by `blindzap_test`, and changing a circuit shape changes the digest.
+
+## Current support boundary
+
+The release target is native 64-bit C++17 on a Linux/x86_64 host using the
+repository's hardened default flags (`-O3 -fstack-protector-all
+-D_FORTIFY_SOURCE=2 -fno-strict-overflow`).  The checked envelope ceiling is
+128 MiB, selected to bound allocation while admitting the supported proof
+family.  32-bit and wasm builds are not release-supported BlindZap targets in
+this repository; operators must not infer portability from the presence of a
+generic wasm build target.  Re-run the compatibility and metric checks before
+accepting any parameter, compiler, or circuit-digest change.
