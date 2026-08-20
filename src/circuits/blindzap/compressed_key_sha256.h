@@ -17,10 +17,10 @@ namespace proofs {
 // therefore reversed within each v8.  FlatSHA256Circuit packs its v32 round
 // witnesses with BitPlucker, then returns the v256 digest in field-integer bit
 // order (the displayed SHA byte stream is consequently reversed by bytes).
-// assert_message() constrains the block and zero padding; message_hash() uses
-// its selected packed H1 witness.  SEC bits are taken directly from the
-// already constrained coordinate encoding, so no message, padding, length, or
-// digest input is exposed by this stage.
+// assert_message() constrains the block and zero padding; the digest is
+// unpacked from that constrained block's H1 witness.  SEC bits are taken
+// directly from the already constrained coordinate encoding, so no message,
+// padding, length, or digest input is exposed by this stage.
 template <class LogicCircuit>
 class CompressedKeySha256Circuit {
   using v8 = typename LogicCircuit::v8;
@@ -57,7 +57,20 @@ class CompressedKeySha256Circuit {
 
     const v8 one_block = lc_.template vbit<8>(1);
     sha_.assert_message(1, one_block, block.data(), &witness.block);
-    return sha_.message_hash(1, one_block, &witness.block);
+
+    // FlatSHA256Circuit deliberately exposes its bit plucker so callers can
+    // encode and decode packed witnesses.  This message always occupies one
+    // block, so H1 is the selected final state without the multi-block mux
+    // used by assert_hash().  Keep the same field-integer bit order as that
+    // method while leaving the digest private to the surrounding circuit.
+    v256 digest;
+    for (size_t word = 0; word < 8; ++word) {
+      const auto unpacked = sha_.bp_.unpack_v32(witness.block.h1[word]);
+      for (size_t bit = 0; bit < 32; ++bit) {
+        digest[(7 - word) * 32 + bit] = unpacked[bit];
+      }
+    }
+    return digest;
   }
 
  private:
