@@ -12,7 +12,14 @@
 namespace proofs {
 enum class BlindzapProviderKind { kCurrentTip, kHistoricalSnapshot };
 enum class BlindzapChainStatus { kUnspent, kSpent, kInconclusive, kUnavailable, kMalformed, kWrongNetwork, kStale };
-struct BlindzapChainRequest { BlindzapNetwork network; std::array<uint8_t,32> txid{}; uint32_t vout = 0; bool has_snapshot = false; std::array<uint8_t,32> snapshot{}; };
+struct BlindzapChainRequest {
+  BlindzapNetwork network;
+  std::array<uint8_t, 32> txid{};
+  uint32_t vout = 0;
+  bool has_snapshot = false;
+  std::array<uint8_t, 32> snapshot{};
+  uint32_t snapshot_height = 0;
+};
 struct BlindzapChainEvidence { BlindzapChainStatus status = BlindzapChainStatus::kUnavailable; BlindzapNetwork network = BlindzapNetwork::kMainnet; std::array<uint8_t,32> block{}; uint64_t height = 0; uint64_t confirmations = 0; uint64_t amount_sats = 0; std::vector<uint8_t> script_pub_key; std::string detail; };
 class BlindzapChainProvider { public: virtual ~BlindzapChainProvider() = default; virtual BlindzapProviderKind kind() const = 0; virtual BlindzapChainEvidence Lookup(const BlindzapChainRequest&) = 0; };
 inline bool BlindzapIsP2wpkh(const BlindzapClaimV1& claim, const std::vector<uint8_t>& script) { return script.size() == 22 && script[0] == 0 && script[1] == 20 && std::equal(claim.program.begin(), claim.program.end(), script.begin() + 2); }

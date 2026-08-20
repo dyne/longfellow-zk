@@ -12,6 +12,23 @@ GX = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798
 GY = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8
 
 
+def u16(value):
+    return value.to_bytes(2, "big")
+
+
+def u32(value):
+    return value.to_bytes(4, "big")
+
+
+def u64(value):
+    return value.to_bytes(8, "big")
+
+
+def tagged_hash(tag, message):
+    tag_hash = hashlib.sha256(tag.encode("ascii")).digest()
+    return hashlib.sha256(tag_hash + tag_hash + message).digest()
+
+
 def add(a, b):
     if a is None:
         return b
@@ -55,6 +72,37 @@ def vector(scalar):
     }
 
 
+def statement_vector():
+    verifier = b"merchant.example"
+    purpose = b"proof-of-funds"
+    nonce = bytes(range(1, 33))
+    message_hash = bytes(range(32, 0, -1))
+    first = bytes([1]) + bytes(31) + u32(2) + u64(42) + bytes([9]) + bytes(19)
+    second = bytes([2]) + bytes(31) + u32(1) + u64(99) + bytes([0, 8]) + bytes(18)
+    encoded = (
+        b"BZP1"
+        + bytes([1, 2])  # version 1, signet
+        + u16(len(verifier))
+        + verifier
+        + u16(len(purpose))
+        + purpose
+        + nonce
+        + message_hash
+        + u64(100)
+        + u64(200)
+        + bytes([0])  # no historical snapshot
+        + bytes([0])  # no bridge binding
+        + u16(2)
+        + first
+        + second
+    )
+    return {
+        "description": "canonical two-claim signet request without snapshot or bridge binding",
+        "encoded_statement": encoded.hex(),
+        "statement_digest": tagged_hash("BlindZap/statement/v1", encoded).hex(),
+    }
+
+
 def main():
     # 1 and n-1 cover the two generator parity branches.  2 and 3 provide
     # distinct arithmetic traces.  153 and 382 are the first positive scalars
@@ -70,6 +118,7 @@ def main():
             "method": "straightforward integer secp256k1 double-and-add; hashlib SHA-256 and RIPEMD-160",
         },
         "secp256k1": {"p": f"{P:064x}", "n": f"{N:064x}"},
+        "statement_v1": statement_vector(),
         "vectors": [vector(value) for value in values],
     }
     json.dump(corpus, sys.stdout, indent=2, sort_keys=True)

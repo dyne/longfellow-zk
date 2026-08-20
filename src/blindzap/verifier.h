@@ -1,6 +1,7 @@
 // Copyright 2026 Google LLC.
 #ifndef PRIVACY_PROOFS_ZK_LIB_BLINDZAP_VERIFIER_H_
 #define PRIVACY_PROOFS_ZK_LIB_BLINDZAP_VERIFIER_H_
+#include <limits>
 #include "blindzap/chain_state.h"
 #include "blindzap/envelope.h"
 namespace proofs {
@@ -10,15 +11,48 @@ inline int BlindzapVerifyExitCode(BlindzapVerifyResult r) { switch(r) { case Bli
 struct BlindzapVerification { BlindzapVerifyResult result = BlindzapVerifyResult::kMalformedStatement; std::vector<BlindzapChainEvidence> claims; uint64_t total_sats = 0; };
 struct BlindzapVerifierConfig { BlindzapReplayPolicy policy; std::function<bool(const BlindzapEnvelopeV1&)> verify_proof; std::function<bool(const BlindzapEnvelopeV1&)> supports; std::function<bool(const BlindzapStatementV1&)> bridge_authorized; BlindzapChainProvider* provider = nullptr; uint64_t min_confirmations = 0; uint64_t minimum_total_sats = 0; };
 inline BlindzapVerification VerifyBlindzap(const std::vector<uint8_t>& bytes, const BlindzapVerifierConfig& config) {
-  BlindzapEnvelopeV1 envelope; if (!DecodeBlindzapEnvelope(bytes, &envelope)) return {};
+  BlindzapEnvelopeV1 envelope;
+  BlindzapDecodeError decode_error = BlindzapDecodeError::kMalformed;
+  if (!DecodeBlindzapEnvelope(bytes, &envelope, &decode_error)) {
+    return {decode_error == BlindzapDecodeError::kUnsupported
+                ? BlindzapVerifyResult::kUnsupported
+                : BlindzapVerifyResult::kMalformedStatement,
+            {}};
+  }
+  if (BlindzapCheckPolicy(envelope.statement, config.policy, true) != BlindzapAuthorization::kPendingReplayCheck) return {BlindzapVerifyResult::kInvalidProof, {}};
   if (config.supports && !config.supports(envelope)) return {BlindzapVerifyResult::kUnsupported, {}};
   if (!config.verify_proof || !config.verify_proof(envelope)) return {BlindzapVerifyResult::kInvalidProof, {}};
-  if (BlindzapCheckPolicy(envelope.statement, config.policy, true) != BlindzapAuthorization::kPendingReplayCheck) return {BlindzapVerifyResult::kInvalidProof, {}};
   if (!config.provider || (envelope.statement.has_snapshot && config.provider->kind() != BlindzapProviderKind::kHistoricalSnapshot)) return {BlindzapVerifyResult::kStateInconclusive, {}};
   BlindzapVerification out; bool historical = envelope.statement.has_snapshot;
+  std::array<uint8_t, 32> current_block{};
+  uint64_t current_height = 0;
+  bool have_current_tip = false;
   for (const auto& claim : envelope.statement.claims) {
-    BlindzapChainRequest request{envelope.statement.network, claim.txid, claim.vout, historical, envelope.statement.snapshot};
+    BlindzapChainRequest request{envelope.statement.network, claim.txid,
+                                 claim.vout, historical,
+                                 envelope.statement.snapshot,
+                                 envelope.statement.snapshot_height};
     BlindzapChainEvidence evidence = config.provider->Lookup(request); out.claims.push_back(evidence);
+    if (historical && (evidence.block != envelope.statement.snapshot ||
+                       evidence.height != envelope.statement.snapshot_height)) {
+      out.result = BlindzapVerifyResult::kStateInconclusive;
+      return out;
+    }
+    if (!historical) {
+      if (BlindzapAllZero(evidence.block)) {
+        out.result = BlindzapVerifyResult::kStateInconclusive;
+        return out;
+      }
+      if (!have_current_tip) {
+        current_block = evidence.block;
+        current_height = evidence.height;
+        have_current_tip = true;
+      } else if (evidence.block != current_block ||
+                 evidence.height != current_height) {
+        out.result = BlindzapVerifyResult::kStateInconclusive;
+        return out;
+      }
+    }
     const auto state = BlindzapMatchClaim(claim, envelope.statement.network, evidence);
     if (state == BlindzapChainStatus::kSpent) { out.result = BlindzapVerifyResult::kSpentAtSnapshot; return out; }
     if (state != BlindzapChainStatus::kUnspent) { out.result = BlindzapVerifyResult::kStateInconclusive; return out; }

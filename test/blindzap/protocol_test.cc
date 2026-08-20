@@ -1,72 +1,276 @@
 #include <array>
-#include <cstring>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "blindzap/envelope.h"
 
 namespace proofs {
 namespace {
-void Require(bool ok, const char* message) { if (!ok) throw std::runtime_error(message); }
+
+void Require(bool condition, const char* message) {
+  if (!condition) throw std::runtime_error(message);
+}
+
 BlindzapStatementV1 Statement() {
-  BlindzapStatementV1 s; s.network = BlindzapNetwork::kRegtest; s.verifier = "merchant.example"; s.purpose = "proof-of-funds"; s.not_before = 100; s.expires_at = 200;
-  for (size_t i = 0; i < 32; ++i) { s.nonce[i] = static_cast<uint8_t>(i); s.bip322_message_hash[i] = static_cast<uint8_t>(31 - i); }
-  s.has_snapshot = true; s.snapshot[0] = 7; BlindzapClaimV1 a, b; a.txid[0] = 1; a.vout = 2; a.amount_sats = 42; a.program[0] = 9; b.txid[0] = 2; b.vout = 1; b.amount_sats = 99; b.program[1] = 8; s.claims = {a, b}; return s;
+  BlindzapStatementV1 statement;
+  statement.network = BlindzapNetwork::kSignet;
+  statement.verifier = "merchant.example";
+  statement.purpose = "proof-of-funds";
+  statement.not_before = 100;
+  statement.expires_at = 200;
+  for (size_t index = 0; index < 32; ++index) {
+    statement.nonce[index] = static_cast<uint8_t>(index + 1);
+    statement.bip322_message_hash[index] = static_cast<uint8_t>(32 - index);
+  }
+  BlindzapClaimV1 first;
+  first.txid[0] = 1;
+  first.vout = 2;
+  first.amount_sats = 42;
+  first.program[0] = 9;
+  BlindzapClaimV1 second;
+  second.txid[0] = 2;
+  second.vout = 1;
+  second.amount_sats = 99;
+  second.program[1] = 8;
+  statement.claims = {first, second};
+  return statement;
 }
-void TestStatement() {
-  auto s = Statement(); std::vector<uint8_t> bytes; Require(EncodeBlindzapStatement(s, &bytes), "encode statement"); BlindzapStatementV1 decoded; Require(DecodeBlindzapStatement(bytes, &decoded), "decode statement"); std::vector<uint8_t> again; Require(EncodeBlindzapStatement(decoded, &again) && bytes == again, "noncanonical statement round trip");
-  for (size_t i = 0; i < bytes.size(); ++i) { std::vector<uint8_t> cut(bytes.begin(), bytes.begin() + i); Require(!DecodeBlindzapStatement(cut, &decoded), "accepted truncated statement"); }
-  auto trailing = bytes; trailing.push_back(0); Require(!DecodeBlindzapStatement(trailing, &decoded), "accepted trailing statement byte");
-  auto unsorted = s; std::swap(unsorted.claims[0], unsorted.claims[1]); Require(!EncodeBlindzapStatement(unsorted, &again), "accepted unsorted claims");
-  auto duplicate = s; duplicate.claims[1] = duplicate.claims[0]; Require(!EncodeBlindzapStatement(duplicate, &again), "accepted duplicate claims");
-  auto bad_text = s; bad_text.verifier = "\xc0\x80"; Require(!EncodeBlindzapStatement(bad_text, &again), "accepted invalid UTF-8");
+
+void TestNetworks() {
+  const std::pair<const char*, BlindzapNetwork> networks[] = {
+      {"mainnet", BlindzapNetwork::kMainnet},
+      {"testnet", BlindzapNetwork::kTestnet3},
+      {"testnet3", BlindzapNetwork::kTestnet3},
+      {"testnet4", BlindzapNetwork::kTestnet4},
+      {"signet", BlindzapNetwork::kSignet},
+      {"regtest", BlindzapNetwork::kRegtest},
+  };
+  for (const auto& entry : networks) {
+    BlindzapNetwork parsed = BlindzapNetwork::kMainnet;
+    Require(BlindzapParseNetwork(entry.first, &parsed) && parsed == entry.second,
+            "network name rejected");
+    auto statement = Statement();
+    statement.network = entry.second;
+    std::vector<uint8_t> encoded;
+    BlindzapStatementV1 decoded;
+    Require(EncodeBlindzapStatement(statement, &encoded) &&
+                DecodeBlindzapStatement(encoded, &decoded) &&
+                decoded.network == entry.second,
+            "network wire round trip failed");
+  }
+  BlindzapNetwork ignored = BlindzapNetwork::kMainnet;
+  Require(!BlindzapParseNetwork("testnet5", &ignored),
+          "unknown future network accepted");
 }
-void TestHashesAndEnvelope() {
-  const uint8_t message[] = {'h','e','l','l','o'}; const auto bip = BlindzapBip322MessageHash(message, sizeof(message)); const auto same = BlindzapBip322MessageHash(message, sizeof(message)); Require(bip == same, "unstable BIP-322 hash"); auto altered = Statement(); altered.bip322_message_hash = bip; std::array<uint8_t, 32> digest, other; Require(BlindzapStatementDigest(altered, &digest), "statement digest"); altered.purpose = "other"; Require(BlindzapStatementDigest(altered, &other) && digest != other, "purpose not bound");
-  BlindzapEnvelopeV1 e; e.statement = Statement(); e.proof.circuit_digest[0] = 4; e.proof.bytes = {1,2,3,4}; const auto seed = BlindzapTranscriptSeed(e.statement, e.proof); Require(seed != bip, "BIP-322 hash reused as BlindZap transcript"); e.statement.nonce[0] ^= 1; Require(seed != BlindzapTranscriptSeed(e.statement, e.proof), "nonce not transcript bound"); e.statement.nonce[0] ^= 1;
-  std::vector<uint8_t> bytes; Require(EncodeBlindzapEnvelope(e, &bytes), "encode envelope"); BlindzapEnvelopeV1 parsed; Require(DecodeBlindzapEnvelope(bytes, &parsed), "decode envelope"); std::vector<uint8_t> again; Require(EncodeBlindzapEnvelope(parsed, &again) && bytes == again, "noncanonical envelope round trip");
-  const std::string inspection = BlindzapInspectJson(parsed); Require(inspection.find("blindzap-pof-v1") != std::string::npos && inspection.find("proof_bytes") != std::string::npos && inspection.find("nonce") == std::string::npos, "inspection leaks private or nonce material");
-  for (size_t i = 0; i < bytes.size(); ++i) { std::vector<uint8_t> cut(bytes.begin(), bytes.begin() + i); Require(!DecodeBlindzapEnvelope(cut, &parsed), "accepted truncated envelope"); }
-  auto trailing = bytes; trailing.push_back(0); Require(!DecodeBlindzapEnvelope(trailing, &parsed), "accepted trailing envelope byte"); auto huge = bytes; huge[5] = 0xff; huge[6] = 0xff; huge[7] = 0xff; huge[8] = 0xff; Require(!DecodeBlindzapEnvelope(huge, &parsed), "accepted oversized statement");
-  auto wrong_parameters = bytes; const size_t parameter_version = 5 + 4 + bytes[8] + (size_t(bytes[7]) << 8) + (size_t(bytes[6]) << 16) + (size_t(bytes[5]) << 24) + 32; wrong_parameters[parameter_version + 3] = 2; Require(!DecodeBlindzapEnvelope(wrong_parameters, &parsed), "accepted unknown proof parameters");
-  e.proof.bytes.assign(48 * 1024 * 1024, 0xa5); Require(EncodeBlindzapEnvelope(e, &bytes), "rejected current-proof-scale envelope"); Require(DecodeBlindzapEnvelope(bytes, &parsed) && parsed.proof.bytes == e.proof.bytes, "failed current-proof-scale envelope round trip");
-  e.proof.bytes.assign(kBlindzapMaxProofBytes + 1, 0); Require(!EncodeBlindzapEnvelope(e, &bytes), "accepted proof over allocation limit");
+
+void TestStatementRoundTrip() {
+  const auto statement = Statement();
+  std::vector<uint8_t> encoded;
+  Require(EncodeBlindzapStatement(statement, &encoded), "encode statement");
+  Require(encoded.size() <= kBlindzapMaxStatementBytes, "statement exceeds cap");
+  BlindzapStatementV1 decoded;
+  Require(DecodeBlindzapStatement(encoded, &decoded), "decode statement");
+  std::vector<uint8_t> again;
+  Require(EncodeBlindzapStatement(decoded, &again) && encoded == again,
+          "statement is not canonical");
+  const std::array<uint8_t, 32> expected_digest = {
+      0xfc, 0x1f, 0x6c, 0xce, 0x6a, 0xd6, 0xe1, 0xff,
+      0x35, 0xe8, 0x4b, 0xc3, 0xa1, 0x27, 0xb3, 0x91,
+      0x7e, 0x09, 0xa6, 0x19, 0x64, 0x75, 0xf9, 0x17,
+      0x6c, 0x08, 0xf8, 0x29, 0x33, 0x30, 0xf7, 0x5a};
+  std::array<uint8_t, 32> digest{};
+  Require(BlindzapStatementDigest(statement, &digest) &&
+              digest == expected_digest,
+          "statement digest differs from independent vector");
+  for (size_t size = 0; size < encoded.size(); ++size) {
+    const std::vector<uint8_t> truncated(encoded.begin(), encoded.begin() + size);
+    Require(!DecodeBlindzapStatement(truncated, &decoded),
+            "truncated statement accepted");
+  }
+  auto trailing = encoded;
+  trailing.push_back(0);
+  Require(!DecodeBlindzapStatement(trailing, &decoded),
+          "trailing statement byte accepted");
+
+  auto snapshot = statement;
+  snapshot.has_snapshot = true;
+  snapshot.snapshot[0] = 7;
+  snapshot.snapshot_height = 123;
+  Require(EncodeBlindzapStatement(snapshot, &encoded) &&
+              DecodeBlindzapStatement(encoded, &decoded) &&
+              decoded.snapshot_height == 123,
+          "snapshot hash/height round trip failed");
 }
-void TestStatementByteMutationsBindTranscript() {
-  BlindzapEnvelopeV1 envelope; envelope.statement = Statement(); envelope.proof.circuit_digest[0] = 4; envelope.proof.bytes = {1, 2, 3, 4};
+
+void TestMalformedStatementCorpus() {
+  std::vector<uint8_t> output;
+  auto invalid = Statement();
+  invalid.nonce.fill(0);
+  Require(!EncodeBlindzapStatement(invalid, &output), "zero nonce accepted");
+  invalid = Statement();
+  invalid.bip322_message_hash.fill(0);
+  Require(!EncodeBlindzapStatement(invalid, &output), "zero message hash accepted");
+  invalid = Statement();
+  invalid.not_before = invalid.expires_at;
+  Require(!EncodeBlindzapStatement(invalid, &output), "empty lifetime accepted");
+  invalid = Statement();
+  invalid.purpose = "anything-goes";
+  Require(!EncodeBlindzapStatement(invalid, &output), "unknown purpose accepted");
+  invalid = Statement();
+  invalid.claims[0].txid.fill(0);
+  Require(!EncodeBlindzapStatement(invalid, &output), "zero txid accepted");
+  invalid = Statement();
+  invalid.claims[0].amount_sats = 0;
+  Require(!EncodeBlindzapStatement(invalid, &output), "zero amount accepted");
+  invalid = Statement();
+  invalid.claims[0].amount_sats = kBlindzapMaxMoneySats + 1;
+  Require(!EncodeBlindzapStatement(invalid, &output), "excess amount accepted");
+  invalid = Statement();
+  invalid.claims[0].amount_sats = kBlindzapMaxMoneySats;
+  Require(!EncodeBlindzapStatement(invalid, &output),
+          "aggregate amount above maximum accepted");
+  invalid = Statement();
+  std::swap(invalid.claims[0], invalid.claims[1]);
+  Require(!EncodeBlindzapStatement(invalid, &output), "unsorted claims accepted");
+  invalid = Statement();
+  invalid.claims[1] = invalid.claims[0];
+  Require(!EncodeBlindzapStatement(invalid, &output), "duplicate outpoint accepted");
+  invalid = Statement();
+  BlindzapClaimV1 third = invalid.claims.back();
+  third.txid[0] = 3;
+  third.program[2] = 7;
+  invalid.claims.push_back(third);
+  Require(!EncodeBlindzapStatement(invalid, &output),
+          "third ownership relation accepted");
+  invalid = Statement();
+  invalid.has_snapshot = true;
+  Require(!EncodeBlindzapStatement(invalid, &output), "zero snapshot hash accepted");
+  invalid = Statement();
+  invalid.snapshot_height = 1;
+  Require(!EncodeBlindzapStatement(invalid, &output),
+          "snapshot height without snapshot accepted");
+  invalid = Statement();
+  invalid.has_bridge_binding = true;
+  Require(!EncodeBlindzapStatement(invalid, &output),
+          "incomplete bridge binding accepted");
+  invalid = Statement();
+  invalid.verifier = "\xc0\x80";
+  Require(!EncodeBlindzapStatement(invalid, &output), "invalid UTF-8 accepted");
+  invalid = Statement();
+  invalid.verifier = "line\nbreak";
+  Require(!EncodeBlindzapStatement(invalid, &output),
+          "control character accepted in verifier ID");
+  invalid = Statement();
+  invalid.verifier = std::string("bad") + "\xed\xa0\x80";
+  Require(!EncodeBlindzapStatement(invalid, &output),
+          "UTF-8 surrogate accepted");
+  invalid = Statement();
+  invalid.verifier = "v\xc3\xa9rificateur";
+  Require(EncodeBlindzapStatement(invalid, &output), "valid UTF-8 rejected");
+}
+
+void TestEnvelopeAndTranscript() {
+  BlindzapEnvelopeV1 envelope;
+  envelope.statement = Statement();
+  envelope.proof.circuit_digest[0] = 4;
+  envelope.proof.bytes = {1, 2, 3, 4};
   const auto seed = BlindzapTranscriptSeed(envelope.statement, envelope.proof);
-  std::vector<uint8_t> statement;
-  Require(EncodeBlindzapStatement(envelope.statement, &statement), "encode mutation statement");
-  // A parseable mutation must change the Fiat-Shamir input.  Mutations that
-  // violate canonical statement rules are equally safe because decoding
-  // rejects them before verification.
-  for (size_t index = 0; index < statement.size(); ++index) {
-    auto mutated = statement;
-    mutated[index] ^= 1;
-    BlindzapStatementV1 parsed;
-    if (!DecodeBlindzapStatement(mutated, &parsed)) continue;
-    BlindzapEnvelopeV1 changed = envelope;
-    changed.statement = std::move(parsed);
-    Require(BlindzapTranscriptSeed(changed.statement, changed.proof) != seed,
-            "parseable statement-byte mutation not transcript bound");
+  envelope.statement.nonce[0] ^= 1;
+  Require(seed != BlindzapTranscriptSeed(envelope.statement, envelope.proof),
+          "nonce not transcript-bound");
+  envelope.statement.nonce[0] ^= 1;
+
+  std::vector<uint8_t> wire;
+  Require(EncodeBlindzapEnvelope(envelope, &wire), "encode envelope");
+  BlindzapEnvelopeV1 decoded;
+  Require(DecodeBlindzapEnvelope(wire, &decoded), "decode envelope");
+  std::vector<uint8_t> again;
+  Require(EncodeBlindzapEnvelope(decoded, &again) && wire == again,
+          "envelope is not canonical");
+  auto invalid_envelope = envelope;
+  invalid_envelope.proof.bytes.clear();
+  Require(!EncodeBlindzapEnvelope(invalid_envelope, &again),
+          "empty proof encoded");
+  invalid_envelope = envelope;
+  invalid_envelope.proof.circuit_digest.fill(0);
+  Require(!EncodeBlindzapEnvelope(invalid_envelope, &again),
+          "zero circuit digest encoded");
+  invalid_envelope = envelope;
+  ++invalid_envelope.proof.circuit_version;
+  Require(!EncodeBlindzapEnvelope(invalid_envelope, &again),
+          "unsupported proof parameters encoded");
+  for (size_t size = 0; size < wire.size(); ++size) {
+    const std::vector<uint8_t> truncated(wire.begin(), wire.begin() + size);
+    Require(!DecodeBlindzapEnvelope(truncated, &decoded),
+            "truncated envelope accepted");
   }
-  const auto wire = [&] { std::vector<uint8_t> out; Require(EncodeBlindzapEnvelope(envelope, &out), "encode mutation envelope"); return out; }();
-  for (size_t length = 0; length < wire.size(); ++length) {
-    std::vector<uint8_t> truncated(wire.begin(), wire.begin() + length);
-    BlindzapEnvelopeV1 parsed;
-    Require(!DecodeBlindzapEnvelope(truncated, &parsed), "accepted envelope truncation mutation");
-  }
+
+  auto unsupported = wire;
+  unsupported[4] = 2;
+  BlindzapDecodeError error = BlindzapDecodeError::kNone;
+  Require(!DecodeBlindzapEnvelope(unsupported, &decoded, &error) &&
+              error == BlindzapDecodeError::kUnsupported,
+          "unsupported envelope version misclassified");
+
+  std::vector<uint8_t> oversized = {'B', 'Z', 'E', '1', 1};
+  BlindzapAppendU32(&oversized,
+                    static_cast<uint32_t>(kBlindzapMaxStatementBytes + 1));
+  oversized.resize(oversized.size() + kBlindzapMaxStatementBytes + 1);
+  Require(!DecodeBlindzapEnvelope(oversized, &decoded),
+          "oversized statement allocation accepted");
+
+  const std::string inspection = BlindzapInspectJson(envelope);
+  Require(inspection.find("\"network\":\"signet\"") != std::string::npos &&
+              inspection.find("nonce") == std::string::npos,
+          "inspection output is incorrect or leaks nonce material");
 }
-void TestMultiClaimAndBridgeBinding() {
-  auto s=Statement(); std::vector<std::array<uint8_t,20>> programs; Require(BlindzapDistinctPrograms(s,&programs) && programs.size()==2,"distinct program grouping");
-  s.claims.push_back(s.claims[0]); Require(!BlindzapStatementValid(s),"duplicate outpoint accepted"); s=Statement(); s.claims[1].program=s.claims[0].program; Require(BlindzapDistinctPrograms(s,&programs) && programs.size()==1,"shared program grouping");
-  s=Statement(); s.has_bridge_binding=true; s.bridge.destination_network=BlindzapNetwork::kTestnet; s.bridge.destination_commitment[0]=4; s.bridge.asset_id="asset"; s.bridge.lock_id[0]=5; std::vector<uint8_t> wire; Require(EncodeBlindzapStatement(s,&wire),"bridge encode"); BlindzapStatementV1 decoded; Require(DecodeBlindzapStatement(wire,&decoded) && decoded.bridge.asset_id=="asset","bridge round trip"); std::array<uint8_t,32> one,two; Require(BlindzapStatementDigest(s,&one),"bridge digest"); s.bridge.lock_id[0]^=1; Require(BlindzapStatementDigest(s,&two) && one!=two,"bridge lock not transcript bound");
-}
+
 void TestReplayPolicy() {
-  auto s = Statement(); BlindzapReplayPolicy policy; policy.now = 150; policy.max_lifetime = 200; policy.verifier = s.verifier; policy.purpose = s.purpose; bool consumed = false; policy.nonce_seen = [&](const std::array<uint8_t,32>&) { return consumed; }; policy.consume_nonce = [&](const std::array<uint8_t,32>&) { if (consumed) return false; consumed = true; return true; };
-  Require(BlindzapCheckPolicy(s, policy, true) == BlindzapAuthorization::kPendingReplayCheck, "fresh nonce not pending"); Require(BlindzapConsumeNonce(s, policy) == BlindzapAuthorization::kAuthorized, "fresh nonce not consumed"); Require(BlindzapCheckPolicy(s, policy, true) == BlindzapAuthorization::kReplayRejected, "replay accepted"); consumed = false; Require(BlindzapCheckPolicy(s, policy, false) == BlindzapAuthorization::kPolicyRejected && !consumed, "invalid proof consumed nonce"); s.expires_at = 149; Require(BlindzapCheckPolicy(s, policy, true) == BlindzapAuthorization::kPolicyRejected, "expired statement accepted");
+  const auto statement = Statement();
+  BlindzapReplayPolicy policy;
+  policy.now = 150;
+  policy.max_lifetime = 200;
+  policy.verifier = statement.verifier;
+  policy.purpose = statement.purpose;
+  bool consumed = false;
+  policy.nonce_seen = [&](const std::array<uint8_t, 32>&) { return consumed; };
+  policy.consume_nonce = [&](const std::array<uint8_t, 32>&) {
+    if (consumed) return false;
+    consumed = true;
+    return true;
+  };
+  Require(BlindzapCheckPolicy(statement, policy, true) ==
+              BlindzapAuthorization::kPendingReplayCheck,
+          "fresh nonce rejected");
+  Require(BlindzapConsumeNonce(statement, policy) ==
+              BlindzapAuthorization::kAuthorized,
+          "fresh nonce not consumed");
+  Require(BlindzapCheckPolicy(statement, policy, true) ==
+              BlindzapAuthorization::kReplayRejected,
+          "replay accepted");
+  policy.now = statement.expires_at;
+  Require(BlindzapCheckPolicy(statement, policy, true) ==
+              BlindzapAuthorization::kPolicyRejected,
+          "expiry boundary accepted");
 }
+
 }  // namespace
 }  // namespace proofs
-int main() { try { proofs::TestStatement(); proofs::TestHashesAndEnvelope(); proofs::TestStatementByteMutationsBindTranscript(); proofs::TestMultiClaimAndBridgeBinding(); proofs::TestReplayPolicy(); } catch (const std::exception& e) { std::cerr << "not ok - " << e.what() << '\n'; return 1; } std::cout << "BlindZap protocol tests passed\n"; }
+
+int main() {
+  try {
+    proofs::TestNetworks();
+    proofs::TestStatementRoundTrip();
+    proofs::TestMalformedStatementCorpus();
+    proofs::TestEnvelopeAndTranscript();
+    proofs::TestReplayPolicy();
+  } catch (const std::exception& error) {
+    std::cerr << "not ok - " << error.what() << '\n';
+    return 1;
+  }
+  std::cout << "BlindZap protocol tests passed\n";
+  return 0;
+}

@@ -54,6 +54,9 @@ jobs:
       run: |
         cd test
         ./bats/bin/bats mdoc.bats
+    - name: Run BlindZap production gate
+      run: |
+        make -j$(nproc) blindzap-ci-test CC="ccache ${{ matrix.compiler.cc }}" CXX="ccache ${{ matrix.compiler.cxx }}"
     - name: Pack build results
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
@@ -142,6 +145,9 @@ jobs:
       run: |
         cd test
         ./bats/bin/bats mdoc.bats
+    - name: Run BlindZap portability gate
+      run: |
+        make -j$(sysctl -n hw.ncpu) blindzap-ci-test CC="ccache clang" CXX="ccache clang++"
     - name: Pack build results
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
@@ -185,9 +191,61 @@ jobs:
           release-metrics/longfellow-zk_bip340_metrics.png
           release-metrics/bip340_metrics_release.md
 
+  blindzap-proof:
+    name: BlindZap full proof gate
+    needs: [posix-x86]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+    - name: Import upstream longfellow-zk
+      run: |
+        bash scripts/import_upstream.sh vendor/longfellow-zk
+    - name: Run real one-key and maximum two-key proofs
+      run: |
+        make blindzap-proof-test CC="ccache clang" CXX="ccache clang++"
+
+  blindzap-static-analysis:
+    name: BlindZap static analysis
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        submodules: recursive
+    - name: Install analyzers
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang-tidy cppcheck shellcheck
+    - name: Run analyzers
+      run: |
+        make blindzap-static-analysis
+
+  blindzap-sanitizers:
+    name: BlindZap ASan and UBSan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        submodules: recursive
+    - name: Import upstream longfellow-zk
+      run: |
+        bash scripts/import_upstream.sh vendor/longfellow-zk
+    - name: Build and run the production gate under sanitizers
+      env:
+        ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+        UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      run: |
+        make clean
+        make -j$(nproc) posix CC=clang CXX=clang++ CFLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-strict-overflow"
+        make -j$(nproc) blindzap-ci-test CC=clang CXX=clang++ CFLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-strict-overflow"
+
   draft-binary-release:
     name: 📦 Pack
-    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics]
+    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics, blindzap-proof, blindzap-static-analysis, blindzap-sanitizers]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
