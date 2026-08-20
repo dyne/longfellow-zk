@@ -12,7 +12,7 @@ namespace proofs {
 // The maximum supported two-key relation measures about 88 MiB. Keep a fixed
 // 128 MiB parsing ceiling: it admits the bounded v1 circuit family with
 // headroom while retaining a finite allocation limit at the wire boundary.
-constexpr size_t kBlindzapMaxProofBytes = 128 * 1024 * 1024;
+constexpr size_t kBlindzapMaxProofBytes = size_t{128} * 1024 * 1024;
 constexpr size_t kBlindzapEnvelopeOverheadBytes = 5 + 4 + 32 + 4 + 4 + 4 + 4;
 constexpr size_t kBlindzapMaxEnvelopeBytes =
     kBlindzapEnvelopeOverheadBytes + kBlindzapMaxStatementBytes +
@@ -32,7 +32,7 @@ inline bool DecodeBlindzapEnvelope(
   BlindzapReader r(bytes);
   uint8_t magic[4], version;
   uint32_t n;
-  if (!r.bytes(magic, 4) || std::memcmp(magic, "BZE1", 4)) return false;
+  if (!r.bytes(magic, 4) || std::memcmp(magic, "BZE1", 4) != 0) return false;
   if (!r.u8(&version) || version != 1) {
     if (error != nullptr) *error = BlindzapDecodeError::kUnsupported;
     return false;
@@ -85,7 +85,7 @@ inline std::array<uint8_t, 32> BlindzapTranscriptSeed(const BlindzapStatementV1&
   std::array<uint8_t, 32> digest{}; if (!BlindzapStatementDigest(statement, &digest)) return {}; std::vector<uint8_t> binding(digest.begin(), digest.end()); binding.insert(binding.end(), proof.circuit_digest.begin(), proof.circuit_digest.end()); BlindzapAppendU32(&binding, proof.circuit_version); BlindzapAppendU32(&binding, static_cast<uint32_t>(proof.rate)); BlindzapAppendU32(&binding, static_cast<uint32_t>(proof.queries)); return BlindzapTaggedHash("BlindZap/transcript/v1", binding.data(), binding.size());
 }
 
-enum class BlindzapAuthorization { kInvalid, kPendingReplayCheck, kReplayRejected, kPolicyRejected, kAuthorized };
+enum class BlindzapAuthorization : uint8_t { kInvalid, kPendingReplayCheck, kReplayRejected, kPolicyRejected, kAuthorized };
 struct BlindzapReplayPolicy { uint64_t now = 0; uint64_t max_lifetime = 0; std::string verifier; std::string purpose; std::function<bool(const std::array<uint8_t, 32>&)> nonce_seen; std::function<bool(const std::array<uint8_t, 32>&)> consume_nonce; };
 inline BlindzapAuthorization BlindzapCheckPolicy(const BlindzapStatementV1& statement, const BlindzapReplayPolicy& policy, bool proof_valid) {
   if (!proof_valid || !BlindzapStatementValid(statement) || statement.verifier != policy.verifier || statement.purpose != policy.purpose || policy.now < statement.not_before || policy.now >= statement.expires_at || (policy.max_lifetime && statement.expires_at - statement.not_before > policy.max_lifetime)) return BlindzapAuthorization::kPolicyRejected;

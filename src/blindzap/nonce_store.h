@@ -15,7 +15,7 @@
 
 namespace proofs {
 
-constexpr size_t kBlindzapMaxNonceStoreBytes = 16 * 1024 * 1024;
+constexpr size_t kBlindzapMaxNonceStoreBytes = size_t{16} * 1024 * 1024;
 
 inline bool BlindzapWriteAll(int descriptor, const uint8_t* bytes, size_t size) {
   while (size != 0) {

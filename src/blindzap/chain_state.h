@@ -10,8 +10,8 @@
 #include "blindzap/statement.h"
 
 namespace proofs {
-enum class BlindzapProviderKind { kCurrentTip, kHistoricalSnapshot };
-enum class BlindzapChainStatus { kUnspent, kSpent, kInconclusive, kUnavailable, kMalformed, kWrongNetwork, kStale };
+enum class BlindzapProviderKind : uint8_t { kCurrentTip, kHistoricalSnapshot };
+enum class BlindzapChainStatus : uint8_t { kUnspent, kSpent, kInconclusive, kUnavailable, kMalformed, kWrongNetwork, kStale };
 struct BlindzapChainRequest {
   BlindzapNetwork network;
   std::array<uint8_t, 32> txid{};

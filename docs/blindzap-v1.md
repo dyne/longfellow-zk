@@ -208,5 +208,5 @@ races, and circuit mutations.
 and a complete canonical statement encoding/digest vector. Regenerate it with:
 
 ```
-python3 scripts/generate_blindzap_vectors.py | cmp -s - test/blindzap/testdata/blindzap_vectors.json
+python3 scripts/generate_blindzap_vectors.py | diff -u test/blindzap/testdata/blindzap_vectors.json -
 ```

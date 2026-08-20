@@ -34,7 +34,7 @@ constexpr size_t kBlindzapMaxKeys = 2;
 constexpr size_t kBlindzapMaxStatementBytes = 4096;
 constexpr uint64_t kBlindzapMaxMoneySats = 21000000ULL * 100000000ULL;
 
-enum class BlindzapDecodeError { kNone, kMalformed, kUnsupported };
+enum class BlindzapDecodeError : uint8_t { kNone, kMalformed, kUnsupported };
 
 inline bool BlindzapNetworkValid(BlindzapNetwork network) {
   switch (network) {
