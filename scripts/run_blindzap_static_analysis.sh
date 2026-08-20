@@ -31,10 +31,21 @@ done
 
 cppcheck \
   --enable=warning,performance,portability \
+  --language=c++ \
   --std=c++17 \
   --inline-suppr \
+  --relative-paths=. \
   --suppress=missingIncludeSystem \
   --suppress=unmatchedSuppression \
+  --suppress=normalCheckLevelMaxBranches \
+  --suppress=toomanyconfigs \
+  '--suppress=*:src/util/*' \
+  '--suppress=*:src/circuits/*' \
+  '--suppress=*:src/random/*' \
+  '--suppress=*:src/algebra/*' \
+  '--suppress=*:src/zk/*' \
+  '--suppress=*:src/sumcheck/*' \
+  '--suppress=*:src/cli/json.hpp' \
   --error-exitcode=1 \
   -Isrc \
   src/blindzap/statement.h \

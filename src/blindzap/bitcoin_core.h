@@ -24,7 +24,7 @@
 
 namespace proofs {
 
-constexpr size_t kBlindzapMaxRpcOutputBytes = 1024 * 1024;
+constexpr size_t kBlindzapMaxRpcOutputBytes = size_t{1024} * 1024;
 constexpr std::chrono::seconds kBlindzapRpcTimeout{30};
 
 struct BlindzapProcessResult {
@@ -206,7 +206,8 @@ inline bool TopLevelNumberToken(const std::string& json, const std::string& key,
     while (index < json.size() &&
            (json[index] == ' ' || json[index] == '\t' || json[index] == '\r' ||
             json[index] == '\n')) ++index;
-    if (index == json.size() || json[index++] != ':') return false;
+    if (index == json.size() || json[index] != ':') return false;
+    ++index;
     while (index < json.size() &&
            (json[index] == ' ' || json[index] == '\t' || json[index] == '\r' ||
             json[index] == '\n')) ++index;

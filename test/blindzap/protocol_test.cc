@@ -86,7 +86,9 @@ void TestStatementRoundTrip() {
               digest == expected_digest,
           "statement digest differs from independent vector");
   for (size_t size = 0; size < encoded.size(); ++size) {
-    const std::vector<uint8_t> truncated(encoded.begin(), encoded.begin() + size);
+    const auto end = encoded.begin() +
+                     static_cast<std::vector<uint8_t>::difference_type>(size);
+    const std::vector<uint8_t> truncated(encoded.begin(), end);
     Require(!DecodeBlindzapStatement(truncated, &decoded),
             "truncated statement accepted");
   }
@@ -203,7 +205,9 @@ void TestEnvelopeAndTranscript() {
   Require(!EncodeBlindzapEnvelope(invalid_envelope, &again),
           "unsupported proof parameters encoded");
   for (size_t size = 0; size < wire.size(); ++size) {
-    const std::vector<uint8_t> truncated(wire.begin(), wire.begin() + size);
+    const auto end = wire.begin() +
+                     static_cast<std::vector<uint8_t>::difference_type>(size);
+    const std::vector<uint8_t> truncated(wire.begin(), end);
     Require(!DecodeBlindzapEnvelope(truncated, &decoded),
             "truncated envelope accepted");
   }

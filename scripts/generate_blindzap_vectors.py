@@ -3,7 +3,6 @@
 
 import hashlib
 import json
-import platform
 import sys
 
 P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
@@ -111,10 +110,8 @@ def main():
     corpus = {
         "format": "blindzap-v1-independent-vectors",
         "generator": {
+            "version": 1,
             "path": "scripts/generate_blindzap_vectors.py",
-            "python": platform.python_version(),
-            "implementation": platform.python_implementation(),
-            "hashlib_openssl": getattr(hashlib, "openssl_version", "implementation-provided"),
             "method": "straightforward integer secp256k1 double-and-add; hashlib SHA-256 and RIPEMD-160",
         },
         "secp256k1": {"p": f"{P:064x}", "n": f"{N:064x}"},

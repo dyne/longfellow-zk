@@ -1,11 +1,9 @@
 {
   "format": "blindzap-v1-independent-vectors",
   "generator": {
-    "hashlib_openssl": "implementation-provided",
-    "implementation": "CPython",
     "method": "straightforward integer secp256k1 double-and-add; hashlib SHA-256 and RIPEMD-160",
     "path": "scripts/generate_blindzap_vectors.py",
-    "python": "3.13.5"
+    "version": 1
   },
   "secp256k1": {
     "n": "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141",

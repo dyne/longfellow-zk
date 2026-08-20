@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <exception>
 #include <fcntl.h>
 #include <fstream>
 #include <iostream>
@@ -29,6 +30,7 @@ namespace {
 
 constexpr int kUsage = 64;
 constexpr int kData = 65;
+constexpr int kSoftware = 70;
 constexpr int kIoError = 74;
 constexpr uint64_t kDefaultLifetimeSeconds = 300;
 constexpr uint64_t kMaximumLifetimeSeconds = 86400;
@@ -479,7 +481,7 @@ int Inspect(const std::string& path) {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+int BlindzapMain(int argc, char** argv) {
   if (argc == 2 && std::string(argv[1]) == "--help") {
     std::cout << "BlindZap private proof-of-control CLI\n";
     PrintUsage(std::cout);
@@ -498,4 +500,15 @@ int main(int argc, char** argv) {
   if (argc >= 3 && std::string(argv[1]) == "verify") return Verify(argc, argv);
   if (argc == 3 && std::string(argv[1]) == "inspect") return Inspect(argv[2]);
   return Usage();
+}
+
+int main(int argc, char** argv) {
+  try {
+    return BlindzapMain(argc, argv);
+  } catch (const std::exception& exception) {
+    std::cerr << "fatal BlindZap error: " << exception.what() << '\n';
+  } catch (...) {
+    std::cerr << "fatal BlindZap error\n";
+  }
+  return kSoftware;
 }
