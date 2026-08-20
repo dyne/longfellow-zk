@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0.
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <fstream>
@@ -38,6 +39,17 @@ using EC = P256k1;
 using CompileBackend = CompilerBackend<Field>;
 using CompileLogic = Logic<Field, CompileBackend>;
 using Relation = BlindzapCircuitV1<CompileLogic, Field, EC>;
+struct NativeMetric {
+  uint64_t build_ms;
+  uint64_t prove_ms;
+  uint64_t verify_ms;
+  size_t proof_bytes;
+  size_t public_inputs;
+  size_t total_inputs;
+  size_t quad_terms;
+  size_t crt_block_enc;
+};
+std::vector<NativeMetric> native_metrics;
 
 void Require(bool value, const char* message) {
   if (!value) throw std::runtime_error(message);
@@ -136,21 +148,33 @@ void TestWitnessInputValidation() {
 }
 
 void TestProofRoundTrip(const std::array<uint8_t, 32>& secret) {
+  const auto build_started = std::chrono::steady_clock::now();
   BlindzapWitnessV1<Field, EC> witness;
   Require(witness.compute(p256k1, secret.data(), secret.size()), "witness compute failed");
   QuadCircuit<Field> q(p256k1_base); auto circuit = BuildCircuit(q);
+  const auto build_finished = std::chrono::steady_clock::now();
   auto inputs = std::make_unique<Dense<Field>>(1, circuit->ninputs);
   { DenseFiller<Field> fill(*inputs); fill.push_back(p256k1_base.one()); BitPluckerEncoder<Field,8> enc(p256k1_base); for (auto b : witness.program()) fill.push_back(enc.encode(b)); witness.fill_witness(fill); }
   using Crt = CRT256<Field>; using CF = CrtConvolutionFactory<Crt, Field>; using RS = ReedSolomonFactory<Field, CF>;
   const size_t block = circuit->ninputs - circuit->npub_in + q.nquad_terms_ + 1; Require(check_crt_block_enc<Crt>(block).empty(), "CRT guard rejected circuit"); Require(!check_crt_block_enc<Crt>((1ull << 22) + 1).empty(), "CRT guard accepted oversized value"); CF cf(p256k1_base); RS rs(cf, p256k1_base);
-  ZkProof<Field> proof(*circuit, 4, 128, block); ZkProver<Field, RS> prover(*circuit, p256k1_base, rs); SecureRandomEngine rng; uint8_t tag[] = {'B','Z','P','1'}; Transcript tp(tag, sizeof(tag)); prover.commit(proof, *inputs, tp, rng); Require(prover.prove(proof, *inputs, tp), "prove failed");
+  ZkProof<Field> proof(*circuit, 4, 128, block); ZkProver<Field, RS> prover(*circuit, p256k1_base, rs); SecureRandomEngine rng; uint8_t tag[] = {'B','Z','P','1'}; Transcript tp(tag, sizeof(tag));
+  const auto prove_started = std::chrono::steady_clock::now();
+  prover.commit(proof, *inputs, tp, rng); Require(prover.prove(proof, *inputs, tp), "prove failed");
+  const auto prove_finished = std::chrono::steady_clock::now();
   std::vector<uint8_t> bytes; proof.write(bytes, p256k1_base); ReadBuffer rb(bytes.data(), bytes.size()); ZkProof<Field> parsed(*circuit, 4, 128, block); Require(parsed.read(rb, p256k1_base), "parse failed");
   Dense<Field> pub(1, circuit->npub_in); { DenseFiller<Field> fill(pub); fill.push_back(p256k1_base.one()); BitPluckerEncoder<Field,8> enc(p256k1_base); for (auto b : witness.program()) fill.push_back(enc.encode(b)); }
-  Transcript tv(tag, sizeof(tag)); ZkVerifier<Field, RS> verifier(*circuit, rs, 4, 128, block, p256k1_base); verifier.recv_commitment(parsed, tv); std::cerr << "positive verify begin\n"; Require(verifier.verify(parsed, pub, tv), "verify failed"); std::cerr << "positive verify done\n";
+  Transcript tv(tag, sizeof(tag)); ZkVerifier<Field, RS> verifier(*circuit, rs, 4, 128, block, p256k1_base);
+  const auto verify_started = std::chrono::steady_clock::now();
+  verifier.recv_commitment(parsed, tv); std::cerr << "positive verify begin\n"; Require(verifier.verify(parsed, pub, tv), "verify failed"); std::cerr << "positive verify done\n";
+  const auto verify_finished = std::chrono::steady_clock::now();
   auto changed = pub.clone(); changed->v_[1] = p256k1_base.addf(changed->v_[1], p256k1_base.one()); Transcript changed_tv(tag, sizeof(tag)); ZkVerifier<Field, RS> changed_verifier(*circuit, rs, 4, 128, block, p256k1_base); changed_verifier.recv_commitment(parsed, changed_tv); Require(!changed_verifier.verify(parsed, *changed, changed_tv), "public-byte mutation accepted");
   auto swapped = pub.clone(); std::swap(swapped->v_[1], swapped->v_[2]); Transcript swapped_tv(tag, sizeof(tag)); ZkVerifier<Field, RS> swapped_verifier(*circuit, rs, 4, 128, block, p256k1_base); swapped_verifier.recv_commitment(parsed, swapped_tv); Require(!swapped_verifier.verify(parsed, *swapped, swapped_tv), "swapped public bytes accepted");
   bytes[10] ^= 1; ReadBuffer bad_rb(bytes.data(), bytes.size()); ZkProof<Field> bad(*circuit, 4, 128, block); Require(bad.read(bad_rb, p256k1_base), "tampered proof parse failed"); Transcript bad_tv(tag, sizeof(tag)); ZkVerifier<Field, RS> bad_verifier(*circuit, rs, 4, 128, block, p256k1_base); bad_verifier.recv_commitment(bad, bad_tv); Require(!bad_verifier.verify(bad, pub, bad_tv), "tampered proof accepted");
-  std::ofstream metrics("test/results/native_blindzap_metrics.csv"); Require(metrics.good(), "metrics output unavailable"); metrics << "target,circuit,proof_bytes,public_inputs,total_inputs,quad_terms,crt_block_enc\n" << "native,blindzap," << bytes.size() << ',' << circuit->npub_in << ',' << circuit->ninputs << ',' << q.nquad_terms_ << ',' << block << '\n';
+  native_metrics.push_back({
+      static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(build_finished - build_started).count()),
+      static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(prove_finished - prove_started).count()),
+      static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(verify_finished - verify_started).count()),
+      bytes.size(), circuit->npub_in, circuit->ninputs, q.nquad_terms_, block});
 }
 }  // namespace
 }  // namespace proofs
@@ -171,6 +195,10 @@ int main() {
     proofs::TestProofRoundTrip(three_eighty_two);
     std::array<uint8_t, 32> n_minus_one = {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xfe,0xba,0xae,0xdc,0xe6,0xaf,0x48,0xa0,0x3b,0xbf,0xd2,0x5e,0x8c,0xd0,0x36,0x41,0x40};
     proofs::TestProofRoundTrip(n_minus_one);
+    std::ofstream metrics("test/results/native_blindzap_metrics.csv");
+    proofs::Require(metrics.good(), "metrics output unavailable");
+    metrics << "target,circuit,build_ms,prove_ms,verify_ms,proof_bytes,public_inputs,total_inputs,quad_terms,crt_block_enc\n";
+    for (const auto& metric : proofs::native_metrics) metrics << "native,blindzap," << metric.build_ms << ',' << metric.prove_ms << ',' << metric.verify_ms << ',' << metric.proof_bytes << ',' << metric.public_inputs << ',' << metric.total_inputs << ',' << metric.quad_terms << ',' << metric.crt_block_enc << '\n';
   } catch (const std::exception& error) {
     std::cerr << "not ok - " << error.what() << '\n';
     return 1;

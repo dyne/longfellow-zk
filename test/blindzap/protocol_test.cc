@@ -33,6 +33,31 @@ void TestHashesAndEnvelope() {
   e.proof.bytes.assign(48 * 1024 * 1024, 0xa5); Require(EncodeBlindzapEnvelope(e, &bytes), "rejected current-proof-scale envelope"); Require(DecodeBlindzapEnvelope(bytes, &parsed) && parsed.proof.bytes == e.proof.bytes, "failed current-proof-scale envelope round trip");
   e.proof.bytes.assign(kBlindzapMaxProofBytes + 1, 0); Require(!EncodeBlindzapEnvelope(e, &bytes), "accepted proof over allocation limit");
 }
+void TestStatementByteMutationsBindTranscript() {
+  BlindzapEnvelopeV1 envelope; envelope.statement = Statement(); envelope.proof.circuit_digest[0] = 4; envelope.proof.bytes = {1, 2, 3, 4};
+  const auto seed = BlindzapTranscriptSeed(envelope.statement, envelope.proof);
+  std::vector<uint8_t> statement;
+  Require(EncodeBlindzapStatement(envelope.statement, &statement), "encode mutation statement");
+  // A parseable mutation must change the Fiat-Shamir input.  Mutations that
+  // violate canonical statement rules are equally safe because decoding
+  // rejects them before verification.
+  for (size_t index = 0; index < statement.size(); ++index) {
+    auto mutated = statement;
+    mutated[index] ^= 1;
+    BlindzapStatementV1 parsed;
+    if (!DecodeBlindzapStatement(mutated, &parsed)) continue;
+    BlindzapEnvelopeV1 changed = envelope;
+    changed.statement = std::move(parsed);
+    Require(BlindzapTranscriptSeed(changed.statement, changed.proof) != seed,
+            "parseable statement-byte mutation not transcript bound");
+  }
+  const auto wire = [&] { std::vector<uint8_t> out; Require(EncodeBlindzapEnvelope(envelope, &out), "encode mutation envelope"); return out; }();
+  for (size_t length = 0; length < wire.size(); ++length) {
+    std::vector<uint8_t> truncated(wire.begin(), wire.begin() + length);
+    BlindzapEnvelopeV1 parsed;
+    Require(!DecodeBlindzapEnvelope(truncated, &parsed), "accepted envelope truncation mutation");
+  }
+}
 void TestMultiClaimAndBridgeBinding() {
   auto s=Statement(); std::vector<std::array<uint8_t,20>> programs; Require(BlindzapDistinctPrograms(s,&programs) && programs.size()==2,"distinct program grouping");
   s.claims.push_back(s.claims[0]); Require(!BlindzapStatementValid(s),"duplicate outpoint accepted"); s=Statement(); s.claims[1].program=s.claims[0].program; Require(BlindzapDistinctPrograms(s,&programs) && programs.size()==1,"shared program grouping");
@@ -44,4 +69,4 @@ void TestReplayPolicy() {
 }
 }  // namespace
 }  // namespace proofs
-int main() { try { proofs::TestStatement(); proofs::TestHashesAndEnvelope(); proofs::TestMultiClaimAndBridgeBinding(); proofs::TestReplayPolicy(); } catch (const std::exception& e) { std::cerr << "not ok - " << e.what() << '\n'; return 1; } std::cout << "BlindZap protocol tests passed\n"; }
+int main() { try { proofs::TestStatement(); proofs::TestHashesAndEnvelope(); proofs::TestStatementByteMutationsBindTranscript(); proofs::TestMultiClaimAndBridgeBinding(); proofs::TestReplayPolicy(); } catch (const std::exception& e) { std::cerr << "not ok - " << e.what() << '\n'; return 1; } std::cout << "BlindZap protocol tests passed\n"; }
