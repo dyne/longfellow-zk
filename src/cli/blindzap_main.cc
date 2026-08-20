@@ -1,32 +1,501 @@
+#include <algorithm>
 #include <array>
-#include <cstdio>
+#include <cerrno>
+#include <chrono>
+#include <cstdint>
+#include <cstring>
+#include <fcntl.h>
 #include <fstream>
 #include <iostream>
-#include <iterator>
-#include <chrono>
+#include <limits>
+#include <map>
+#include <set>
 #include <string>
+#include <sys/stat.h>
+#include <termios.h>
+#include <unistd.h>
+#include <utility>
 #include <vector>
+
+#include "blindzap/bitcoin_core.h"
 #include "blindzap/envelope.h"
+#include "blindzap/nonce_store.h"
 #include "blindzap/prover.h"
 #include "blindzap/verifier.h"
-#include "blindzap/bitcoin_core.h"
+#include "cli/json.hpp"
+#include "util/randombytes.h"
 
 namespace {
-constexpr int kUsage = 64, kData = 65;
-int Usage() { std::cerr << "usage: blindzap challenge create --network N --purpose P | blindzap prove --network N --purpose P --snapshot HASH --output FILE | blindzap verify FILE --bitcoin-cli PATH | blindzap inspect FILE\n"; return kUsage; }
-bool Read(const std::string& path, std::vector<uint8_t>* out) { std::ifstream in(path, std::ios::binary); if (!in) return false; out->assign(std::istreambuf_iterator<char>(in), {}); return in.good() || in.eof(); }
-bool WriteAtomic(const std::string& path, const std::vector<uint8_t>& bytes) { const std::string tmp=path+".tmp"; { std::ofstream out(tmp, std::ios::binary|std::ios::trunc); if(!out) return false; out.write(reinterpret_cast<const char*>(bytes.data()), bytes.size()); if(!out) return false; } return std::rename(tmp.c_str(),path.c_str())==0; }
-bool SecretFromStdin(std::array<uint8_t,32>* secret) { std::string hex; if(!std::getline(std::cin,hex) || hex.size()!=64) return false; auto nibble=[](char c)->int { return c>='0'&&c<='9'?c-'0':c>='a'&&c<='f'?c-'a'+10:c>='A'&&c<='F'?c-'A'+10:-1; }; for(size_t i=0;i<32;++i) { int a=nibble(hex[2*i]),b=nibble(hex[2*i+1]); if(a<0||b<0) return false; (*secret)[i]=static_cast<uint8_t>((a<<4)|b); } return true; }
-bool Network(const std::string& s, proofs::BlindzapNetwork* n) { if(s=="mainnet") *n=proofs::BlindzapNetwork::kMainnet; else if(s=="testnet") *n=proofs::BlindzapNetwork::kTestnet; else if(s=="regtest") *n=proofs::BlindzapNetwork::kRegtest; else return false; return true; }
-bool Hex32(const std::string& hex, std::array<uint8_t,32>* out) { if(hex.size()!=64) return false; auto n=[](char c)->int{return c>='0'&&c<='9'?c-'0':c>='a'&&c<='f'?c-'a'+10:c>='A'&&c<='F'?c-'A'+10:-1;}; for(size_t i=0;i<32;++i){int a=n(hex[2*i]),b=n(hex[2*i+1]);if(a<0||b<0)return false;(*out)[i]=uint8_t((a<<4)|b);}return true; }
-int PrintResult(proofs::BlindzapVerifyResult result) { std::cout << "{\"result\":\"" << proofs::BlindzapVerifyResultName(result) << "\",\"exit_code\":" << proofs::BlindzapVerifyExitCode(result) << "}\n"; return proofs::BlindzapVerifyExitCode(result); }
+
+constexpr int kUsage = 64;
+constexpr int kData = 65;
+constexpr int kIoError = 74;
+constexpr uint64_t kDefaultLifetimeSeconds = 300;
+constexpr uint64_t kMaximumLifetimeSeconds = 86400;
+
+using Options = std::map<std::string, std::vector<std::string>>;
+
+void SecureErase(void* pointer, size_t size) {
+  volatile uint8_t* bytes = static_cast<volatile uint8_t*>(pointer);
+  while (size-- != 0) *bytes++ = 0;
 }
+
+void PrintUsage(std::ostream& output) {
+  output
+      << "usage:\n"
+      << "  blindzap challenge create --network NETWORK --verifier ID "
+         "--purpose PURPOSE --message TEXT --claim "
+         "TXID:VOUT:SATOSHIS:PROGRAM [--claim ...] --output REQUEST\n"
+      << "  blindzap prove --request REQUEST --output PROOF\n"
+      << "  blindzap verify PROOF --bitcoin-cli /ABSOLUTE/PATH --verifier ID "
+         "--purpose PURPOSE --nonce-store FILE [--min-confirmations N] "
+         "[--minimum-total-sats N] [--max-lifetime SECONDS]\n"
+      << "  blindzap inspect FILE\n"
+      << "networks: mainnet, testnet3 (alias testnet), testnet4, signet, regtest\n";
+}
+
+int Usage() {
+  PrintUsage(std::cerr);
+  return kUsage;
+}
+
+bool ParseOptions(int argc, char** argv, int begin,
+                  const std::set<std::string>& allowed, Options* options) {
+  if (options == nullptr) return false;
+  options->clear();
+  for (int index = begin; index < argc; index += 2) {
+    const std::string name = argv[index];
+    if (name.rfind("--", 0) != 0 || !allowed.count(name) || index + 1 >= argc)
+      return false;
+    (*options)[name].emplace_back(argv[index + 1]);
+  }
+  return true;
+}
+
+bool One(const Options& options, const std::string& name, std::string* value,
+         bool required = true) {
+  const auto found = options.find(name);
+  if (found == options.end()) return !required;
+  if (value == nullptr || found->second.size() != 1) return false;
+  *value = found->second.front();
+  return true;
+}
+
+bool ParseU64(const std::string& text, uint64_t* value) {
+  if (value == nullptr || text.empty()) return false;
+  uint64_t parsed = 0;
+  for (char digit : text) {
+    if (digit < '0' || digit > '9' ||
+        parsed > (std::numeric_limits<uint64_t>::max() -
+                  static_cast<uint64_t>(digit - '0')) / 10) return false;
+    parsed = parsed * 10 + static_cast<uint64_t>(digit - '0');
+  }
+  *value = parsed;
+  return true;
+}
+
+int HexNibble(char value) {
+  if (value >= '0' && value <= '9') return value - '0';
+  if (value >= 'a' && value <= 'f') return value - 'a' + 10;
+  if (value >= 'A' && value <= 'F') return value - 'A' + 10;
+  return -1;
+}
+
+template <size_t N>
+bool HexArray(const std::string& hex, std::array<uint8_t, N>* output) {
+  if (output == nullptr || hex.size() != N * 2) return false;
+  for (size_t index = 0; index < N; ++index) {
+    const int high = HexNibble(hex[index * 2]);
+    const int low = HexNibble(hex[index * 2 + 1]);
+    if (high < 0 || low < 0) return false;
+    (*output)[index] = static_cast<uint8_t>((high << 4) | low);
+  }
+  return true;
+}
+
+template <size_t N>
+std::string ArrayHex(const std::array<uint8_t, N>& value) {
+  static constexpr char kHex[] = "0123456789abcdef";
+  std::string output;
+  output.reserve(N * 2);
+  for (uint8_t byte : value) {
+    output.push_back(kHex[byte >> 4]);
+    output.push_back(kHex[byte & 15]);
+  }
+  return output;
+}
+
+bool ParseClaim(const std::string& text, proofs::BlindzapClaimV1* claim) {
+  if (claim == nullptr) return false;
+  std::array<std::string, 4> fields;
+  size_t begin = 0;
+  for (size_t index = 0; index < fields.size(); ++index) {
+    const size_t separator = text.find(':', begin);
+    if ((index + 1 < fields.size() && separator == std::string::npos) ||
+        (index + 1 == fields.size() && separator != std::string::npos)) return false;
+    fields[index] = text.substr(begin, separator - begin);
+    begin = separator == std::string::npos ? text.size() : separator + 1;
+  }
+  uint64_t vout = 0, amount = 0;
+  proofs::BlindzapClaimV1 parsed;
+  if (!HexArray(fields[0], &parsed.txid) || !ParseU64(fields[1], &vout) ||
+      vout > std::numeric_limits<uint32_t>::max() ||
+      !ParseU64(fields[2], &amount) || amount == 0 ||
+      amount > proofs::kBlindzapMaxMoneySats ||
+      !HexArray(fields[3], &parsed.program)) return false;
+  parsed.vout = static_cast<uint32_t>(vout);
+  parsed.amount_sats = amount;
+  *claim = parsed;
+  return true;
+}
+
+bool ReadBounded(const std::string& path, size_t maximum,
+                 std::vector<uint8_t>* output) {
+  if (output == nullptr) return false;
+  std::ifstream stream(path, std::ios::binary);
+  if (!stream) return false;
+  output->clear();
+  std::array<char, 8192> buffer{};
+  while (stream) {
+    stream.read(buffer.data(), buffer.size());
+    const std::streamsize count = stream.gcount();
+    if (count < 0 || static_cast<size_t>(count) > maximum - output->size()) {
+      output->clear();
+      return false;
+    }
+    output->insert(output->end(), buffer.data(), buffer.data() + count);
+  }
+  return stream.eof();
+}
+
+bool WriteAll(int descriptor, const uint8_t* bytes, size_t size) {
+  while (size != 0) {
+    const ssize_t written = write(descriptor, bytes, size);
+    if (written < 0 && errno == EINTR) continue;
+    if (written <= 0) return false;
+    bytes += written;
+    size -= static_cast<size_t>(written);
+  }
+  return true;
+}
+
+bool WriteNewFileAtomic(const std::string& path,
+                        const std::vector<uint8_t>& bytes) {
+  if (path.empty()) return false;
+  std::array<uint8_t, 8> random_suffix{};
+  if (randombytes(random_suffix.data(), random_suffix.size()) != 0) return false;
+  const std::string temporary = path + ".tmp." + std::to_string(getpid()) + "." +
+                                ArrayHex(random_suffix);
+  const int descriptor =
+      open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+  if (descriptor < 0) return false;
+  const bool written = WriteAll(descriptor, bytes.data(), bytes.size()) &&
+                       fsync(descriptor) == 0;
+  const int close_result = close(descriptor);
+  if (!written || close_result != 0 || link(temporary.c_str(), path.c_str()) != 0) {
+    (void)unlink(temporary.c_str());
+    return false;
+  }
+  (void)unlink(temporary.c_str());
+  const size_t separator = path.find_last_of('/');
+  const std::string directory = separator == std::string::npos
+                                    ? "."
+                                    : separator == 0 ? "/" : path.substr(0, separator);
+  const int directory_descriptor =
+      open(directory.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+  const bool durable = directory_descriptor >= 0 &&
+                       fsync(directory_descriptor) == 0;
+  if (directory_descriptor >= 0) (void)close(directory_descriptor);
+  if (!durable) (void)unlink(path.c_str());
+  return durable;
+}
+
+class TerminalEchoGuard {
+ public:
+  TerminalEchoGuard() {
+    if (!isatty(STDIN_FILENO) || tcgetattr(STDIN_FILENO, &original_) != 0) return;
+    termios hidden = original_;
+    hidden.c_lflag &= static_cast<tcflag_t>(~ECHO);
+    active_ = tcsetattr(STDIN_FILENO, TCSAFLUSH, &hidden) == 0;
+  }
+  ~TerminalEchoGuard() {
+    if (active_) (void)tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_);
+  }
+  TerminalEchoGuard(const TerminalEchoGuard&) = delete;
+  TerminalEchoGuard& operator=(const TerminalEchoGuard&) = delete;
+
+ private:
+  termios original_{};
+  bool active_ = false;
+};
+
+bool ReadSecrets(size_t count,
+                 std::vector<std::array<uint8_t, 32>>* secrets) {
+  if (secrets == nullptr || count == 0 || count > proofs::kBlindzapMaxKeys)
+    return false;
+  secrets->clear();
+  secrets->reserve(count);
+  const bool terminal = isatty(STDIN_FILENO);
+  if (terminal)
+    std::cerr << "enter " << count << " hexadecimal secret key(s), one per line: ";
+  TerminalEchoGuard echo_guard;
+  for (size_t index = 0; index < count; ++index) {
+    std::string line;
+    if (!std::getline(std::cin, line)) return false;
+    std::array<uint8_t, 32> secret{};
+    const bool valid = HexArray(line, &secret);
+    if (!line.empty()) SecureErase(line.data(), line.size());
+    if (!valid) {
+      SecureErase(secret.data(), secret.size());
+      return false;
+    }
+    secrets->push_back(secret);
+    SecureErase(secret.data(), secret.size());
+  }
+  if (terminal) std::cerr << '\n';
+  return true;
+}
+
+void EraseSecrets(std::vector<std::array<uint8_t, 32>>* secrets) {
+  if (secrets == nullptr) return;
+  for (auto& secret : *secrets) SecureErase(secret.data(), secret.size());
+  secrets->clear();
+}
+
+int PrintResult(const proofs::BlindzapVerification& verification) {
+  nlohmann::json output = {
+      {"result", proofs::BlindzapVerifyResultName(verification.result)},
+      {"exit_code", proofs::BlindzapVerifyExitCode(verification.result)},
+      {"total_sats", verification.total_sats},
+      {"claims_checked", verification.claims.size()},
+  };
+  std::cout << output.dump() << '\n';
+  return proofs::BlindzapVerifyExitCode(verification.result);
+}
+
+int ChallengeCreate(int argc, char** argv) {
+  const std::set<std::string> allowed = {
+      "--network", "--verifier", "--purpose", "--message", "--claim",
+      "--output", "--expires-in"};
+  Options options;
+  if (!ParseOptions(argc, argv, 3, allowed, &options)) return Usage();
+  std::string network_name, verifier, purpose, message, output_path,
+      lifetime_text;
+  if (!One(options, "--network", &network_name) ||
+      !One(options, "--verifier", &verifier) ||
+      !One(options, "--purpose", &purpose) ||
+      !One(options, "--message", &message) ||
+      !One(options, "--output", &output_path) ||
+      !One(options, "--expires-in", &lifetime_text, false)) return Usage();
+  uint64_t lifetime = kDefaultLifetimeSeconds;
+  if (!lifetime_text.empty() && !ParseU64(lifetime_text, &lifetime)) return Usage();
+  if (lifetime == 0 || lifetime > kMaximumLifetimeSeconds) return Usage();
+  const auto claims = options.find("--claim");
+  if (claims == options.end() || claims->second.empty() ||
+      claims->second.size() > proofs::kBlindzapMaxClaims) return Usage();
+
+  proofs::BlindzapStatementV1 statement;
+  if (!proofs::BlindzapParseNetwork(network_name, &statement.network)) return Usage();
+  statement.verifier = verifier;
+  statement.purpose = purpose;
+  for (size_t attempt = 0; proofs::BlindzapAllZero(statement.nonce); ++attempt) {
+    if (attempt == 4 ||
+        randombytes(statement.nonce.data(), statement.nonce.size()) != 0)
+      return kIoError;
+  }
+  statement.bip322_message_hash = proofs::BlindzapBip322MessageHash(
+      reinterpret_cast<const uint8_t*>(message.data()), message.size());
+  const auto now = std::chrono::system_clock::to_time_t(
+      std::chrono::system_clock::now());
+  if (now < 0 || static_cast<uint64_t>(now) >
+                     std::numeric_limits<uint64_t>::max() - lifetime) return kIoError;
+  statement.not_before = static_cast<uint64_t>(now);
+  statement.expires_at = statement.not_before + lifetime;
+  for (const auto& encoded_claim : claims->second) {
+    proofs::BlindzapClaimV1 claim;
+    if (!ParseClaim(encoded_claim, &claim)) return Usage();
+    statement.claims.push_back(claim);
+  }
+  std::sort(statement.claims.begin(), statement.claims.end());
+  std::vector<uint8_t> request;
+  if (!proofs::EncodeBlindzapStatement(statement, &request)) {
+    std::cerr << "challenge violates the BlindZap v1 statement contract\n";
+    return kData;
+  }
+  if (!WriteNewFileAtomic(output_path, request)) {
+    std::cerr << "could not create request file (the destination must not exist)\n";
+    return kIoError;
+  }
+  nlohmann::json result = {{"result", "challenge_created"},
+                           {"request", output_path},
+                           {"network", proofs::BlindzapNetworkName(statement.network)},
+                           {"expires_at", statement.expires_at},
+                           {"claims", statement.claims.size()}};
+  std::cout << result.dump() << '\n';
+  return 0;
+}
+
+int Prove(int argc, char** argv) {
+  Options options;
+  if (!ParseOptions(argc, argv, 2, {"--request", "--output"}, &options))
+    return Usage();
+  std::string request_path, output_path;
+  if (!One(options, "--request", &request_path) ||
+      !One(options, "--output", &output_path)) return Usage();
+  std::vector<uint8_t> request;
+  proofs::BlindzapStatementV1 statement;
+  proofs::BlindzapDecodeError error = proofs::BlindzapDecodeError::kMalformed;
+  if (!ReadBounded(request_path, proofs::kBlindzapMaxStatementBytes, &request) ||
+      !proofs::DecodeBlindzapStatement(request, &statement, &error)) {
+    std::cerr << "invalid or unsupported BlindZap request\n";
+    return kData;
+  }
+  const auto now = std::chrono::system_clock::to_time_t(
+      std::chrono::system_clock::now());
+  if (now < 0 || static_cast<uint64_t>(now) < statement.not_before ||
+      static_cast<uint64_t>(now) >= statement.expires_at) {
+    std::cerr << "BlindZap request is not currently valid\n";
+    return kData;
+  }
+  std::vector<std::array<uint8_t, 20>> programs;
+  if (!proofs::BlindzapDistinctPrograms(statement, &programs)) return kData;
+  std::vector<std::array<uint8_t, 32>> secrets;
+  if (!ReadSecrets(programs.size(), &secrets)) {
+    EraseSecrets(&secrets);
+    std::cerr << "expected one 32-byte hexadecimal secret per distinct program\n";
+    return kData;
+  }
+  proofs::BlindzapEnvelopeV1 envelope;
+  bool proved = false;
+  if (programs.size() == 1)
+    proved = proofs::BlindzapProveKeys<1>(secrets, statement, &envelope);
+  else if (programs.size() == 2)
+    proved = proofs::BlindzapProveKeys<2>(secrets, statement, &envelope);
+  EraseSecrets(&secrets);
+  std::vector<uint8_t> wire;
+  if (!proved || !proofs::EncodeBlindzapEnvelope(envelope, &wire)) {
+    std::cerr << "proof generation failed\n";
+    return 2;
+  }
+  if (!WriteNewFileAtomic(output_path, wire)) {
+    std::cerr << "could not create proof file (the destination must not exist)\n";
+    return kIoError;
+  }
+  std::cout << nlohmann::json({{"result", "proof_created"},
+                               {"proof", output_path},
+                               {"proof_bytes", envelope.proof.bytes.size()}}).dump()
+            << '\n';
+  return 0;
+}
+
+int Verify(int argc, char** argv) {
+  if (argc < 3) return Usage();
+  const std::string proof_path = argv[2];
+  Options options;
+  if (!ParseOptions(argc, argv, 3,
+                    {"--bitcoin-cli", "--verifier", "--purpose",
+                     "--nonce-store", "--min-confirmations",
+                     "--minimum-total-sats", "--max-lifetime"},
+                    &options)) return Usage();
+  std::string executable, verifier, purpose, nonce_store, confirmations_text,
+      minimum_text, lifetime_text;
+  if (!One(options, "--bitcoin-cli", &executable) ||
+      !One(options, "--verifier", &verifier) ||
+      !One(options, "--purpose", &purpose) ||
+      !One(options, "--nonce-store", &nonce_store) ||
+      !One(options, "--min-confirmations", &confirmations_text, false) ||
+      !One(options, "--minimum-total-sats", &minimum_text, false) ||
+      !One(options, "--max-lifetime", &lifetime_text, false)) return Usage();
+  if (executable.empty() || executable[0] != '/' ||
+      access(executable.c_str(), X_OK) != 0) return Usage();
+  uint64_t min_confirmations = 1, minimum_total = 0,
+           max_lifetime = kMaximumLifetimeSeconds;
+  if ((!confirmations_text.empty() &&
+       !ParseU64(confirmations_text, &min_confirmations)) ||
+      (!minimum_text.empty() && !ParseU64(minimum_text, &minimum_total)) ||
+      (!lifetime_text.empty() && !ParseU64(lifetime_text, &max_lifetime)) ||
+      minimum_total > proofs::kBlindzapMaxMoneySats || max_lifetime == 0 ||
+      max_lifetime > kMaximumLifetimeSeconds) return Usage();
+
+  std::vector<uint8_t> wire;
+  if (!ReadBounded(proof_path, proofs::kBlindzapMaxEnvelopeBytes, &wire))
+    return PrintResult({proofs::BlindzapVerifyResult::kMalformedStatement, {}});
+  proofs::BlindzapEnvelopeV1 envelope;
+  proofs::BlindzapDecodeError error = proofs::BlindzapDecodeError::kMalformed;
+  if (!proofs::DecodeBlindzapEnvelope(wire, &envelope, &error))
+    return PrintResult({error == proofs::BlindzapDecodeError::kUnsupported
+                            ? proofs::BlindzapVerifyResult::kUnsupported
+                            : proofs::BlindzapVerifyResult::kMalformedStatement,
+                        {}});
+  proofs::BitcoinCoreCurrentTipProvider provider(executable,
+                                                  envelope.statement.network);
+  proofs::BlindzapVerifierConfig config;
+  config.provider = &provider;
+  config.supports = [](const proofs::BlindzapEnvelopeV1& candidate) {
+    return proofs::BlindzapProofSupported(candidate);
+  };
+  config.verify_proof = [](const proofs::BlindzapEnvelopeV1& candidate) {
+    return proofs::BlindzapVerifyProof(candidate);
+  };
+  const auto now = std::chrono::system_clock::to_time_t(
+      std::chrono::system_clock::now());
+  if (now < 0) {
+    std::cerr << "system clock is outside the supported range\n";
+    return kIoError;
+  }
+  config.policy.now = static_cast<uint64_t>(now);
+  config.policy.max_lifetime = max_lifetime;
+  config.policy.verifier = verifier;
+  config.policy.purpose = purpose;
+  config.policy.consume_nonce = [&nonce_store](const std::array<uint8_t, 32>& nonce) {
+    return proofs::BlindzapConsumeNonceFile(nonce_store, nonce);
+  };
+  config.min_confirmations = min_confirmations;
+  config.minimum_total_sats = minimum_total;
+  return PrintResult(proofs::VerifyBlindzap(wire, config));
+}
+
+int Inspect(const std::string& path) {
+  std::vector<uint8_t> bytes;
+  if (!ReadBounded(path, proofs::kBlindzapMaxEnvelopeBytes, &bytes)) return kData;
+  proofs::BlindzapEnvelopeV1 envelope;
+  if (proofs::DecodeBlindzapEnvelope(bytes, &envelope)) {
+    std::cout << proofs::BlindzapInspectJson(envelope) << '\n';
+    return 0;
+  }
+  proofs::BlindzapStatementV1 statement;
+  if (!proofs::DecodeBlindzapStatement(bytes, &statement)) return kData;
+  nlohmann::json output = {{"format", "blindzap-request-v1"},
+                           {"network", proofs::BlindzapNetworkName(statement.network)},
+                           {"verifier", statement.verifier},
+                           {"purpose", statement.purpose},
+                           {"not_before", statement.not_before},
+                           {"expires_at", statement.expires_at},
+                           {"claims", statement.claims.size()},
+                           {"has_snapshot", statement.has_snapshot}};
+  std::cout << output.dump() << '\n';
+  return 0;
+}
+
+}  // namespace
+
 int main(int argc, char** argv) {
-  if(argc>1 && std::string(argv[1])=="--help") { std::cout<<"BlindZap proof-of-control CLI\n"; return 0; }
-  for(int i=1;i<argc;++i) if(std::string(argv[i])=="--secret" || std::string(argv[i]).rfind("--secret=",0)==0) { std::cerr<<"secret material is accepted only from stdin\n"; return kUsage; }
-  if(argc==3 && std::string(argv[1])=="inspect") { std::vector<uint8_t> wire; proofs::BlindzapEnvelopeV1 e; if(!Read(argv[2],&wire)||!proofs::DecodeBlindzapEnvelope(wire,&e)) { std::cerr<<"invalid BlindZap envelope\n"; return kData; } std::cout<<proofs::BlindzapInspectJson(e)<<'\n'; return 0; }
-  if(argc==7 && std::string(argv[1])=="challenge" && std::string(argv[2])=="create" && std::string(argv[3])=="--network" && std::string(argv[5])=="--purpose") { proofs::BlindzapNetwork n; if(!Network(argv[4],&n)||std::string(argv[6]).empty()) return Usage(); std::cout<<"{\"network\":\""<<argv[4]<<"\",\"purpose\":\""<<argv[6]<<"\"}\n"; return 0; }
-  if(argc==5 && std::string(argv[1])=="verify" && std::string(argv[3])=="--bitcoin-cli") { std::vector<uint8_t> wire; proofs::BlindzapEnvelopeV1 e; if(!Read(argv[2],&wire)||!proofs::DecodeBlindzapEnvelope(wire,&e)) return PrintResult(proofs::BlindzapVerifyResult::kMalformedStatement); const std::string executable=argv[4]; if(executable.empty() || executable.find('\0') != std::string::npos) return Usage(); proofs::BitcoinCoreCurrentTipProvider provider(executable,e.statement.network); proofs::BlindzapVerifierConfig c; c.provider=&provider; c.verify_proof=[](const proofs::BlindzapEnvelopeV1& x){return proofs::BlindzapVerifyProof(x);}; c.policy.now=static_cast<uint64_t>(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())); c.policy.verifier="blindzap-cli"; c.policy.purpose=e.statement.purpose; c.policy.consume_nonce=[](const std::array<uint8_t,32>&){return true;}; return PrintResult(proofs::VerifyBlindzap(wire,c).result); }
-  if(argc==10 && std::string(argv[1])=="prove" && std::string(argv[2])=="--network" && std::string(argv[4])=="--purpose" && std::string(argv[6])=="--snapshot" && std::string(argv[8])=="--output") { proofs::BlindzapNetwork n; std::array<uint8_t,32> secret{}, snapshot{}; if(!Network(argv[3],&n)||std::string(argv[5]).empty()||!Hex32(argv[7],&snapshot)||!SecretFromStdin(&secret)) { std::cerr<<"expected explicit 32-byte snapshot and one 32-byte hexadecimal secret on stdin\n"; return kUsage; } proofs::BlindzapStatementV1 s; s.network=n; s.verifier="blindzap-cli"; s.purpose=argv[5]; s.has_snapshot=true; s.snapshot=snapshot; s.expires_at=UINT64_MAX; proofs::BlindzapEnvelopeV1 e; const bool ok=proofs::BlindzapProve(secret.data(),secret.size(),s,&e); std::fill(secret.begin(),secret.end(),0); std::vector<uint8_t> wire; if(!ok||!proofs::EncodeBlindzapEnvelope(e,&wire)||!WriteAtomic(argv[9],wire)) { std::cerr<<"proof generation failed\n"; return 2; } std::cout<<"{\"result\":\"proof_created\"}\n"; return 0; }
+  if (argc == 2 && std::string(argv[1]) == "--help") {
+    std::cout << "BlindZap private proof-of-control CLI\n";
+    PrintUsage(std::cout);
+    return 0;
+  }
+  for (int index = 1; index < argc; ++index) {
+    const std::string argument = argv[index];
+    if (argument == "--secret" || argument.rfind("--secret=", 0) == 0) {
+      std::cerr << "secret material is accepted only from protected stdin\n";
+      return kUsage;
+    }
+  }
+  if (argc >= 3 && std::string(argv[1]) == "challenge" &&
+      std::string(argv[2]) == "create") return ChallengeCreate(argc, argv);
+  if (argc >= 2 && std::string(argv[1]) == "prove") return Prove(argc, argv);
+  if (argc >= 3 && std::string(argv[1]) == "verify") return Verify(argc, argv);
+  if (argc == 3 && std::string(argv[1]) == "inspect") return Inspect(argv[2]);
   return Usage();
 }

@@ -22,7 +22,8 @@ The initial product is off-chain. It does not spend, lock, or transfer bitcoin,
 and it requires no Bitcoin consensus change. An auditor or application:
 
 1. issues a fresh, purpose-bound challenge;
-2. receives a BlindZap proof for one specified P2WPKH outpoint in v1;
+2. receives a BlindZap proof for up to sixteen specified P2WPKH outpoints
+   controlled by at most two distinct keys in v1;
 3. verifies the zero-knowledge proof; and
 4. independently checks that the outpoints are unspent at the declared Bitcoin
    snapshot.
@@ -90,7 +91,8 @@ Combining both checks produces a useful snapshot attestation without revealing
 - binding of that proof to a fresh verifier challenge;
 - binding to an entity, purpose, network, and protocol version;
 - binding to explicit outpoints and a Bitcoin snapshot;
-- control of the single claimed output in a v1 proof.
+- control of up to sixteen claimed outputs backed by at most two distinct
+  P2WPKH programs in a v1 proof.
 
 ### BlindZap does not establish by itself
 
@@ -129,8 +131,8 @@ proofs periodically.
 protocol_version
 circuit_id
 bitcoin_network
-snapshot_block_hash
-snapshot_block_height
+optional_snapshot_block_hash
+optional_snapshot_block_height
 verifier_challenge
 verifier_or_entity_id
 purpose
@@ -287,8 +289,8 @@ Define a namespaced, versioned experimental envelope:
 blindzap-pof-v1 {
     network
     circuit_id
-    snapshot_block_hash
-    snapshot_block_height
+    optional_snapshot_block_hash
+    optional_snapshot_block_height
     message
     verifier_challenge
     claims[] {
@@ -390,15 +392,16 @@ Responsibilities:
 - calculate accepted value totals; and
 - return structured, auditable results.
 
-### CLI prototype
+### CLI
 
-Illustrative interface:
+The implemented request/proof interface is:
 
 ```text
-blindzap challenge create
-blindzap prove --request request.json --wallet wallet.dat
-blindzap verify --proof proof.bz --bitcoin-rpc ...
-blindzap inspect --proof proof.bz
+blindzap challenge create --network signet --verifier ID --purpose proof-of-funds --message TEXT --claim TXID:VOUT:SATS:PROGRAM --output request.bzr
+blindzap prove --request request.bzr --output proof.bze
+blindzap verify proof.bze --bitcoin-cli /absolute/path --verifier ID --purpose proof-of-funds --nonce-store FILE
+blindzap inspect request.bzr
+blindzap inspect proof.bze
 ```
 
 ### Auditor service
@@ -525,7 +528,7 @@ The product strategy prioritizes modes requiring no Bitcoin consensus change.
 - Wallet and hardware-signer proof-request UX.
 - Interoperability test vectors.
 
-### Phase 3: multi-UTXO proof of reserves (post-v1)
+### Phase 3: multi-UTXO proof of reserves
 
 - Aggregate claims and minimum-value assertions.
 - Duplicate and overlap detection.
@@ -533,7 +536,7 @@ The product strategy prioritizes modes requiring no Bitcoin consensus change.
 - Liability-proof integration interface.
 - Auditor tooling and reproducible reports.
 
-### Phase 4: bridge authorization profile
+### Phase 4: bridge authorization profile and audit
 
 - Destination-bound claims.
 - Deposit/SPV adapter interface.
@@ -568,7 +571,7 @@ The concise product promise is:
 
 ## Post-v1 research
 
-Multi-claim aggregation, amount thresholds, public reuse policies, liability
-formats, and bridge integrations are deliberately deferred. They must define a
-new protocol version and circuit identity; they are not choices left open to a
-v1 implementation.
+Larger key sets, hidden outpoints, liability formats, authenticated historical
+snapshot providers, and bridge integrations remain deferred. Changes to the
+bounded v1 circuit family or canonical wire relation require a new protocol
+version and circuit identity.

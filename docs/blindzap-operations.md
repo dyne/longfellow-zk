@@ -1,76 +1,122 @@
-# BlindZap v1 operator and review guide
+# BlindZap operations
 
-BlindZap is an off-chain proof of control for native P2WPKH outputs.  It does
-not spend bitcoin, reserve a UTXO, prove liabilities, or constitute a standard
-BIP-322 signature.  In particular, an unmodified BIP-322 script verifier does
-not verify a `blindzap-pof-v1` envelope.
+BlindZap is experimental and MUST NOT authorize production funds or minting
+until an independent cryptographic/protocol audit is complete. The controls
+below are mandatory for production-oriented testing.
 
-## Minimal native workflow
-
-Build and run the deterministic checks from the repository root:
+## Build and quick verification
 
 ```
-make posix
-make blindzap-spec-test blindzap-protocol-test blindzap-integration-test
-make blindzap-cli
-./blindzap challenge create --network regtest --purpose proof-of-funds
+make blindzap-ci-test
 ```
 
-For proof creation, provide one 32-byte hexadecimal secret on standard input;
-the CLI deliberately rejects `--secret` arguments.  A caller supplies an
-explicit 32-byte snapshot hash and keeps the resulting envelope only as long
-as its operational policy permits:
+The high-memory proof gate is separate:
 
 ```
-printf '%064x\n' 1 | ./blindzap prove --network regtest --purpose proof-of-funds \
-  --snapshot 0000000000000000000000000000000000000000000000000000000000000000 \
-  --output proof.bze
-./blindzap inspect proof.bze
-./blindzap verify proof.bze --bitcoin-cli /usr/bin/bitcoin-cli
+make blindzap-proof-test
 ```
 
-The final command requires a correctly configured Bitcoin Core node for the
-selected network.  `--bitcoin-cli` is an explicit executable path (the
-adapter uses `execv`, not PATH lookup); use a wrapper with an absolute path if
-you need fixed arguments such as `-regtest`.  For a regtest fixture, start
-Bitcoin Core with `-regtest`, create and confirm the relevant native P2WPKH
-output, and pass that wrapper path.  Treat `valid_historical` as evidence at
-the named snapshot only, and treat `state_inconclusive`, `stale_snapshot`, or
-`spent_at_snapshot` as non-authorization results.
+## Supported Bitcoin networks
 
-## Required operating policy
+The CLI accepts `mainnet`, `testnet3` (or alias `testnet`), `testnet4`, `signet`,
+and `regtest`. Prefer signet for public integration testing and regtest for
+deterministic local tests. The verifier compares the proof network with Bitcoin
+Core's `getblockchaininfo.chain`; a mismatch is never accepted as evidence. It
+also invokes `bitcoin-cli` with the corresponding explicit selector
+(`-testnet`, `-testnet4`, `-signet`, or `-regtest`) so the ambient Core default
+cannot silently select another chain.
 
-- Issue a high-entropy nonce for each verifier/purpose request, persist it,
-  and atomically consume it only after a valid proof and policy check.
-- Set a bounded expiry/staleness policy and retain the snapshot identifier,
-  provider response, envelope, verifier decision, and software/circuit digest
-  for audit.  Never reuse a nonce after a failed or interrupted workflow.
-- The public statement reveals outpoints and amounts.  It therefore reveals
-  reserve composition; a later spend makes a proof historical rather than
-  current.
-- Independently choose and monitor the Bitcoin provider, confirmation and
-  reorg policy.  Proof validity never establishes UTXO existence/unspentness.
-- A bridge additionally needs an independently enforced Bitcoin lock/custody
-  rule, destination-chain finality, and one-time mint/nullifier policy.
+## Challenge → proof → verification
 
-## Deliberately unsupported in v1
+The verifier creates a short-lived canonical request. Every `--claim` is
+`TXID:VOUT:SATOSHIS:PROGRAM`, where `PROGRAM` is the 40-hex-character P2WPKH
+witness program (the bytes after `0014`). Requests and proofs are created with
+mode `0600` and existing destinations are not overwritten.
 
-P2SH-wrapped P2WPKH, P2WSH, multisig, P2TR, generic script verification,
-unbounded batches, confidential outpoints/amounts, Bitcoin consensus changes,
-proof of liabilities/solvency, standard BIP-322 verification, and bridge lock
-or mint enforcement are outside v1.
+```
+./blindzap challenge create \
+  --network signet \
+  --verifier auditor.example \
+  --purpose proof-of-funds \
+  --message '2026-Q3 reserve attestation' \
+  --expires-in 300 \
+  --claim TXID:0:100000:PROGRAM \
+  --output request.bzr
+```
 
-## External-review checklist
+The prover reviews the request, then supplies one 32-byte hexadecimal secret
+per distinct program. Interactive terminal input has echo disabled; automation
+should provide secrets through a protected pipe, never argv or shell history.
 
-1. Rebuild from a clean native tree and reproduce the spec vectors, circuit
-   digests, proof metrics, and full BlindZap/BIP-340 test suite.
-2. Trace every product claim through [the security matrix](blindzap-security.md)
-   to a circuit constraint, verifier check, test, or explicitly external
-   assumption.
-3. Review scalar/point/SEC/SHA/RIPEMD constraints, public input ordering,
-   Fiat-Shamir transcript binding, parser bounds, proof parameter identity,
-   replay storage, and all result-code precedence.
-4. Assess proof-system/parameter assumptions, chain-provider and snapshot
-   trust, nonce-store atomicity, operational logs, and bridge lock/mint logic
-   independently.  This repository has not received an independent security
-   audit.
+```
+./blindzap inspect request.bzr
+./blindzap prove --request request.bzr --output proof.bze
+```
+
+The verifier supplies its expected identity and purpose rather than trusting
+those values from the proof. `--bitcoin-cli` MUST be an absolute executable
+path. The nonce store is owner-only, locked, atomically checked/appended, and
+fsynced before authorization succeeds.
+
+```
+./blindzap verify proof.bze \
+  --bitcoin-cli /usr/bin/bitcoin-cli \
+  --verifier auditor.example \
+  --purpose proof-of-funds \
+  --nonce-store ./consumed-nonces \
+  --min-confirmations 6 \
+  --minimum-total-sats 100000 \
+  --max-lifetime 300
+```
+
+The bundled Bitcoin Core provider verifies only a stable current tip. Snapshot
+statements require a separately configured authenticated historical provider
+through the library API; the CLI does not claim historical support.
+
+## Bitcoin Core configuration
+
+Use a dedicated least-privilege RPC configuration and a fully validated node on
+the expected network. The provider:
+
+- executes an absolute argv vector without a shell;
+- separates stdout and stderr;
+- caps each stream at 1 MiB and kills the process group on limit/timeout;
+- validates structured JSON and the exact node `chain` value;
+- converts the original decimal BTC token to satoshis without floating point;
+- requires `gettxout.bestblock` and two surrounding chain-tip observations to
+  agree; and
+- treats a null `gettxout` result as inconclusive, not proof of spending.
+
+If RPC authentication needs wrapper arguments, create a fixed, audited wrapper
+with no user-controlled shell expansion and pass its absolute path.
+
+## Production controls
+
+- Generate verifier nonces with the operating-system CSPRNG and never reuse
+  them, including after failed or interrupted workflows.
+- Keep lifetimes short. The CLI caps them at 24 hours; deployments should
+  normally use minutes.
+- Persist the request, proof, verification result, node identity, chain tip,
+  software/circuit digest, and policy version in an append-only audit log.
+- Protect proof parsing and verification with process memory/CPU quotas. A
+  valid proof is intentionally large and expensive.
+- Monitor claimed outpoints after verification. Proof of key knowledge is not a
+  lock, exclusive ownership proof, or solvency proof.
+- Require independent bridge lock/custody evidence and atomic one-time minting;
+  a BlindZap proof alone never authorizes issuance.
+- Treat `state_inconclusive`, `stale_snapshot`, `spent_at_snapshot`,
+  `bridge_rejected`, `unsupported`, and all parse/proof failures as
+  non-authorization outcomes.
+
+## Release gate
+
+Before a production-oriented release:
+
+1. Rebuild from a pinned clean checkout and pinned toolchain.
+2. Run quick, sanitizer, static-analysis, one-key proof, and maximum two-key
+   proof gates.
+3. Compare canonical vectors and circuit digests across two independent builds.
+4. Exercise regtest, signet, testnet3, and testnet4 node-network mismatch tests.
+5. Complete independent circuit, proof-system, parser, RPC, replay-store, and
+   operational audits.
+6. Publish resource measurements and all residual assumptions/limitations.

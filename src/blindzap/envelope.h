@@ -3,6 +3,7 @@
 #define PRIVACY_PROOFS_ZK_LIB_BLINDZAP_ENVELOPE_H_
 
 #include <functional>
+#include <limits>
 #include <sstream>
 #include "blindzap/proof.h"
 #include "blindzap/statement.h"
@@ -12,23 +13,58 @@ namespace proofs {
 // 128 MiB parsing ceiling: it admits the bounded v1 circuit family with
 // headroom while retaining a finite allocation limit at the wire boundary.
 constexpr size_t kBlindzapMaxProofBytes = 128 * 1024 * 1024;
+constexpr size_t kBlindzapEnvelopeOverheadBytes = 5 + 4 + 32 + 4 + 4 + 4 + 4;
+constexpr size_t kBlindzapMaxEnvelopeBytes =
+    kBlindzapEnvelopeOverheadBytes + kBlindzapMaxStatementBytes +
+    kBlindzapMaxProofBytes;
 struct BlindzapEnvelopeV1 { BlindzapStatementV1 statement; BlindzapProofV1 proof; };
 
 inline bool EncodeBlindzapEnvelope(const BlindzapEnvelopeV1& envelope, std::vector<uint8_t>* out) {
-  std::vector<uint8_t> statement; if (!out || !EncodeBlindzapStatement(envelope.statement, &statement) || statement.size() > std::numeric_limits<uint32_t>::max() || envelope.proof.bytes.size() > kBlindzapMaxProofBytes || envelope.proof.rate > std::numeric_limits<uint32_t>::max() || envelope.proof.queries > std::numeric_limits<uint32_t>::max()) return false;
+  std::vector<uint8_t> statement; if (!out || !EncodeBlindzapStatement(envelope.statement, &statement) || statement.size() > std::numeric_limits<uint32_t>::max() || envelope.proof.bytes.empty() || envelope.proof.bytes.size() > kBlindzapMaxProofBytes || BlindzapAllZero(envelope.proof.circuit_digest) || envelope.proof.circuit_version != BlindzapProofParametersV1::kCircuitVersion || envelope.proof.rate != BlindzapProofParametersV1::kRate || envelope.proof.queries != BlindzapProofParametersV1::kQueries) return false;
   out->clear(); out->insert(out->end(), {'B','Z','E','1',1}); BlindzapAppendU32(out, static_cast<uint32_t>(statement.size())); out->insert(out->end(), statement.begin(), statement.end()); out->insert(out->end(), envelope.proof.circuit_digest.begin(), envelope.proof.circuit_digest.end()); BlindzapAppendU32(out, envelope.proof.circuit_version); BlindzapAppendU32(out, static_cast<uint32_t>(envelope.proof.rate)); BlindzapAppendU32(out, static_cast<uint32_t>(envelope.proof.queries)); BlindzapAppendU32(out, static_cast<uint32_t>(envelope.proof.bytes.size())); out->insert(out->end(), envelope.proof.bytes.begin(), envelope.proof.bytes.end()); return true;
 }
-inline bool DecodeBlindzapEnvelope(const std::vector<uint8_t>& bytes, BlindzapEnvelopeV1* envelope) {
-  if (!envelope || bytes.size() < 5) return false;
+inline bool DecodeBlindzapEnvelope(
+    const std::vector<uint8_t>& bytes, BlindzapEnvelopeV1* envelope,
+    BlindzapDecodeError* error = nullptr) {
+  if (error != nullptr) *error = BlindzapDecodeError::kMalformed;
+  if (!envelope || bytes.size() < kBlindzapEnvelopeOverheadBytes ||
+      bytes.size() > kBlindzapMaxEnvelopeBytes) return false;
   BlindzapReader r(bytes);
   uint8_t magic[4], version;
   uint32_t n;
-  if (!r.bytes(magic, 4) || std::memcmp(magic, "BZE1", 4) || !r.u8(&version) || version != 1 || !r.u32(&n) || n > r.left()) return false;
-  std::vector<uint8_t> statement(n); if (!r.bytes(statement.data(), n)) return false; BlindzapEnvelopeV1 out; if (!DecodeBlindzapStatement(statement, &out.statement) || !r.bytes(out.proof.circuit_digest.data(), 32) || !r.u32(&out.proof.circuit_version)) return false;
+  if (!r.bytes(magic, 4) || std::memcmp(magic, "BZE1", 4)) return false;
+  if (!r.u8(&version) || version != 1) {
+    if (error != nullptr) *error = BlindzapDecodeError::kUnsupported;
+    return false;
+  }
+  if (!r.u32(&n) || n == 0 || n > kBlindzapMaxStatementBytes || n > r.left())
+    return false;
+  std::vector<uint8_t> statement(n);
+  if (!r.bytes(statement.data(), n)) return false;
+  BlindzapEnvelopeV1 out;
+  BlindzapDecodeError statement_error = BlindzapDecodeError::kMalformed;
+  if (!DecodeBlindzapStatement(statement, &out.statement, &statement_error)) {
+    if (error != nullptr) *error = statement_error;
+    return false;
+  }
+  if (!r.bytes(out.proof.circuit_digest.data(), 32) ||
+      !r.u32(&out.proof.circuit_version)) return false;
+  if (BlindzapAllZero(out.proof.circuit_digest)) return false;
   uint32_t rate, queries, proof_size; if (!r.u32(&rate) || !r.u32(&queries) || !r.u32(&proof_size) ||
-      out.proof.circuit_version != BlindzapProofParametersV1::kCircuitVersion || rate != BlindzapProofParametersV1::kRate ||
-      queries != BlindzapProofParametersV1::kQueries || proof_size > kBlindzapMaxProofBytes || proof_size != r.left()) return false;
-  out.proof.rate = rate; out.proof.queries = queries; out.proof.bytes.resize(proof_size); if (!r.bytes(out.proof.bytes.data(), proof_size)) return false; *envelope = std::move(out); return true;
+      proof_size == 0 || proof_size > kBlindzapMaxProofBytes || proof_size != r.left()) return false;
+  if (out.proof.circuit_version != BlindzapProofParametersV1::kCircuitVersion ||
+      rate != BlindzapProofParametersV1::kRate ||
+      queries != BlindzapProofParametersV1::kQueries) {
+    if (error != nullptr) *error = BlindzapDecodeError::kUnsupported;
+    return false;
+  }
+  out.proof.rate = rate;
+  out.proof.queries = queries;
+  out.proof.bytes.resize(proof_size);
+  if (!r.bytes(out.proof.bytes.data(), proof_size)) return false;
+  *envelope = std::move(out);
+  if (error != nullptr) *error = BlindzapDecodeError::kNone;
+  return true;
 }
 
 // Inspection is deliberately a presentation format. Verification always uses
@@ -38,7 +74,7 @@ inline std::string BlindzapInspectJson(const BlindzapEnvelopeV1& envelope) {
   static const char hex[] = "0123456789abcdef";
   auto hexify = [&](const uint8_t* p, size_t n) { std::string out; out.reserve(n * 2); for (size_t i = 0; i < n; ++i) { out.push_back(hex[p[i] >> 4]); out.push_back(hex[p[i] & 15]); } return out; };
   auto json = [](const std::string& value) { std::string out; for (unsigned char c : value) { if (c == '"' || c == '\\') out.push_back('\\'); if (c >= 0x20) out.push_back(static_cast<char>(c)); } return out; };
-  std::ostringstream out; out << "{\"format\":\"blindzap-pof-v1\",\"network\":" << unsigned(envelope.statement.network)
+  std::ostringstream out; out << "{\"format\":\"blindzap-proof-v1\",\"network\":\"" << BlindzapNetworkName(envelope.statement.network) << "\""
       << ",\"verifier\":\"" << json(envelope.statement.verifier) << "\",\"purpose\":\"" << json(envelope.statement.purpose)
       << "\",\"statement_bytes\":" << statement.size() << ",\"circuit_digest\":\"" << hexify(envelope.proof.circuit_digest.data(), 32)
       << "\",\"proof_bytes\":" << envelope.proof.bytes.size() << ",\"claims\":" << envelope.statement.claims.size() << "}";
@@ -52,7 +88,7 @@ inline std::array<uint8_t, 32> BlindzapTranscriptSeed(const BlindzapStatementV1&
 enum class BlindzapAuthorization { kInvalid, kPendingReplayCheck, kReplayRejected, kPolicyRejected, kAuthorized };
 struct BlindzapReplayPolicy { uint64_t now = 0; uint64_t max_lifetime = 0; std::string verifier; std::string purpose; std::function<bool(const std::array<uint8_t, 32>&)> nonce_seen; std::function<bool(const std::array<uint8_t, 32>&)> consume_nonce; };
 inline BlindzapAuthorization BlindzapCheckPolicy(const BlindzapStatementV1& statement, const BlindzapReplayPolicy& policy, bool proof_valid) {
-  if (!proof_valid || !BlindzapStatementValid(statement) || statement.verifier != policy.verifier || statement.purpose != policy.purpose || policy.now < statement.not_before || policy.now > statement.expires_at || (policy.max_lifetime && statement.expires_at - statement.not_before > policy.max_lifetime)) return BlindzapAuthorization::kPolicyRejected;
+  if (!proof_valid || !BlindzapStatementValid(statement) || statement.verifier != policy.verifier || statement.purpose != policy.purpose || policy.now < statement.not_before || policy.now >= statement.expires_at || (policy.max_lifetime && statement.expires_at - statement.not_before > policy.max_lifetime)) return BlindzapAuthorization::kPolicyRejected;
   if (policy.nonce_seen && policy.nonce_seen(statement.nonce)) return BlindzapAuthorization::kReplayRejected;
   return BlindzapAuthorization::kPendingReplayCheck;
 }

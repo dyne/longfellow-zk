@@ -89,6 +89,7 @@ blindzap-ripemd160-test: test/blindzap/ripemd160_test
 
 .PHONY: blindzap-test
 blindzap-test: test/blindzap/blindzap_test
+	@mkdir -p test/results
 	@./test/blindzap/blindzap_test
 
 .PHONY: blindzap-protocol-test
@@ -101,6 +102,20 @@ blindzap-integration-test: test/blindzap/integration_test
 
 .PHONY: blindzap-cli
 blindzap-cli: blindzap
+	@./test/blindzap/cli_test.sh ./blindzap
+
+.PHONY: blindzap-ci-test
+blindzap-ci-test: blindzap-spec-test bip340-test secp256k1-ec-gadget-test \
+		blindzap-key-ownership-test blindzap-sha256-test \
+		blindzap-ripemd160-test blindzap-protocol-test \
+		blindzap-integration-test blindzap-cli
+
+.PHONY: blindzap-proof-test
+blindzap-proof-test: blindzap-test
+
+.PHONY: blindzap-static-analysis
+blindzap-static-analysis:
+	@./scripts/run_blindzap_static_analysis.sh
 
 blindzap: src/cli/blindzap_main.cc $(wildcard src/blindzap/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
@@ -133,7 +148,7 @@ test/blindzap/ripemd160_test: test/blindzap/ripemd160_test.cc $(wildcard src/cir
 	@mkdir -p test/blindzap
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
-test/blindzap/blindzap_test: test/blindzap/blindzap_test.cc $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/ripemd160/*.h) $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+test/blindzap/blindzap_test: test/blindzap/blindzap_test.cc $(wildcard src/blindzap/*.h) $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/ripemd160/*.h) $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
@@ -152,7 +167,15 @@ clean-vendor: clean
 
 clean:
 	rm -f *.a
+	rm -f blindzap
 	rm -f longfellow-zk longfellow-zk.wasm
 	rm -f test/bip340_test
+	rm -f test/secp256k1/ec_gadget_test
+	rm -f test/blindzap/blindzap_test
+	rm -f test/blindzap/compressed_key_sha256_test
+	rm -f test/blindzap/integration_test
+	rm -f test/blindzap/key_ownership_test
+	rm -f test/blindzap/protocol_test
+	rm -f test/blindzap/ripemd160_test
 	@$(MAKE) -C src clean
 	@$(MAKE) -C vendor/zstd clean
