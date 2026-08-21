@@ -14,6 +14,7 @@ longfellow-zk
 test/bip340_test
 compile_commands.json
 test/security/panic_parser_test
+test/arrays/dense_test
 test/fuzz/parser_fuzz
 test/fuzz/transcript_fuzz
 __pycache__/

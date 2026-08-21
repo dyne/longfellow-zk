@@ -20,6 +20,7 @@
 
 #include <array>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -44,22 +45,71 @@ class Dense {
   // Row-major indexing: v_[i1*n0+i0] stores the value at (i0, i1)
   std::vector<Elt> v_;
 
-  explicit Dense(corner_t n0, corner_t n1) : n0_(n0), n1_(n1), v_(n0 * n1) {}
+  explicit Dense(corner_t n0, corner_t n1)
+      : n0_(n0), n1_(n1), v_(checked_element_count(n0, n1)) {
+    track_allocation();
+  }
 
   // make0 replacement
-  explicit Dense(const Field& F) : n0_(1), n1_(1), v_(1) { v_[0] = F.zero(); }
+  explicit Dense(const Field& F) : n0_(1), n1_(1), v_(1) {
+    track_allocation();
+    v_[0] = F.zero();
+  }
 
   // initialize dense array from P[i1*ldp+i0]
   explicit Dense(corner_t n0, corner_t n1, const Elt p[], size_t ldp)
-      : n0_(n0), n1_(n1), v_(n0 * n1) {
+      : n0_(n0), n1_(n1), v_(checked_element_count(n0, n1)) {
+    check(p != nullptr, "p != nullptr");
+    check(ldp >= n0, "ldp >= n0");
+    check(n1 == 1 || ldp <= std::numeric_limits<size_t>::max() / (n1 - 1),
+          "Dense source stride does not overflow");
+    track_allocation();
     for (corner_t i1 = 0; i1 < n1; ++i1) {
       Blas<Field>::copy(n0, v_[i1 * n0], 1, &p[i1 * ldp], 1);
     }
   }
 
-  Dense(const Dense& y) = delete;
-  Dense(const Dense&& y) = delete;
-  Dense operator=(const Dense& y) = delete;
+  Dense(const Dense&) = delete;
+  Dense& operator=(const Dense&) = delete;
+
+  Dense(Dense&& y) noexcept
+      : n0_(y.n0_), n1_(y.n1_), v_(std::move(y.v_)) {
+    y.n0_ = 0;
+    y.n1_ = 0;
+  }
+
+  Dense& operator=(Dense&& y) noexcept {
+    if (this != &y) {
+      release_allocation();
+      n0_ = y.n0_;
+      n1_ = y.n1_;
+      v_ = std::move(y.v_);
+      y.n0_ = 0;
+      y.n1_ = 0;
+    }
+    return *this;
+  }
+
+  ~Dense() { release_allocation(); }
+
+  static size_t checked_element_count(corner_t n0, corner_t n1) {
+    check(n0 > 0, "n0 > 0");
+    check(n1 > 0, "n1 > 0");
+    check(n1 <= std::numeric_limits<size_t>::max() / n0,
+          "Dense dimensions do not overflow");
+    const size_t count = n0 * n1;
+    check(count <= std::vector<Elt>().max_size(),
+          "Dense dimensions exceed vector capacity");
+    return count;
+  }
+
+#ifdef PROOFS_DENSE_TESTING
+  static size_t testing_live_elements() noexcept { return live_elements_; }
+
+  static size_t testing_live_bytes() noexcept {
+    return live_elements_ * sizeof(Elt);
+  }
+#endif
 
   std::unique_ptr<Dense> clone() const {
     auto d = std::make_unique<Dense>(n0_, n1_);
@@ -150,6 +200,23 @@ class Dense {
     check(n1_ == 1, "n1_ == 1");
     return v_[0];
   }
+
+ private:
+  void track_allocation() noexcept {
+#ifdef PROOFS_DENSE_TESTING
+    live_elements_ += v_.size();
+#endif
+  }
+
+  void release_allocation() noexcept {
+#ifdef PROOFS_DENSE_TESTING
+    live_elements_ -= v_.size();
+#endif
+  }
+
+#ifdef PROOFS_DENSE_TESTING
+  inline static size_t live_elements_ = 0;
+#endif
 };
 
 // Helper class to fill a dense array a la std::vector<>

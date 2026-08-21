@@ -112,7 +112,7 @@ class ProverLayers {
   // Generate proof for circuit, as a protected member, the caller must
   // ensure that input parameters are valid.
   void prove(Proof<Field>* pr, const Proof<Field>* pad,
-             const Circuit<Field>* circ, const inputs& in, ProofAux<Field>* aux,
+             const Circuit<Field>* circ, inputs& in, ProofAux<Field>* aux,
              bindings& bnd, TranscriptSumcheck<Field>& ts, const Field& F) {
     size_t logc = circ->logc;
     corner_t nc = circ->nc;
@@ -152,6 +152,11 @@ class ProverLayers {
       if (aux != nullptr) {
         aux->bound_quad[ly] = HQUAD->scalar();
       }
+
+      // Later sumcheck layers use only their own evaluated wires.  Releasing
+      // this completed layer immediately bounds retained witness storage to
+      // the current and remaining layers without changing the transcript.
+      in.at(ly).reset();
     }
   }
 

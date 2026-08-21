@@ -114,11 +114,14 @@ blindzap-integration-test: test/blindzap/integration_test
 blindzap-cli: blindzap
 	@./test/blindzap/cli_test.sh ./blindzap
 
-.PHONY: blindzap-ci-test
+.PHONY: blindzap-ci-test dense-test
 blindzap-ci-test: panic-parser-test blindzap-spec-test bip340-test secp256k1-ec-gadget-test \
 		blindzap-key-ownership-test blindzap-sha256-test \
 		blindzap-ripemd160-test blindzap-sage-vector-test blindzap-protocol-test \
 		blindzap-integration-test blindzap-cli transcript-clone-test
+
+dense-test: test/arrays/dense_test
+	@./test/arrays/dense_test
 
 .PHONY: transcript-clone-test
 transcript-clone-test: test/random/transcript_clone_test
@@ -222,6 +225,12 @@ test/random/transcript_clone_test: test/random/transcript_clone_test.cc \
 		src/random/transcript.h src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/random
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+test/arrays/dense_test: test/arrays/dense_test.cc src/arrays/dense.h \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/arrays
+	$(CXX) -std=c++17 $(CFLAGS) -DPROOFS_DENSE_TESTING -Isrc -Ivendor/zstd/lib -o $@ $< \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/key_ownership_test: test/blindzap/key_ownership_test.cc $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
