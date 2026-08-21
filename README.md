@@ -10,40 +10,15 @@ Our effort is currently supported by the EU HORIZON grant nr.[101132610](https:/
 
 ## Purpose and strategy
 
-The purpose of this distribution is to make **Longfellow-ZK available for European wallets** and to welcome contributions without the need to sign any development agreement with Google. Our build removes any dependency from the Google Play API for the use of this ZK technology, **granting freedom of choice for mobile OS** and solving a [privacy problem impacting the use of ZK](https://news.dyne.org/privacy-in-eudi). We work further to grant full portability to **WebAssembly (WASM) builds**, native mobile environments (Android and iOS) as well add usable command-line tools (CLI) for testing purposes.
+This is **the community maintained Longfellow-ZK C++ implementation**. It doesn't depend from the Google Play API and **grants freedom of choice for mobile OS**, whilst solving a [privacy problem impacting the use of ZK](https://news.dyne.org/privacy-in-eudi).
 
-By **soft fork** we mean that changes we make to the code are fully backward compatible with Google's upstream code, while we may adopt different implementation approaches: for instance **we already removed the OpenSSL dependency** with embedded code, we added a bunch of SIMD128 assembler primitives and made a few more lower-system changes for portability.
-
-If upstream will ever include changes that break EUDI functionalities or go against the interest of European implementations, this will turn into an hard-fork and we'll publish a roadmap to highlight divergent paths and compatibilities.
-
-## Current Status
-
-This distribution is at an early stage and includes all upstream primitives for circuit design, as well the upstream implementation for ISO mDoc (U.S. mobile driver's license) credentials for identity verification, and stubs for JWT parsing and plans for additional circuits supporting EUDI and e-ID implementations.
-
-For now, just like the upstream code, this is a demonstrator at TRL 4 and we just focus on portability and test environment, but we also devleoping a [language (DSL) to design longfellow-zk circuits](https://github.com/dyne/Zenroom/pull/1143) which will soon be ready to ease the customization of circuits fitting EUDI standard formats.
-
-### BIP-340 circuit
-
-The secp256k1 Schnorr circuit is synchronized from Google's contributed
-`lib/circuits/tests/contrib/bip340` implementation while retaining this
-distribution's portable SHA-256 adapter and standalone test harness. To update
-only that circuit from a Longfellow checkout:
-
-```sh
-make import-bip340 BIP340_UPSTREAM=../google-longfellow-zk
-make bip340-test
-```
-
-The focused test exercises all 19 Bitcoin Core vectors, semantic golden facts,
-the scalar-canonicality and even-`R.y` constraints, private/public mutation
-rejection, CRT capacity boundaries, proof generation and verification, and
-serialized-proof tampering.
+Is is also fully portable to **WebAssembly (WASM) builds**, native mobile environments (Android and iOS) and adds usable command-line tools (CLI) for testing purposes.
 
 ## References
 - [Anonymous credentials from ECDSA](https://eprint.iacr.org/2024/2010)
 - [libzk: A C++ Library for Zero-Knowledge Proofs](https://datatracker.ietf.org/doc/draft-google-cfrg-libzk/)
 - [Independent benchmark at Dyne.org](https://news.dyne.org/longfellow-zero-knowledge-google-zk/)
-- [Privacy analysis](https://news.dyne.org/privacy-in-eudi) explaining why one should never use a ZK library via OS API.
+- [Privacy analysis on integration](https://news.dyne.org/privacy-in-eudi) explaining why one should never use a ZK library via OS API.
 
 ## Known implementations
 
@@ -57,7 +32,9 @@ serialized-proof tampering.
 
 The upstream Google implementation is mostly left untouched in this distribution and it is licensed as **Apache 2.0**.
 
-This distribution project and all additional code contributed by Dyne.org is also licensed as **Apache 2.0**.
+Some additional code is Copyright (C) by the Dyne.org foundation is also licensed as **Apache 2.0**.
+
+The Blindzap circuit implementation is Copyright (C) by the Plan-B foundation and licensed as **GPLv3+**.
 
 Everyone is welcome to submit patches under MIT and/or Apache 2.0 licenses.
 
