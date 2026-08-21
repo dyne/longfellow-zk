@@ -11,8 +11,67 @@ env:
   BUILD_TYPE: Release
 
 jobs:
+  ci-scope:
+    name: Determine CI scope
+    runs-on: ubuntu-latest
+    outputs:
+      run_tests: ${{ steps.scope.outputs.run_tests }}
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 0
+    - name: Detect code changes
+      id: scope
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        PUSH_BEFORE_SHA: ${{ github.event.before }}
+        PUSH_HEAD_SHA: ${{ github.sha }}
+      run: |
+        set -Eeuo pipefail
+
+        run_tests=true
+        if [[ "$EVENT_NAME" == "pull_request" ]]; then
+          base_sha="$PR_BASE_SHA"
+          head_sha="$PR_HEAD_SHA"
+        elif [[ "$EVENT_NAME" == "push" &&
+                ! "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
+          base_sha="$PUSH_BEFORE_SHA"
+          head_sha="$PUSH_HEAD_SHA"
+        else
+          # Manual runs and unusual pushes fail open to the full CI matrix.
+          base_sha=""
+          head_sha=""
+        fi
+
+        if [[ -n "$base_sha" && -n "$head_sha" ]]; then
+          git rev-parse --verify "${base_sha}^{commit}" >/dev/null
+          git rev-parse --verify "${head_sha}^{commit}" >/dev/null
+          run_tests=false
+          while IFS= read -r -d '' path; do
+            if [[ "$path" == *.md ]]; then
+              continue
+            fi
+
+            base_mode="$(git ls-tree "$base_sha" -- "$path" | awk '{print $1}')"
+            head_mode="$(git ls-tree "$head_sha" -- "$path" | awk '{print $1}')"
+            if [[ "$base_mode" == "160000" || "$head_mode" == "160000" ]]; then
+              continue
+            fi
+
+            run_tests=true
+            break
+          done < <(git diff --name-only --no-renames -z "$base_sha" "$head_sha")
+        fi
+
+        printf 'run_tests=%s\n' "$run_tests" | tee -a "$GITHUB_OUTPUT"
+
   posix-x86:
     name: Build & Test on POSIX x86
+    needs: [ci-scope]
+    if: needs.ci-scope.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -71,6 +130,8 @@ jobs:
 
   wasm-wasi:
     name: Build & Test on WASM WASI
+    needs: [ci-scope]
+    if: needs.ci-scope.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -112,6 +173,8 @@ jobs:
 
   apple-osx:
     name: Build & Test on Apple OSX 15 ARM64
+    needs: [ci-scope]
+    if: needs.ci-scope.outputs.run_tests == 'true'
     runs-on: macos-15
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -211,6 +274,8 @@ jobs:
 
   blindzap-static-analysis:
     name: BlindZap static analysis
+    needs: [ci-scope]
+    if: needs.ci-scope.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -226,6 +291,8 @@ jobs:
 
   blindzap-sage-reference:
     name: BlindZap Sage reference model
+    needs: [ci-scope]
+    if: needs.ci-scope.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -235,6 +302,8 @@ jobs:
 
   blindzap-sanitizers:
     name: BlindZap ASan and UBSan
+    needs: [ci-scope]
+    if: needs.ci-scope.outputs.run_tests == 'true'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
