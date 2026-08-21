@@ -58,5 +58,5 @@ cppcheck \
   src/cli/blindzap_main.cc
 
 shellcheck test/blindzap/cli_test.sh scripts/run_blindzap_sage.sh \
-  scripts/run_blindzap_static_analysis.sh
+  scripts/import_upstream.sh scripts/run_blindzap_static_analysis.sh
 printf 'BlindZap static analysis passed\n'

@@ -72,18 +72,77 @@ bip340_test_vectors.csv
 
 EOF
 
+# These files intentionally diverge from the vendored snapshot. They contain
+# fork-owned security and compatibility repairs and must survive both import
+# and clean operations. Keep this list explicit so additions are reviewable.
+readarray -t fork_overrides <<EOF
+algebra/fp_p256k1.h
+algebra/sysdep.h
+cbor/host_decoder.h
+circuits/mdoc/mdoc_witness.h
+circuits/mdoc/mdoc_zk.cc
+ligero/ligero_param.h
+ligero/ligero_verifier.h
+proto/circuit_io.h
+proto/circuit_reader.h
+util/readbuffer.h
+zk/zk_common.h
+zk/zk_proof.h
+zk/zk_prover.h
+zk/zk_verifier.h
+
+EOF
+
+# The lists above are formatted for readability and may contain several paths
+# per line. Flatten them once so every later expansion can remain quoted.
+normalize_file_list() {
+	local -n list_ref="$1"
+	local -a flattened=()
+	local -a words=()
+	local line
+	for line in "${list_ref[@]}"; do
+		words=()
+		read -r -a words <<< "$line"
+		flattened+=("${words[@]}")
+	done
+	list_ref=("${flattened[@]}")
+}
+
+for list_name in sources optional_sources headers optional_headers \
+		bip340_headers bip340_testdata fork_overrides; do
+	normalize_file_list "$list_name"
+done
+
+is_fork_override() {
+	local path="$1"
+	local override
+	for override in "${fork_overrides[@]}"; do
+		[[ -n "$override" && "$override" == "$path" ]] && return 0
+	done
+	return 1
+}
+
+remove_imported() {
+	local path="$1"
+	if is_fork_override "$path"; then
+		printf 'keeping checked-in fork override: src/%s\n' "$path" >&2
+	else
+		rm -f -- "src/$path"
+	fi
+}
+
 [[ "${1:-}" == "clean" ]] && {
-  for i in ${sources[@]}; do
-    rm -f src/$i
+  for i in "${sources[@]}"; do
+    remove_imported "$i"
   done
-  for i in ${optional_sources[@]}; do
-    rm -f src/$i
+  for i in "${optional_sources[@]}"; do
+    remove_imported "$i"
   done
-  for i in ${headers[@]}; do
-    rm -f src/$i
+  for i in "${headers[@]}"; do
+    remove_imported "$i"
   done
-  for i in ${optional_headers[@]}; do
-    rm -f src/$i
+  for i in "${optional_headers[@]}"; do
+    remove_imported "$i"
   done
   for i in "${bip340_headers[@]}"; do
     [[ -z "$i" ]] || rm -f "src/circuits/bip340/$i"
@@ -118,13 +177,35 @@ fi
 copy_optional() {
 	local from="$1"
 	local to="$2"
-	if [[ -r "$from" ]]; then
-		cp "$from" "$to"
+	local relative="${to#src/}"
+	if is_fork_override "$relative"; then
+		[[ -r "$to" ]] || {
+			printf 'missing checked-in fork override: %s\n' "$to" >&2
+			exit 1
+		}
+		printf 'keeping checked-in fork override: %s\n' "$to" >&2
+	elif [[ -r "$from" ]]; then
+		cp -- "$from" "$to"
 	elif [[ -r "$to" ]]; then
 		>&2 echo "keeping checked-in optional import: $to"
 	else
 		>&2 echo "optional upstream file missing and no checked-in copy: $from"
 		exit 1
+	fi
+}
+
+copy_imported() {
+	local from="$1"
+	local to="$2"
+	local relative="${to#src/}"
+	if is_fork_override "$relative"; then
+		[[ -r "$to" ]] || {
+			printf 'missing checked-in fork override: %s\n' "$to" >&2
+			exit 1
+		}
+		printf 'keeping checked-in fork override: %s\n' "$to" >&2
+	else
+		cp -- "$from" "$to"
 	fi
 }
 
@@ -174,16 +255,16 @@ if $bip340_only; then
 fi
 
 echo "SOURCES := \\" > src/sources.mk
-for i in ${sources[@]}; do
-	mkdir -p src/`dirname $i`
+for i in "${sources[@]}"; do
+	mkdir -p "src/$(dirname "$i")"
 	cc="${1}/lib/${i}"
 	h="${cc%.cc}.h"
-	cp "$cc" src/"$i"
-	[ -r "$h" ] && cp "$h" "src/${i%.cc}.h"
+	copy_imported "$cc" "src/$i"
+	[[ -r "$h" ]] && copy_imported "$h" "src/${i%.cc}.h"
 	echo "${i}.o \\" >> src/sources.mk
 done
-for i in ${optional_sources[@]}; do
-	mkdir -p src/`dirname $i`
+for i in "${optional_sources[@]}"; do
+	mkdir -p "src/$(dirname "$i")"
 	cc="${1}/lib/${i}"
 	h="${cc%.cc}.h"
 	copy_optional "$cc" src/"$i"
@@ -191,13 +272,13 @@ for i in ${optional_sources[@]}; do
 	echo "${i}.o \\" >> src/sources.mk
 done
 
-for i in ${headers[@]}; do
-	mkdir -p src/`dirname $i`
+for i in "${headers[@]}"; do
+	mkdir -p "src/$(dirname "$i")"
 	h="${1}/lib/${i}"
-	cp "$h" src/"$i"
+	copy_imported "$h" "src/$i"
 done
-for i in ${optional_headers[@]}; do
-	mkdir -p src/`dirname $i`
+for i in "${optional_headers[@]}"; do
+	mkdir -p "src/$(dirname "$i")"
 	h="${1}/lib/${i}"
 	copy_optional "$h" src/"$i"
 done
