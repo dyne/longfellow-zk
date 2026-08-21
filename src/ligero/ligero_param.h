@@ -124,26 +124,26 @@ struct LigeroParam {
   size_t nreq;     // number of opened columns
 
   // computed parameters
-  size_t block_enc;   // total number of elts per row
-  size_t block;       // number of elts per block
-  size_t dblock;      // 2 * BLOCK - 1
-  size_t block_ext;   // BLOCK_ENC - DBLOCK (number of leaves in the
-                      // Merkle tree).
-  size_t r;           // number of random elts in a witness block
-  size_t w;           // number of witnesses in a witness block
-  size_t nwrow;       // number of witness rows
-  size_t nqtriples;   // number of triples of quadratic-check rows
-  size_t nwqrow;      // nwqrow + nqtriples
-  size_t nrow;        // total number of rows (nwqrow + three blinding rows)
-  size_t mc_pathlen;  // length of a Merkle-tree proof
-                      // with BLOCK_ENC-BLOCK leaves
+  size_t block_enc = 0;   // total number of elts per row
+  size_t block = 0;       // number of elts per block
+  size_t dblock = 0;      // 2 * BLOCK - 1
+  size_t block_ext = 0;  // BLOCK_ENC - DBLOCK (number of leaves in the
+                         // Merkle tree).
+  size_t r = 0;           // number of random elts in a witness block
+  size_t w = 0;           // number of witnesses in a witness block
+  size_t nwrow = 0;       // number of witness rows
+  size_t nqtriples = 0;   // number of triples of quadratic-check rows
+  size_t nwqrow = 0;      // nwqrow + nqtriples
+  size_t nrow = 0;        // total number of rows (nwqrow + three blinding rows)
+  size_t mc_pathlen = 0;  // length of a Merkle-tree proof with
+                          // BLOCK_ENC-BLOCK leaves
 
   // layout of rows
-  size_t ildt;   // blinding for the low-degree test
-  size_t idot;   // blinding row for the dot-product check
-  size_t iquad;  // blinding row for the quadratic check
-  size_t iw;     // first witness row
-  size_t iq;     // first quadratic row
+  size_t ildt = 0;   // blinding for the low-degree test
+  size_t idot = 0;   // blinding row for the dot-product check
+  size_t iquad = 0;  // blinding row for the quadratic check
+  size_t iw = 0;     // first witness row
+  size_t iq = 0;     // first quadratic row
 
   // Deprecated version of the constructor attempts to optimize the block_enc
   // parameter. This optimization can now be performed offline and stored as
@@ -163,9 +163,10 @@ struct LigeroParam {
       }
     }
 
-    // recompute parameters
-    layout(best_block_enc);
-    sanity();
+    // Recompute parameters.  Invalid externally supplied geometry is retained
+    // as an invalid value and rejected by proof APIs rather than aborting.
+    valid_ = layout(best_block_enc) < SIZE_MAX;
+    if (valid_) sanity();
   }
 
   // Constructor that accepts a pre-computed block_enc.
@@ -173,9 +174,11 @@ struct LigeroParam {
               size_t be)
       : nw(nw), nq(nq), rateinv(rateinv), nreq(nreq), block_enc(be) {
     r = nreq;
-    check(layout(block_enc) < SIZE_MAX, "block_enc too large");
-    sanity();
+    valid_ = layout(block_enc) < SIZE_MAX;
+    if (valid_) sanity();
   }
+
+  bool valid() const { return valid_; }
 
   // Return an estimate of the proof size.
   //
@@ -193,6 +196,14 @@ struct LigeroParam {
     constexpr size_t max_size = static_cast<size_t>(1) << max_lg_size;
     block_enc = e;
 
+    // Reject invalid external parameters before arithmetic or division.  In
+    // particular, avoid wraparound in 2 + rateinv and division by block_enc.
+    if (block_enc == 0 || nreq == 0 || nw == 0 || nq == 0 ||
+        block_enc > max_size || rateinv > max_size - 2 || nw > max_size ||
+        nq > max_size) {
+      return SIZE_MAX;
+    }
+
     // block_enc must fit in the subfield
     size_t subfield_bits = 8 * Field::kSubFieldBytes;
     if (subfield_bits <= max_lg_size) {
@@ -203,8 +214,7 @@ struct LigeroParam {
 
     // limit block_enc to avoid overflow in the computation
     // of the proof size
-    if (block_enc > max_size || rateinv > max_size ||
-        (block_enc + 1) < (2 + rateinv)) {
+    if (block_enc + 1 < 2 + rateinv) {
       return SIZE_MAX;
     }
 
@@ -224,7 +234,7 @@ struct LigeroParam {
     //     W + R == BLOCK
 
     // Ensure W >= R (needed for reasonable space utilization).
-    if (w < r) {
+    if (w == 0 || w < r) {
       return SIZE_MAX;
     }
     // now R <= W < MAX_SIZE
@@ -241,11 +251,18 @@ struct LigeroParam {
     // now DBLOCK <= BLOCK_ENC
 
     block_ext = block_enc - dblock;
+    if (block_ext < nreq) {
+      return SIZE_MAX;
+    }
     // now 0 <= BLOCK_EXT < MAX_SIZE
 
     nwrow = ceildiv(nw, w);
     nqtriples = ceildiv(nq, w);
 
+    if (nwrow >= max_size || nqtriples >= max_size / 3 ||
+        nwrow >= max_size - 3 * nqtriples) {
+      return SIZE_MAX;
+    }
     nwqrow = nwrow + 3 * nqtriples;
     nrow = nwqrow + /*blinding rows=*/3;
 
@@ -295,6 +312,8 @@ struct LigeroParam {
   }
 
  private:
+  bool valid_ = false;
+
   void sanity() {
     proofs::check(block_enc > block, "block_enc > block");
     ildt = 0;
@@ -315,19 +334,19 @@ template <class Field>
 struct LigeroProof {
   using Elt = typename Field::Elt;
   explicit LigeroProof(const LigeroParam<Field> *p)
-      : block(p->block),
-        dblock(p->dblock),
-        r(p->r),
-        block_enc(p->block_enc),
-        nrow(p->nrow),
-        nreq(p->nreq),
-        mc_pathlen(p->mc_pathlen),
-        y_ldt(p->block),
-        y_dot(p->dblock),
-        y_quad_0(p->r),
-        y_quad_2(p->dblock - p->block),
-        req(p->nrow * p->nreq),
-        merkle(p->nreq) {}
+      : block(p->valid() ? p->block : 0),
+        dblock(p->valid() ? p->dblock : 0),
+        r(p->valid() ? p->r : 0),
+        block_enc(p->valid() ? p->block_enc : 0),
+        nrow(p->valid() ? p->nrow : 0),
+        nreq(p->valid() ? p->nreq : 0),
+        mc_pathlen(p->valid() ? p->mc_pathlen : 0),
+        y_ldt(block),
+        y_dot(dblock),
+        y_quad_0(r),
+        y_quad_2(dblock - block),
+        req(nrow * nreq),
+        merkle(nreq) {}
 
   // The proof stores a copy of all parameters relevant to the proof.
   size_t block;
@@ -345,6 +364,21 @@ struct LigeroProof {
   std::vector<Elt> y_quad_2;  // [dblock - block] last part of y_quad
   std::vector<Elt> req;       // [nrow, nreq]
   MerkleProof merkle;
+
+  bool valid_for(const LigeroParam<Field>& p) const {
+    if (!p.valid() || block != p.block || dblock != p.dblock || r != p.r ||
+        block_enc != p.block_enc || nrow != p.nrow || nreq != p.nreq ||
+        mc_pathlen != p.mc_pathlen || y_ldt.size() != block ||
+        y_dot.size() != dblock || y_quad_0.size() != r || dblock < block ||
+        y_quad_2.size() != dblock - block ||
+        (nrow != 0 && nreq > SIZE_MAX / nrow) ||
+        req.size() != nrow * nreq || merkle.nonce.size() != nreq ||
+        (mc_pathlen != 0 && nreq > SIZE_MAX / mc_pathlen) ||
+        merkle.path.size() > nreq * mc_pathlen) {
+      return false;
+    }
+    return true;
+  }
 
   Elt &req_at(size_t i, size_t j) { return req[i * nreq + j]; }
   const Elt &req_at(size_t i, size_t j) const { return req[i * nreq + j]; }

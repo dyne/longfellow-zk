@@ -50,6 +50,10 @@ class LigeroVerifier {
     if (why == nullptr) {
       return false;
     }
+    if (!p.valid() || !proof.valid_for(p)) {
+      *why = "invalid Ligero parameters or proof geometry";
+      return false;
+    }
 
     std::vector<Elt> u_ldt(p.nwqrow);
     std::vector<Elt> alphal(nl);

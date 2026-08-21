@@ -79,6 +79,8 @@ using gf2k = f_128::Elt;
 
 using RSFactory = LCH14ReedSolomonFactory<f_128>;
 
+static constexpr size_t kMaxSessionTranscriptBytes = 60000;
+
 // Root of unity for the f_p256^2 extension field.
 static constexpr char kRootX[] =
     "112649224146410281873500457609690258373018840430489408729223714171582664"
@@ -113,6 +115,36 @@ static constexpr bool enforce_circuit_id_in_prover = false;
 static constexpr bool enforce_circuit_id_in_verifier = false;
 
 // =========== Helper methods for the main exported C functions.
+
+bool supported_zk_spec(const ZkSpecStruct* candidate) {
+  if (candidate == nullptr || candidate->system == nullptr) return false;
+  for (const auto& supported : kZkSpecs) {
+    if (std::strcmp(candidate->system, supported.system) == 0 &&
+        std::memcmp(candidate->circuit_hash, supported.circuit_hash,
+                    sizeof(candidate->circuit_hash)) == 0 &&
+        candidate->num_attributes == supported.num_attributes &&
+        candidate->version == supported.version &&
+        candidate->block_enc_hash == supported.block_enc_hash &&
+        candidate->block_enc_sig == supported.block_enc_sig) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool valid_requested_attributes(const RequestedAttribute* attrs, size_t len) {
+  if (attrs == nullptr || len == 0) return false;
+  for (size_t i = 0; i < len; ++i) {
+    if (attrs[i].namespace_len == 0 ||
+        attrs[i].namespace_len > sizeof(attrs[i].namespace_id) ||
+        attrs[i].id_len == 0 || attrs[i].id_len > sizeof(attrs[i].id) ||
+        attrs[i].cbor_value_len == 0 ||
+        attrs[i].cbor_value_len > sizeof(attrs[i].cbor_value)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 // Specialization for filling the mac when using f_128.
 template <>
@@ -278,7 +310,11 @@ gf2k generate_mac_key(Transcript& t) {
   f_128 gf;
   uint8_t buf[f_128::kBytes];
   t.bytes(buf, f_128::kBytes);
-  return gf.of_bytes_field(buf).value();
+  auto key = gf.of_bytes_field(buf);
+  if (!key.has_value()) {
+    panic("random bytes did not encode a GF(2^128) element");
+  }
+  return key.value();
 }
 
 // Updates the dense input array with a mac.The location
@@ -332,12 +368,11 @@ bool sameNamespace(const RequestedAttribute attrs[/*n*/], size_t n) {
 // - Fulldate (TAG 1004) -> must be 14 bytes total
 // - Tdate (TAG 0) -> must be 22 bytes total
 bool cbor_validate(const uint8_t* in, size_t len) {
-  uint8_t dummy[1];  // For 0-length checks if needed, though len > 0 usually
-  const uint8_t* buf = in ? in : dummy;
+  if (in == nullptr) return false;
   size_t pos = 0;
   CborDoc doc;
 
-  if (!doc.decode(buf, len, pos, 0)) {
+  if (!doc.decode(in, len, pos, 0)) {
     return false;
   }
 
@@ -407,6 +442,12 @@ MdocProverErrorCode run_mdoc_prover(
       transcript == nullptr || attrs == nullptr || now == nullptr ||
       prf == nullptr || proof_len == nullptr || zk_spec == nullptr) {
     return MDOC_PROVER_NULL_INPUT;
+  }
+  if (!supported_zk_spec(zk_spec) ||
+      !valid_requested_attributes(attrs, attrs_len) ||
+      attrs_len != zk_spec->num_attributes ||
+      tr_len > kMaxSessionTranscriptBytes) {
+    return MDOC_PROVER_INVALID_INPUT;
   }
 
   Elt pkX, pkY;
@@ -552,6 +593,12 @@ MdocVerifierErrorCode run_mdoc_verifier(
       zkproof == nullptr || docType == nullptr || zk_spec == nullptr) {
     return MDOC_VERIFIER_NULL_INPUT;
   }
+  if (!supported_zk_spec(zk_spec) ||
+      !valid_requested_attributes(attrs, attrs_len) ||
+      attrs_len != zk_spec->num_attributes ||
+      tr_len > kMaxSessionTranscriptBytes) {
+    return MDOC_VERIFIER_INVALID_INPUT;
+  }
 
   Elt pkX, pkY;
   if (!parsePk(pkx, pky, pkX, pkY)) {
@@ -630,7 +677,15 @@ MdocVerifierErrorCode run_mdoc_verifier(
   gf2k macs[6];
 
   for (size_t i = 0; i < 6; ++i) {
-    macs[i] = Fs.of_bytes_field(rb.next(f_128::kBytes)).value();
+    const uint8_t* mac_bytes = nullptr;
+    if (!rb.read(f_128::kBytes, &mac_bytes)) {
+      return MDOC_VERIFIER_HASH_PARSING_FAILURE;
+    }
+    auto mac = Fs.of_bytes_field(mac_bytes);
+    if (!mac.has_value()) {
+      return MDOC_VERIFIER_HASH_PARSING_FAILURE;
+    }
+    macs[i] = mac.value();
   }
 
   // The proof read methods check proof length internally.

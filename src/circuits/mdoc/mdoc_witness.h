@@ -206,23 +206,34 @@ class ParsedMdoc {
         auto rand = er.lookup(resp, 6, (uint8_t*)"random", di);
         if (rand.key == nullptr) return MDOC_PROVER_ATTRIBUTE_RANDOM_MISSING;
 
+        size_t ei_pos, ei_len, ev_key_pos, ev_len, digid_key_pos,
+            digid_key_len, digid_len, rand_key_pos, rand_key_len, rand_len;
+        if (!value_metadata(ei.val, &ei_pos, &ei_len) ||
+            !value_metadata(ev.key, &ev_key_pos, nullptr) ||
+            !value_metadata(ev.val, nullptr, &ev_len) ||
+            !value_metadata(digid.key, &digid_key_pos, &digid_key_len) ||
+            !value_metadata(digid.val, nullptr, &digid_len) ||
+            !value_metadata(rand.key, &rand_key_pos, &rand_key_len) ||
+            !value_metadata(rand.val, nullptr, &rand_len)) {
+          return MDOC_PROVER_ATTRIBUTE_DECODE_FAILURE;
+        }
+
         attributes_.push_back((FullAttribute){
             //  For the elementIdentifier, the [1] index is the position and
             //  length of the value.
-            ei.val->position(),
-            ei.val->length(),
+            ei_pos,
+            ei_len,
             // For version 7, record the index of the elementValue key, i.e.,
             // ev[0], instead of the value. This makes it easier to handle
             // different orderings of the elementIdentifier and elementValue
             // keys in the CBOR encoding. Previous versions of the circuit did
             // not use the ev[1] index, because they assumed canonical order.
-            ev.key->position(),
-            ev.val->length(),
-            digid.key->position(),
-            digid.key->length() + digid.val->length() + 1,
-            rand.key->position(),
-            rand.key->length() + rand.val->length() + 1 +
-                (rand.val->length() < 24 ? 1 : 2),
+            ev_key_pos,
+            ev_len,
+            digid_key_pos,
+            digid_key_len + digid_len + 1,
+            rand_key_pos,
+            rand_key_len + rand_len + 1 + (rand_len < 24 ? 1 : 2),
             (const uint8_t*)sn,
             static_cast<size_t>(digid.val->as_unsigned()), /* digest_id */
             {0, 0, 0},                                     /* default mso_ind */
@@ -245,6 +256,7 @@ class ParsedMdoc {
     // Then parse tagged mso. Skip 5 bytes to skip the D8 18 59 <len2>.
     if (!tmso->is_variant(BYTES)) return MDOC_PROVER_MSO_MISSING;
     CborDoc::CborString tmso_str = tmso->as_bytes();
+    if (tmso_str.len < 5) return MDOC_PROVER_MSO_DECODING_FAILURE;
     const uint8_t* pmso = resp + tmso_str.pos + 5;
     size_t pos = 0;
     CborDoc mso;
@@ -318,6 +330,13 @@ class ParsedMdoc {
   }
 
  private:
+  static bool value_metadata(const CborDoc* node, size_t* pos, size_t* len) {
+    if (node == nullptr) return false;
+    if (pos != nullptr && !node->value_position(pos)) return false;
+    if (len != nullptr && !node->value_length(len)) return false;
+    return true;
+  }
+
   // Used to copy the results of a map lookup.
   static void copy_kv_header(CborIndex& ind, CborDoc::LookupResult n) {
     ind.k = n.key->header_pos();
@@ -509,6 +528,11 @@ template <class Field>
 MdocProverErrorCode fill_attribute(DenseFiller<Field>& filler,
                                    const RequestedAttribute& attr,
                                    const Field& F, size_t version) {
+  if (attr.id_len == 0 || attr.id_len >= 256 ||
+      attr.id_len > sizeof(attr.id) ||
+      attr.cbor_value_len > sizeof(attr.cbor_value)) {
+    return MDOC_PROVER_ATTRIBUTE_TOO_LONG;
+  }
   // In version >= 4, the attribute is encoded as
   // <len(identifier)> <name of identifier> <elementValue> <attributeValue>.
   // This extra length field distinguishes the two attributes:

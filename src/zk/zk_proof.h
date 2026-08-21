@@ -31,6 +31,30 @@
 
 namespace proofs {
 
+enum class ProofReadErrorCode {
+  kNone = 0,
+  kTruncated,
+  kUnsupportedGeometry,
+  kNoncanonicalFieldElement,
+  kInvalidRunLength,
+  kInvalidMerklePath,
+};
+
+enum class ProofReadSection {
+  kNone = 0,
+  kCommitment,
+  kSumcheck,
+  kLigero,
+};
+
+struct ProofReadError {
+  ProofReadErrorCode code = ProofReadErrorCode::kNone;
+  ProofReadSection section = ProofReadSection::kNone;
+  size_t offset = 0;
+
+  explicit operator bool() const { return code != ProofReadErrorCode::kNone; }
+};
+
 // ZkProof class handles proof serialization.
 //
 // We expect circuits to be created and stored locally by the prover and
@@ -105,11 +129,18 @@ struct ZkProof {
 
   // The read function returns false on error or underflow.
   bool read(ReadBuffer &buf, const Field &F) {
+    last_read_error_ = {};
+    if (!ZkCommon<Field>::valid_circuit(c) || !param.valid()) {
+      return fail(ProofReadErrorCode::kUnsupportedGeometry,
+                  ProofReadSection::kNone, buf);
+    }
     if (!read_com(com, buf, F)) return false;
     if (!read_sc_proof(proof, buf, F)) return false;
     if (!read_com_proof(com_proof, buf, F)) return false;
     return true;
   }
+
+  const ProofReadError &last_read_error() const { return last_read_error_; }
 
   void write_sc_proof(const Proof<Field> &pr, std::vector<uint8_t> &buf,
                       const Field &F) const {
@@ -216,10 +247,16 @@ struct ZkProof {
   }
 
   bool read_sc_proof(Proof<Field> &pr, ReadBuffer &buf, const Field &F) {
-    if (c.logc != 0) return false;
+    if (c.logc != 0) {
+      return fail(ProofReadErrorCode::kUnsupportedGeometry,
+                  ProofReadSection::kSumcheck, buf);
+    }
     for (size_t i = 0; i < pr.l.size(); ++i) {
-      size_t needed = (c.l[i].logw * (3 - 1) * 2 + 2) * Field::kBytes;
-      if (!buf.have(needed)) return false;
+      size_t elements = c.l[i].logw * (3 - 1) * 2 + 2;
+      if (!have_elements(buf, elements, Field::kBytes)) {
+        return fail(ProofReadErrorCode::kTruncated,
+                    ProofReadSection::kSumcheck, buf);
+      }
       for (size_t wi = 0; wi < c.l[i].logw; ++wi) {
         for (size_t k = 0; k < 3; ++k) {
           // Optimization: the p(1) value was not sent.
@@ -229,7 +266,7 @@ struct ZkProof {
               if (v) {
                 pr.l[i].hp[hi][wi].t_[k] = v.value();
               } else {
-                return false;
+                return fail_field_error(ProofReadSection::kSumcheck, buf);
               }
             }
           } else {
@@ -243,7 +280,7 @@ struct ZkProof {
         if (v) {
           pr.l[i].wc[wi] = v.value();
         } else {
-          return false;
+          return fail_field_error(ProofReadSection::kSumcheck, buf);
         }
       }
     }
@@ -252,82 +289,122 @@ struct ZkProof {
 
   bool read_com(LigeroCommitment<Field> &com0, ReadBuffer &buf,
                 const Field &F) {
-    if (!buf.have(Digest::kLength)) return false;
-    read_digest(buf, com0.root);
+    if (!read_digest(buf, com0.root)) {
+      return fail(ProofReadErrorCode::kTruncated,
+                  ProofReadSection::kCommitment, buf);
+    }
     return true;
   }
 
   bool read_com_proof(LigeroProof<Field> &pr, ReadBuffer &buf, const Field &F) {
-    if (!buf.have(pr.block * Field::kBytes)) return false;
+    if (!have_elements(buf, pr.block, Field::kBytes)) {
+      return fail(ProofReadErrorCode::kTruncated, ProofReadSection::kLigero,
+                  buf);
+    }
     for (size_t i = 0; i < pr.block; ++i) {
       auto v = read_elt(buf, F);
       if (v) {
         pr.y_ldt[i] = v.value();
       } else {
-        return false;
+        return fail_field_error(ProofReadSection::kLigero, buf);
       }
     }
 
-    if (!buf.have(pr.dblock * Field::kBytes)) return false;
+    if (!have_elements(buf, pr.dblock, Field::kBytes)) {
+      return fail(ProofReadErrorCode::kTruncated, ProofReadSection::kLigero,
+                  buf);
+    }
     for (size_t i = 0; i < pr.dblock; ++i) {
       auto v = read_elt(buf, F);
       if (v) {
         pr.y_dot[i] = v.value();
       } else {
-        return false;
+        return fail_field_error(ProofReadSection::kLigero, buf);
       }
     }
 
-    if (!buf.have(pr.r * Field::kBytes)) return false;
+    if (!have_elements(buf, pr.r, Field::kBytes)) {
+      return fail(ProofReadErrorCode::kTruncated, ProofReadSection::kLigero,
+                  buf);
+    }
     for (size_t i = 0; i < pr.r; ++i) {
       auto v = read_elt(buf, F);
       if (v) {
         pr.y_quad_0[i] = v.value();
       } else {
-        return false;
+        return fail_field_error(ProofReadSection::kLigero, buf);
       }
     }
 
-    if (!buf.have((pr.dblock - pr.block) * Field::kBytes)) return false;
+    if (pr.dblock < pr.block ||
+        !have_elements(buf, pr.dblock - pr.block, Field::kBytes)) {
+      return fail(pr.dblock < pr.block
+                      ? ProofReadErrorCode::kUnsupportedGeometry
+                      : ProofReadErrorCode::kTruncated,
+                  ProofReadSection::kLigero, buf);
+    }
     for (size_t i = 0; i < pr.dblock - pr.block; ++i) {
       auto v = read_elt(buf, F);
       if (v) {
         pr.y_quad_2[i] = v.value();
       } else {
-        return false;
+        return fail_field_error(ProofReadSection::kLigero, buf);
       }
     }
 
-    if (!buf.have(pr.nreq * MerkleNonce::kLength)) return false;
+    if (!have_elements(buf, pr.nreq, MerkleNonce::kLength)) {
+      return fail(ProofReadErrorCode::kTruncated, ProofReadSection::kLigero,
+                  buf);
+    }
     for (size_t i = 0; i < pr.nreq; ++i) {
-      read_nonce(buf, pr.merkle.nonce[i]);
+      if (!read_nonce(buf, pr.merkle.nonce[i])) {
+        return fail(ProofReadErrorCode::kTruncated,
+                    ProofReadSection::kLigero, buf);
+      }
     }
 
     // Decode runs of real and full Field elements.
     size_t ci = 0;
+    if (pr.nrow != 0 && pr.nreq > SIZE_MAX / pr.nrow) {
+      return fail(ProofReadErrorCode::kUnsupportedGeometry,
+                  ProofReadSection::kLigero, buf);
+    }
+    const size_t request_elements = pr.nreq * pr.nrow;
     bool subfield_run = false;
-    while (ci < pr.nreq * pr.nrow) {
-      if (!buf.have(4)) return false;
-      size_t runlen = read_size(buf); /* untrusted size input */
-      if (runlen >= kMaxRunLen || ci + runlen > pr.nreq * pr.nrow) return false;
+    while (ci < request_elements) {
+      size_t runlen;
+      if (!read_size(buf, &runlen)) {
+        return fail(ProofReadErrorCode::kTruncated,
+                    ProofReadSection::kLigero, buf);
+      }
+      if (runlen > kMaxRunLen || runlen > request_elements - ci) {
+        return fail(ProofReadErrorCode::kInvalidRunLength,
+                    ProofReadSection::kLigero, buf);
+      }
       if (subfield_run) {
-        if (!buf.have(runlen * Field::kSubFieldBytes)) return false;
+        if (!have_elements(buf, runlen, Field::kSubFieldBytes)) {
+          return fail(ProofReadErrorCode::kTruncated,
+                      ProofReadSection::kLigero, buf);
+        }
         for (size_t i = ci; i < ci + runlen; ++i) {
           auto v = read_subfield_elt(buf, F);
           if (v) {
             pr.req[i] = v.value();
           } else {
-            return false;
+            return fail_field_error(ProofReadSection::kLigero, buf);
           }
         }
       } else {
-        if (!buf.have(runlen * Field::kBytes)) return false;
+        if (!have_elements(buf, runlen, Field::kBytes)) {
+          return fail(ProofReadErrorCode::kTruncated,
+                      ProofReadSection::kLigero, buf);
+        }
         for (size_t i = ci; i < ci + runlen; ++i) {
           auto v = read_elt(buf, F);
           if (v) {
             pr.req[i] = v.value();
           } else {
-            return false;
+            return fail_field_error(ProofReadSection::kLigero, buf);
           }
         }
       }
@@ -335,42 +412,92 @@ struct ZkProof {
       subfield_run = !subfield_run;
     }
 
-    if (!buf.have(4)) return false;
-    size_t sz = read_size(buf); /* untrusted size input */
+    size_t sz;
+    if (!read_size(buf, &sz)) {
+      return fail(ProofReadErrorCode::kTruncated, ProofReadSection::kLigero,
+                  buf);
+    }
 
     // Merkle proofs of length < NREQ are not valid in the zk proof setting.
-    if (sz < pr.nreq || sz >= kMaxNumDigests) return false;  // avoid overflow
-    if (!buf.have(sz * Digest::kLength)) return false;
+    if (sz < pr.nreq || sz >= kMaxNumDigests) {
+      return fail(ProofReadErrorCode::kInvalidMerklePath,
+                  ProofReadSection::kLigero, buf);
+    }
+    if (!have_elements(buf, sz, Digest::kLength)) {
+      return fail(ProofReadErrorCode::kTruncated, ProofReadSection::kLigero,
+                  buf);
+    }
 
     // Sanity check, the proof should never be larger than this.
     // That value should always fit into memory, so this check aims to avoid
     // an exception by resize() if there is not enough memory to resize.
-    if (sz > pr.nreq * pr.mc_pathlen) return false;
+    if (pr.mc_pathlen != 0 && pr.nreq > SIZE_MAX / pr.mc_pathlen) {
+      return fail(ProofReadErrorCode::kUnsupportedGeometry,
+                  ProofReadSection::kLigero, buf);
+    }
+    if (sz > pr.nreq * pr.mc_pathlen) {
+      return fail(ProofReadErrorCode::kInvalidMerklePath,
+                  ProofReadSection::kLigero, buf);
+    }
 
     pr.merkle.path.resize(sz);
     for (size_t i = 0; i < sz; ++i) {
-      read_digest(buf, pr.merkle.path[i]);
+      if (!read_digest(buf, pr.merkle.path[i])) {
+        return fail(ProofReadErrorCode::kTruncated,
+                    ProofReadSection::kLigero, buf);
+      }
     }
     return true;
   }
 
   std::optional<Elt> read_elt(ReadBuffer &buf, const Field &F) const {
-    return F.of_bytes_field(buf.next(Field::kBytes));
+    const uint8_t *bytes = nullptr;
+    if (!buf.read(Field::kBytes, &bytes)) return std::nullopt;
+    return F.of_bytes_field(bytes);
   }
 
   std::optional<Elt> read_subfield_elt(ReadBuffer &buf, const Field &F) const {
-    return F.of_bytes_subfield(buf.next(Field::kSubFieldBytes));
+    const uint8_t *bytes = nullptr;
+    if (!buf.read(Field::kSubFieldBytes, &bytes)) return std::nullopt;
+    return F.of_bytes_subfield(bytes);
   }
 
-  void read_digest(ReadBuffer &buf, Digest &x) const {
-    buf.next(Digest::kLength, x.data);
+  bool read_digest(ReadBuffer &buf, Digest &x) const {
+    return buf.read(Digest::kLength, x.data);
   }
 
-  void read_nonce(ReadBuffer &buf, MerkleNonce &x) const {
-    buf.next(MerkleNonce::kLength, x.bytes);
+  bool read_nonce(ReadBuffer &buf, MerkleNonce &x) const {
+    return buf.read(MerkleNonce::kLength, x.bytes);
   }
 
-  size_t read_size(ReadBuffer &buf) { return u32_of_le(buf.next(4)); }
+  bool read_size(ReadBuffer &buf, size_t *out) const {
+    const uint8_t *bytes = nullptr;
+    if (!buf.read(4, &bytes)) return false;
+    *out = u32_of_le(bytes);
+    return true;
+  }
+
+  static bool have_elements(const ReadBuffer &buf, size_t count,
+                            size_t width) {
+    return width != 0 && count <= buf.remaining() / width;
+  }
+
+  bool fail(ProofReadErrorCode code, ProofReadSection section,
+            const ReadBuffer &buf) {
+    if (!last_read_error_) {
+      last_read_error_ = {code, section, buf.position()};
+    }
+    return false;
+  }
+
+  bool fail_field_error(ProofReadSection section, const ReadBuffer &buf) {
+    const auto code = buf.status().error == ReadBufferError::kNone
+                          ? ProofReadErrorCode::kNoncanonicalFieldElement
+                          : ProofReadErrorCode::kTruncated;
+    return fail(code, section, buf);
+  }
+
+  ProofReadError last_read_error_;
 };
 
 }  // namespace proofs
