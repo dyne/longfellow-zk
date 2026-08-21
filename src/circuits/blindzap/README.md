@@ -123,6 +123,50 @@ queries are hashed into the proof identity. Verification selects the family
 member from the canonical distinct-program count and rejects an identity or
 parameter mismatch before accepting the proof.
 
+## Scaling and useful workloads
+
+Let `N` be the number of claimed P2WPKH outputs and `K` the number of distinct
+witness programs among them. BlindZap groups claims by program, so each
+distinct program contributes one key-ownership and HASH160 relation:
+
+```text
+ZK circuit, proof size, and proof work:  O(K)
+Canonical statement and envelope data:  O(N)
+Bitcoin chain-state lookups:             O(N)
+```
+
+Consequently, the ZK portion is constant in `N` only while `K` remains fixed.
+BlindZap v1 fixes `K <= 2` and `N <= 16`, so additional outputs controlled by
+either already-proven key do not enlarge the circuit or systematically grow
+the proof (serialized size can vary slightly with proof randomness). They
+still add public claims to the envelope and require independent amount,
+script, confirmation, network, and unspent-state checks.
+
+This is useful for bounded custodial or treasury workflows where several
+UTXOs deliberately share one or two P2WPKH programs, for example:
+
+- proving control of several fragmented outputs held at one operational
+  address;
+- combining outputs split across one hot and one cold or migration address;
+- a signet or regtest reserve, custody, or bridge integration test whose
+  outputs use a deliberately bounded key set; or
+- proving control without revealing the compressed public key of an unspent
+  P2WPKH output that has never exposed that key through a spend.
+
+It is not an efficient general proof of a modern HD wallet or exchange reserve
+when every UTXO uses a fresh address. In that case `K` grows with `N`, and the
+current construction repeats scalar multiplication, SHA-256, and RIPEMD-160
+for every key. Circuit size, proof size, proving time, and verification time
+then grow approximately linearly; merely raising the template limit also runs
+into Longfellow's CRT block-encoding capacity. Supporting many unrelated keys
+would require a different aggregation design, such as recursion or a suitable
+commitment and set-membership construction, together with a new security
+analysis.
+
+The constant-ZK-cost case should not be confused with Bitcoin multisig. Each
+program is an independent ordinary P2WPKH spending condition; the circuit
+aggregates proofs of knowledge but creates no `m-of-n` authorization policy.
+
 ## Witness construction is not a trust boundary
 
 `BlindzapWitnessV1` computes native advice for performance:
