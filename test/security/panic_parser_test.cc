@@ -25,8 +25,10 @@
 #include "cbor/host_decoder.h"
 #include "ec/p256.h"
 #include "proto/circuit_reader.h"
+#include "proto/circuit_writer.h"
 #include "sumcheck/circuit.h"
 #include "util/panic.h"
+#include "util/byte_cursor.h"
 #include "util/readbuffer.h"
 #include "zk/zk_proof.h"
 
@@ -89,6 +91,30 @@ void test_recoverable_buffer_underflow() {
           "null non-empty buffer was accepted");
 }
 
+void test_byte_cursor_boundaries() {
+  const uint8_t bytes[] = {0x01, 0x02};
+  ByteCursor exact(bytes, sizeof(bytes));
+  const uint8_t* out = nullptr;
+  require(exact.take(2, &out), "exact-end cursor read failed");
+  require(exact.remaining() == 0 && out[1] == 0x02,
+          "exact-end cursor did not consume input");
+  require(!exact.take(1, &out), "truncated cursor read succeeded");
+  require(exact.error().code == ParseErrorCode::kTruncated &&
+              exact.error().offset == 2 && exact.error().available == 0,
+          "cursor truncation lacks stable boundary details");
+
+  ByteCursor limited(bytes, sizeof(bytes), {.bytes = 1, .allocations = 1,
+                                             .elements = 1});
+  require(!limited.take(2, &out) &&
+              limited.error().code == ParseErrorCode::kResourceLimit,
+          "byte limit was not enforced");
+  ByteCursor aggregate(bytes, sizeof(bytes), {.allocations = 1, .elements = 1});
+  require(aggregate.consume_allocation(1) && !aggregate.consume_allocation(1),
+          "allocation aggregate limit was not enforced");
+  require(aggregate.error().code == ParseErrorCode::kResourceLimit,
+          "aggregate limit lacks structured error");
+}
+
 void test_malformed_circuit_is_recoverable() {
   const Field& field = p256_base;
   const std::vector<uint8_t> truncated = {1};
@@ -98,6 +124,14 @@ void test_malformed_circuit_is_recoverable() {
           "truncated circuit was accepted");
   require(reader.last_error().code == CircuitReadErrorCode::kTruncated,
           "truncated circuit lacks structured error");
+
+  std::vector<uint8_t> huge(1, 1);
+  huge.resize(1 + 8 * CircuitIO::kBytesPerSizeT, 0xff);
+  ByteCursor limited(huge.data(), huge.size(), {.bytes = 1});
+  require(reader.from_bytes(limited, true) == nullptr &&
+              reader.last_error().code == CircuitReadErrorCode::kResourceLimit &&
+              reader.last_error().offset == 1,
+          "limited LFC1 header lacks resource-limit boundary");
 }
 
 void test_malformed_proof_is_recoverable() {
@@ -123,9 +157,22 @@ void test_malformed_proof_is_recoverable() {
       .logw = 1,
       .quad = std::unique_ptr<const Quad<Field>>(std::move(quad))});
 
+  std::vector<uint8_t> serialized;
+  circuit_id(circuit.id, circuit, field);
+  CircuitWriter<Field> writer(field, P256_ID);
+  writer.to_bytes(circuit, serialized);
+  const size_t exact_size = serialized.size();
+  serialized.push_back(0);
+  ByteCursor trailing(serialized.data(), serialized.size());
+  CircuitReader<Field> reader(field, P256_ID);
+  require(reader.from_bytes(trailing, true) == nullptr &&
+              reader.last_error().code == CircuitReadErrorCode::kTrailingBytes &&
+              reader.last_error().offset == exact_size,
+          "LFC1 trailing byte lacks stable error and offset");
+
   ZkProof<Field> proof(circuit, 4, 2);
   const std::vector<uint8_t> empty;
-  ReadBuffer buf(empty);
+  ByteCursor buf(empty.data(), empty.size());
   require(!proof.read(buf, field), "empty proof was accepted");
   require(proof.last_read_error().code == ProofReadErrorCode::kTruncated &&
               proof.last_read_error().section == ProofReadSection::kCommitment,
@@ -171,6 +218,7 @@ void test_untrusted_cbor_lookup_is_recoverable() {
 int main() {
   proofs::test_internal_invariants_abort();
   proofs::test_recoverable_buffer_underflow();
+  proofs::test_byte_cursor_boundaries();
   proofs::test_malformed_circuit_is_recoverable();
   proofs::test_malformed_proof_is_recoverable();
   proofs::test_untrusted_cbor_lookup_is_recoverable();

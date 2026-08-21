@@ -199,7 +199,7 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
     proofs::CircuitWriter<Field> writer(proofs::p256k1_base, proofs::SECP_ID);
     writer.to_bytes(*circuit, circuit_bytes);
 
-    proofs::ReadBuffer rb(circuit_bytes.data(), circuit_bytes.size());
+    proofs::ByteCursor rb(circuit_bytes.data(), circuit_bytes.size());
     proofs::CircuitReader<Field> reader(proofs::p256k1_base, proofs::SECP_ID);
     auto decoded = reader.from_bytes(rb, true);
     if (!decoded) {
@@ -311,7 +311,7 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
                      {"compressed_bytes", proof_bytes.size()}});
 
     phase_start = Clock::now();
-    proofs::ReadBuffer proof_rb(proof_bytes.data(), proof_bytes.size());
+    proofs::ByteCursor proof_rb(proof_bytes.data(), proof_bytes.size());
     proofs::ZkProof<Field> parsed_proof(*decoded, kRate, kQueries, block_enc);
     if (!parsed_proof.read(proof_rb, proofs::p256k1_base)) {
         return buf_err(err_buf, err_len, "BIP340 serialized proof failed decode");

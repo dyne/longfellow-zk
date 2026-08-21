@@ -63,6 +63,14 @@ class ReadBuffer {
 
   size_t position() const { return next_; }
 
+  // Transitional adapter for parsers migrated to ByteCursor.
+  const uint8_t* data() const { return buf_ == nullptr ? nullptr : buf_ + next_; }
+
+  bool advance(size_t n) {
+    const uint8_t* ignored = nullptr;
+    return read(n, &ignored);
+  }
+
   const ReadBufferStatus &status() const { return status_; }
 
   // Recoverable reads for untrusted input.  A failed read does not advance the

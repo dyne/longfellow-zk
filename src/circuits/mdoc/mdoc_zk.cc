@@ -477,16 +477,19 @@ MdocProverErrorCode run_mdoc_prover(
     }
 
     log(INFO, "bytes len: %zu", full_size);
-    ReadBuffer rb_circuit(bytes.data(), full_size);
+    ByteCursor rb_circuit(bytes.data(), full_size);
 
     CircuitReader<Fp256Base> cr_s(p256_base, P256_ID);
-    c_sig = cr_s.from_bytes(rb_circuit, enforce_circuit_id_in_prover);
+    c_sig = cr_s.from_record(rb_circuit, enforce_circuit_id_in_prover);
     if (c_sig == nullptr) {
       log(ERROR, "signature circuit could not be parsed");
       return MDOC_PROVER_CIRCUIT_PARSING_FAILURE;
     }
     CircuitReader<f_128> cr_h(Fs, GF2_128_ID);
-    c_hash = cr_h.from_bytes(rb_circuit, enforce_circuit_id_in_prover);
+    c_hash = cr_h.from_record(rb_circuit, enforce_circuit_id_in_prover);
+    if (c_hash == nullptr || rb_circuit.remaining() != 0) {
+      return MDOC_PROVER_CIRCUIT_PARSING_FAILURE;
+    }
 
     if (c_hash == nullptr) {
       log(ERROR, "hash circuit could not be parsed");
@@ -638,18 +641,18 @@ MdocVerifierErrorCode run_mdoc_verifier(
   // pass the ZkSpecStruct to all required downstream functions.
   log(INFO, "bytes len: %zu", full_size);
 
-  ReadBuffer rb_circuit(bytes.data(), full_size);
+  ByteCursor rb_circuit(bytes.data(), full_size);
   CircuitReader<Fp256Base> cr_s(p256_base, P256_ID);
-  auto c_sig = cr_s.from_bytes(rb_circuit, enforce_circuit_id_in_verifier);
+  auto c_sig = cr_s.from_record(rb_circuit, enforce_circuit_id_in_verifier);
   if (c_sig == nullptr) {
     log(ERROR, "signature circuit could not be parsed");
     return MDOC_VERIFIER_CIRCUIT_PARSING_FAILURE;
   }
 
   CircuitReader<f_128> cr_h(Fs, GF2_128_ID);
-  auto c_hash = cr_h.from_bytes(rb_circuit, enforce_circuit_id_in_verifier);
+  auto c_hash = cr_h.from_record(rb_circuit, enforce_circuit_id_in_verifier);
 
-  if (c_hash == nullptr) {
+  if (c_hash == nullptr || rb_circuit.remaining() != 0) {
     log(ERROR, "circuit could not be parsed");
     return MDOC_VERIFIER_CIRCUIT_PARSING_FAILURE;
   }
@@ -670,7 +673,7 @@ MdocVerifierErrorCode run_mdoc_verifier(
       pr_sig.param.nrow);
 
   const std::vector<uint8_t> zbuf(zkproof, zkproof + proof_len);
-  ReadBuffer rb(zbuf);
+  ByteCursor rb(zbuf.data(), zbuf.size());
 
   // Read macs from proof string.
   // The sanity check above ensures that the proof is big enough for the MACs.
@@ -678,7 +681,7 @@ MdocVerifierErrorCode run_mdoc_verifier(
 
   for (size_t i = 0; i < 6; ++i) {
     const uint8_t* mac_bytes = nullptr;
-    if (!rb.read(f_128::kBytes, &mac_bytes)) {
+    if (!rb.take(f_128::kBytes, &mac_bytes)) {
       return MDOC_VERIFIER_HASH_PARSING_FAILURE;
     }
     auto mac = Fs.of_bytes_field(mac_bytes);
