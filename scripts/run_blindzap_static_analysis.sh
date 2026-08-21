@@ -17,6 +17,7 @@ readonly header_filter='(^|.*/)(src/blindzap/|src/cli/blindzap_main\.cc|test/bli
 readonly translation_units=(
   test/blindzap/protocol_test.cc
   test/blindzap/integration_test.cc
+  test/blindzap/sage_vector_test.cc
   src/cli/blindzap_main.cc
 )
 
