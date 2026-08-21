@@ -20,18 +20,40 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT = ROOT / "test" / "compatibility"
 CPP_REPORTER = ROOT / "test" / "compatibility" / "cpp_artifact_report.cc"
 RUST_REPORTER = ROOT / "test" / "compatibility" / "rust_artifact_report.rs"
+LFC1_PRODUCER = ROOT / "test" / "compatibility" / "lfc1_fixture.cc"
+CXX = os.environ.get("CXX", "g++")
 RUSTC = os.environ.get("RUSTC", str(Path.home() / ".cargo" / "bin" / "rustc"))
 ARTIFACTS = (
     ("transcript", "transcript", "vendor/longfellow-zk/rust/runtime/random/tests/transcript_test_vector.bin"),
     ("commitment", "commitment", "test/blindzap/testdata/blindzap_vectors.json"),
     ("proof", "proof", "test/bip340/testdata/bip340_golden.inc"),
-    ("lfc1", "LFC1", "src/proto/circuit_reader.h"),
+    ("lfc1", "LFC1", "test/compatibility/lfc1_fixture.bin"),
     ("verification", "verification", "vendor/longfellow-zk/rust/runtime/ligero/tests/ligero.rs"),
 )
 
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def produce_lfc1(output: Path, include_root: Path | None = None) -> None:
+    """Serialize the canonical C++ circuit fixture through CircuitWriter."""
+    command = [CXX, "-std=c++17"]
+    if include_root:
+        command.extend(["-I", str(include_root / "src")])
+    command.extend(["-Isrc", str(LFC1_PRODUCER), "src/ec/p256.cc",
+                    "src/algebra/nat.cc", "src/util/log.cc", "-o"])
+    with tempfile.TemporaryDirectory(prefix="compatibility-lfc1-producer-") as temporary:
+        producer = Path(temporary) / "lfc1-producer"
+        subprocess.run([*command, str(producer)], cwd=ROOT, check=True)
+        subprocess.run([str(producer), str(output)], cwd=ROOT, check=True)
+
+
+def generated_lfc1(include_root: Path | None = None) -> bytes:
+    with tempfile.TemporaryDirectory(prefix="compatibility-lfc1-") as temporary:
+        artifact = Path(temporary) / "lfc1_fixture.bin"
+        produce_lfc1(artifact, include_root)
+        return artifact.read_bytes()
 
 
 def report_lines(binary: Path, artifacts: list[str]) -> str:
@@ -46,7 +68,7 @@ def cross_check(rust_report: Path | None = None, write_rust_report: Path | None 
         directory = Path(temporary)
         cpp = directory / "cpp-report"
         rust = directory / "rust-report"
-        subprocess.run(["g++", "-std=c++17", str(CPP_REPORTER), "-o", str(cpp)], check=True)
+        subprocess.run([CXX, "-std=c++17", str(CPP_REPORTER), "-o", str(cpp)], check=True)
         subprocess.run([RUSTC, "--edition=2021", str(RUST_REPORTER), "-o", str(rust)], check=True)
         cpp_lines = report_lines(cpp, artifacts)
         rust_lines = rust_report.read_text() if rust_report else report_lines(rust, artifacts)
@@ -61,21 +83,26 @@ def cross_check(rust_report: Path | None = None, write_rust_report: Path | None 
             raise RuntimeError(f"cpp↔rust: {artifact} byte report mismatch")
 
 
-def corpus() -> dict:
+def corpus(lfc1: bytes) -> dict:
     artifacts = []
     for name, kind, relative in ARTIFACTS:
-        path = ROOT / relative
-        if not path.is_file():
-            raise RuntimeError(f"missing provenance input: {relative}")
+        if name == "lfc1":
+            payload = lfc1
+        else:
+            path = ROOT / relative
+            if not path.is_file():
+                raise RuntimeError(f"missing provenance input: {relative}")
+            payload = path.read_bytes()
         artifacts.append({"name": name, "kind": kind, "path": relative,
-                          "bytes": path.stat().st_size, "sha256": digest(path)})
+                          "bytes": len(payload),
+                          "sha256": hashlib.sha256(payload).hexdigest()})
     return {
         "format": "longfellow-zk-compatibility-v1",
         "generator": "scripts/compatibility_vectors.py",
         "provenance": {
             "cpp": "ac5d87071e0f9d1f1ef7aed855f7b6633d3f43ff",
             "rust": "vendor/longfellow-zk (git submodule)",
-            "rule": "each artifact is a byte-level SHA-256 baseline",
+            "rule": "each artifact is a byte-level SHA-256 baseline; LFC1 is CircuitWriter output",
         },
         "artifacts": artifacts,
     }
@@ -85,24 +112,26 @@ def encoded(value: dict) -> bytes:
     return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
 
 
-def write_reviewed(directory: Path) -> None:
-    value = corpus()
-    payload = encoded(value)
-    manifest = {
-        "format": "longfellow-zk-compatibility-manifest-v1",
-        "vectors": "vectors.json",
-        "vectors_sha256": hashlib.sha256(payload).hexdigest(),
-    }
+def write_reviewed(directory: Path, include_root: Path | None = None) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="compatibility-vectors-", dir=directory.parent) as temporary:
         staging = Path(temporary)
+        lfc1_path = staging / "lfc1_fixture.bin"
+        produce_lfc1(lfc1_path, include_root)
+        payload = encoded(corpus(lfc1_path.read_bytes()))
+        manifest = {
+            "format": "longfellow-zk-compatibility-manifest-v1",
+            "vectors": "vectors.json",
+            "vectors_sha256": hashlib.sha256(payload).hexdigest(),
+        }
         (staging / "vectors.json").write_bytes(payload)
         (staging / "manifest.json").write_bytes(encoded(manifest))
+        os.replace(lfc1_path, directory / "lfc1_fixture.bin")
         os.replace(staging / "vectors.json", directory / "vectors.json")
         os.replace(staging / "manifest.json", directory / "manifest.json")
 
 
-def check(directory: Path, implementation: str) -> None:
+def check(directory: Path, implementation: str, include_root: Path | None = None) -> None:
     vectors_path = directory / "vectors.json"
     manifest_path = directory / "manifest.json"
     if not vectors_path.is_file() or not manifest_path.is_file():
@@ -118,6 +147,12 @@ def check(directory: Path, implementation: str) -> None:
     for name, (_, _, relative) in expected.items():
         item = actual[name]
         path = ROOT / relative
+        if name == "lfc1":
+            path = directory / "lfc1_fixture.bin"
+            if not path.is_file():
+                raise RuntimeError("reviewed LFC1 fixture is missing")
+            if path.read_bytes() != generated_lfc1(include_root):
+                raise RuntimeError(f"{implementation}: lfc1 serialized byte drift")
         if item.get("path") != relative or item.get("sha256") != digest(path):
             raise RuntimeError(f"{implementation}: {name} hash mismatch")
         if item.get("bytes") != path.stat().st_size:
@@ -132,14 +167,16 @@ def main() -> None:
     parser.add_argument("--implementation", choices=("cpp", "rust"), default="cpp")
     parser.add_argument("--rust-report", type=Path)
     parser.add_argument("--write-rust-report", type=Path)
+    parser.add_argument("--include-root", type=Path,
+                        help="additional source include root used only to prove source-only edits are not vectors")
     args = parser.parse_args()
     if args.update:
         if not args.allow_reviewed_overwrite:
             parser.error("--update requires --allow-reviewed-overwrite")
-        write_reviewed(args.directory)
+        write_reviewed(args.directory, args.include_root)
         print(f"updated reviewed compatibility vectors: {args.directory}")
     cross_check(args.rust_report, args.write_rust_report)
-    check(args.directory, args.implementation)
+    check(args.directory, args.implementation, args.include_root)
     print(f"{args.implementation}: compatibility vectors verified")
 
 

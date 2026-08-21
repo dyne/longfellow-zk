@@ -3,6 +3,7 @@
 *.so
 *.wasm
 *.bin
+!test/compatibility/lfc1_fixture.bin
 test/*.txt
 test/*.log
 test/results/*.csv
