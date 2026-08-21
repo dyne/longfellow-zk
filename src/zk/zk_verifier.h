@@ -17,6 +17,7 @@
 
 #include <stddef.h>
 
+#include <cstring>
 #include <vector>
 
 #include "arrays/dense.h"
@@ -75,6 +76,14 @@ class ZkVerifier {
   bool verify(const ZkProof<Field>& zk, const Dense<Field>& pub,
               Transcript& tv) const {
     log(INFO, "verifier: verify");
+
+    if (!ZkCommon<Field>::valid_circuit(circ_) || !param_.valid() ||
+        !zk.param.valid() || zk.proof.l.size() != circ_.nl ||
+        std::memcmp(zk.c.id, circ_.id, sizeof(circ_.id)) != 0 ||
+        pub.n0_ != 1 || pub.n1_ < circ_.npub_in) {
+      log(ERROR, "invalid proof parameters or public-input dimensions");
+      return false;
+    }
 
     ZkCommon<Field>::initialize_sumcheck_fiat_shamir(tv, circ_, pub, f_);
 

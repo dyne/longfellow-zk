@@ -42,7 +42,10 @@ void CheckScalar(const typename Field::N& value, int mutation = -1) {
   Trace trace;
   const auto generator = p256k1.generator();
   compute_secp256k1_scalar_mult_witness(trace, p256k1, generator, value);
-  const Backend backend(field, true);
+  // Mutated witnesses are deliberately invalid external values, so evaluate
+  // them through the recoverable assertion path.  Valid fixtures retain the
+  // fail-fast invariant mode.
+  const Backend backend(field, mutation < 0);
   const Circuit circuit(&backend, field);
   const Gadget gadget(circuit, p256k1);
   typename Gadget::ScalarMultWitness witness;

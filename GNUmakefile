@@ -113,10 +113,14 @@ blindzap-cli: blindzap
 	@./test/blindzap/cli_test.sh ./blindzap
 
 .PHONY: blindzap-ci-test
-blindzap-ci-test: blindzap-spec-test bip340-test secp256k1-ec-gadget-test \
+blindzap-ci-test: panic-parser-test blindzap-spec-test bip340-test secp256k1-ec-gadget-test \
 		blindzap-key-ownership-test blindzap-sha256-test \
 		blindzap-ripemd160-test blindzap-sage-vector-test blindzap-protocol-test \
 		blindzap-integration-test blindzap-cli
+
+.PHONY: panic-parser-test
+panic-parser-test: test/security/panic_parser_test
+	@./test/security/panic_parser_test
 
 .PHONY: blindzap-proof-test
 blindzap-proof-test: blindzap-test
@@ -143,6 +147,12 @@ test/bip340_test: test/bip340/bip340_test.cc $(BIP340_DEPS) \
 test/secp256k1/ec_gadget_test: test/secp256k1/ec_gadget_test.cc $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/secp256k1
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+test/security/panic_parser_test: test/security/panic_parser_test.cc \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/security
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/key_ownership_test: test/blindzap/key_ownership_test.cc $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
@@ -189,6 +199,7 @@ clean:
 	rm -f longfellow-zk longfellow-zk.wasm
 	rm -f test/bip340_test
 	rm -f test/secp256k1/ec_gadget_test
+	rm -f test/security/panic_parser_test
 	rm -f test/blindzap/blindzap_test
 	rm -f test/blindzap/compressed_key_sha256_test
 	rm -f test/blindzap/integration_test

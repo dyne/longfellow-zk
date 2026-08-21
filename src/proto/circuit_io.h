@@ -48,6 +48,13 @@ struct CircuitIO {
 
   static constexpr size_t kIdSize = 32;
   static constexpr size_t kMaxLayers = 10000;  // deep circuits are errors
+  // Resource limits for untrusted circuit artifacts.  These match the Rust
+  // reader's production limits and are deliberately below address-space
+  // exhaustion on supported 32-bit targets.
+  static constexpr size_t kMaxWires = 5000000;
+  static constexpr size_t kMaxConstants = 5000000;
+  static constexpr size_t kMaxTermsPerLayer = 20000000;
+  static constexpr size_t kMaxTotalTerms = 20000000;
   static constexpr uint64_t kMaxValue = (1ULL << (kBytesPerSizeT * 8)) - 1;
 
   // Multiplies arguments and checks for overflow.

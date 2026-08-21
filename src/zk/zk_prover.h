@@ -17,6 +17,7 @@
 
 #include <stddef.h>
 
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -73,6 +74,17 @@ class ZkProver : public ProverLayers<Field> {
               RandomEngine& rng) {
     log(INFO, "ZK Commit start");
 
+    if (!ZkCommon<Field>::valid_circuit(c_) ||
+        !ZkCommon<Field>::valid_circuit(zkp.c) || !zkp.param.valid() ||
+        !zkp.com_proof.valid_for(zkp.param) ||
+        zkp.proof.l.size() != c_.nl ||
+        std::memcmp(zkp.c.id, c_.id, sizeof(c_.id)) != 0 || W.n0_ != 1 ||
+        W.n1_ < c_.ninputs) {
+      log(ERROR, "invalid proof parameters or witness dimensions");
+      lp_.reset();
+      return;
+    }
+
     // Copy witnesses for commitment
     // Layout of the com: 0 ...<witnesses>... start_pad <pad> len
     // Only commit the private witnesses, which begin at index c_.npub_in.
@@ -100,7 +112,15 @@ class ZkProver : public ProverLayers<Field> {
   }
 
   bool prove(ZkProof<Field>& zkp, const Dense<Field>& W, Transcript& tsp) {
-    check(lp_ != nullptr, "must run commit before prove");
+    if (lp_ == nullptr || !ZkCommon<Field>::valid_circuit(c_) ||
+        !ZkCommon<Field>::valid_circuit(zkp.c) || !zkp.param.valid() ||
+        !zkp.com_proof.valid_for(zkp.param) ||
+        zkp.proof.l.size() != c_.nl ||
+        std::memcmp(zkp.c.id, c_.id, sizeof(c_.id)) != 0 || W.n0_ != 1 ||
+        W.n1_ < c_.ninputs) {
+      log(ERROR, "must successfully commit valid parameters before prove");
+      return false;
+    }
 
     // Interpret W as public parameters, we only append
     // c_.npub_in elements of W to the transcript

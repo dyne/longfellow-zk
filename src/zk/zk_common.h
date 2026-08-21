@@ -45,6 +45,28 @@ class ZkCommon {
   using WPoly = typename LayerProof<Field>::WPoly;
 
  public:
+  // Validate every circuit property assumed by the ZK runtime before parsed
+  // circuit data reaches invariant checks or indexed vectors.
+  static bool valid_circuit(const Circuit<Field>& circuit) {
+    if (circuit.nv == 0 || circuit.logv != lg(circuit.nv) ||
+        circuit.logv > Proof<Field>::kMaxBindings || circuit.nc != 1 ||
+        circuit.logc != 0 ||
+        circuit.nl == 0 || circuit.l.size() != circuit.nl ||
+        circuit.ninputs == 0 || circuit.npub_in > circuit.ninputs ||
+        circuit.subfield_boundary > circuit.ninputs) {
+      return false;
+    }
+    for (const auto& layer : circuit.l) {
+      if (layer.nw < 2 || layer.logw == 0 ||
+          layer.logw > LayerProof<Field>::kMaxBindings ||
+          layer.logw != lg(layer.nw) || layer.quad == nullptr ||
+          layer.quad->size() == 0) {
+        return false;
+      }
+    }
+    return circuit.l.back().nw == circuit.ninputs;
+  }
+
   // pi: witness index for first pad element in a larger commitment
   static size_t verifier_constraints(
       const Circuit<Field>& circuit, const Dense<Field>& pub,

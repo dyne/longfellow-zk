@@ -5,6 +5,7 @@
 
 #include "circuits/bip340/bip340_verify.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -31,6 +32,7 @@
 #include "circuits/logic/evaluation_backend.h"
 #include "circuits/logic/logic.h"
 #include "ec/p256k1.h"
+#include "proto/circuit_reader.h"
 #include "proto/circuit_writer.h"
 #include "util/readbuffer.h"
 #include "random/secure_random_engine.h"
@@ -554,6 +556,22 @@ void TestZkProverVerifierVector0(const char* argv0) {
   CircuitWriter<Field> circuit_writer(F, SECP_ID);
   circuit_writer.to_bytes(*CIRCUIT, circuit_bytes);
 
+  ReadBuffer circuit_rb(circuit_bytes);
+  CircuitReader<Field> circuit_reader(F, SECP_ID);
+  auto parsed_circuit = circuit_reader.from_bytes(circuit_rb, true);
+  Require(parsed_circuit != nullptr, "valid circuit parse failed");
+  Require(circuit_reader.last_error().code == CircuitReadErrorCode::kNone,
+          "valid circuit retained a parse error");
+  for (size_t n = 0; n < std::min<size_t>(circuit_bytes.size(), 25); ++n) {
+    ReadBuffer truncated_circuit(circuit_bytes.data(), n);
+    CircuitReader<Field> truncated_reader(F, SECP_ID);
+    Require(truncated_reader.from_bytes(truncated_circuit, true) == nullptr,
+            "truncated circuit header accepted");
+    Require(truncated_reader.last_error().code ==
+                CircuitReadErrorCode::kTruncated,
+            "truncated circuit header lacks structured error");
+  }
+
   using Crt = CRT256<Field>;
   size_t block_enc = CIRCUIT->ninputs - CIRCUIT->npub_in + Q.nquad_terms_ + 1;
   auto err = check_crt_block_enc<Crt>(block_enc);
@@ -606,6 +624,23 @@ void TestZkProverVerifierVector0(const char* argv0) {
   ReadBuffer proof_rb(proof_bytes.data(), proof_bytes.size());
   ZkProof<Field> parsed_proof(*CIRCUIT, kRate, kQueries);
   Require(parsed_proof.read(proof_rb, F), "proof parse failed");
+  const std::vector<size_t> truncation_points = {
+      0,
+      1,
+      Digest::kLength - 1,
+      Digest::kLength,
+      std::min(proof_bytes.size() / 2, proof_bytes.size() - 1),
+      proof_bytes.size() - 1,
+  };
+  for (size_t n : truncation_points) {
+    ReadBuffer truncated_rb(proof_bytes.data(), n);
+    ZkProof<Field> truncated_proof(*CIRCUIT, kRate, kQueries);
+    Require(!truncated_proof.read(truncated_rb, F),
+            "truncated proof was accepted");
+    Require(truncated_proof.last_read_error().code !=
+                ProofReadErrorCode::kNone,
+            "truncated proof lacks structured error");
+  }
 
   Transcript trv(reinterpret_cast<uint8_t*>(const_cast<char*>("bip340 vec0")),
                  11);

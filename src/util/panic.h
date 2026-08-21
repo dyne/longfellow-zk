@@ -24,12 +24,19 @@
 
 namespace proofs {
 
-inline void check(bool truth, const char* why) {
-  if (!truth) {
-    log(INFO, "PANIC %s", why);
-  }
+// Terminate on an impossible internal state.  This function must not be used
+// to validate untrusted input: parsers are expected to return a recoverable
+// error before an invalid value reaches an invariant check.
+[[noreturn]] inline void panic(const char* why) noexcept {
+  log(ERROR, "PANIC %s", why == nullptr ? "(no reason supplied)" : why);
+  std::fflush(stderr);
+  std::abort();
 }
 
-};  // namespace proofs
+inline void check(bool truth, const char* why) noexcept {
+  if (!truth) panic(why);
+}
+
+}  // namespace proofs
 
 #endif  // PRIVACY_PROOFS_ZK_LIB_UTIL_PANIC_H_

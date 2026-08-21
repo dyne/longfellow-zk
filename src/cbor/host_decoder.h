@@ -124,8 +124,12 @@ class CborDoc {
   //
   // This function can handle adversarial inputs, and returns false when the
   // input cannot be parsed.
-  bool decode(const uint8_t in[], size_t len, size_t& pos, size_t offset) {
+  bool decode(const uint8_t in[], size_t len, size_t& pos, size_t offset,
+              size_t depth = 0) {
     /* invariant: pos is always compared with len before it is referenced. */
+    if (in == nullptr) return false;
+    if (depth > kMaxNestingDepth) return false;
+    if (pos > SIZE_MAX - offset) return false;
     header_pos_ = pos + offset;
 
     if (pos >= len) {
@@ -146,13 +150,13 @@ class CborDoc {
       }
       count = in[pos++];
     } else if (count0 == 25) {
-      if (pos + 1 >= len) {
+      if (pos > len || len - pos < 2) {
         return false;
       }
       count = in[pos] * 256 + in[pos + 1];
       pos += 2;
     } else if (count0 == 26) {
-      if (pos + 3 >= len) {
+      if (pos > len || len - pos < 4) {
         return false;
       }
       for (size_t i = 0; i < 4; ++i) {
@@ -175,7 +179,7 @@ class CborDoc {
 
       case 2: /* BYTES */
       case 3: /* TEXT */
-        if (pos + count > len) {
+        if (pos > len || count > len - pos) {
           return false;
         }
         t_ = (type == 2) ? BYTES : TEXT;
@@ -185,25 +189,27 @@ class CborDoc {
         break;
 
       case 4: /* ARRAY */
-        if (pos + count > len) {
+        if (pos > len || count > len - pos) {
           return false;
         }
-        return decode_items(ARRAY, count, count, in, len, pos, offset);
+        return decode_items(ARRAY, count, count, in, len, pos, offset, depth);
 
       case 5: /* MAP, (key,val) pairs are stored as 2*children */
-        if (pos + 2 * count > len) {
+        if (pos > len || count > (len - pos) / 2) {
           return false;
         }
-        return decode_items(MAP, 2 * count, count, in, len, pos, offset);
+        return decode_items(MAP, 2 * count, count, in, len, pos, offset,
+                            depth);
 
       case 6: /* TAG */
         // Special cases for TAG
         if (count == 1004) {         // date in the form YYYY-MM-DD
-          if (pos + 1 + 10 > len) {  // 0xDA for str length + 10 characters
+          if (pos > len || len - pos < 11) {
+            // 0xDA for str length + 10 characters
             return false;
           }
         }
-        return decode_items(TAG, 1, count, in, len, pos, offset);
+        return decode_items(TAG, 1, count, in, len, pos, offset, depth);
 
       case 7: /* PRIMITIVE */
         t_ = PRIMITIVE;
@@ -228,9 +234,60 @@ class CborDoc {
 
   // Lookup a child node in an array. Expects index to be within bounds.
   const CborDoc* aref(size_t index) const {
-    CborItems arr = as_array();
-    check(index < arr.nchildren, "aref index out of bounds");
+    if (t_ != ARRAY || index >= children_.size()) return nullptr;
     return &children_[index];
+  }
+
+  // Recoverable value metadata accessors for values originating in untrusted
+  // CBOR.  The assertion-based accessors above remain for already validated
+  // internal uses.
+  bool value_position(size_t* out) const {
+    if (out == nullptr) return false;
+    switch (t_) {
+      case UNSIGNED:
+      case NEGATIVE:
+      case PRIMITIVE:
+        *out = header_pos_;
+        return true;
+      case BYTES:
+      case TEXT:
+        *out = u_.string.pos;
+        return true;
+      case TAG:
+        if (children_.size() != 1) return false;
+        if (children_[0].t_ != BYTES && children_[0].t_ != TEXT) return false;
+        *out = children_[0].u_.string.pos;
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  bool value_length(size_t* out) const {
+    if (out == nullptr) return false;
+    switch (t_) {
+      case UNSIGNED:
+        return encoded_integer_length(u_.u64, out);
+      case NEGATIVE: {
+        // decode() stores the CBOR additional value as its negation.
+        const uint64_t magnitude = static_cast<uint64_t>(-(u_.i64 + 1)) + 1;
+        return encoded_integer_length(magnitude, out);
+      }
+      case BYTES:
+      case TEXT:
+        *out = u_.string.len;
+        return true;
+      case TAG:
+        if (children_.size() != 1) return false;
+        if (children_[0].t_ != BYTES && children_[0].t_ != TEXT) return false;
+        *out = children_[0].u_.string.len;
+        return true;
+      case PRIMITIVE:
+        *out = 1;
+        return true;
+      default:
+        return false;
+    }
   }
 
   // Lookup a key in a map of type {bytes->elements}.
@@ -343,6 +400,21 @@ class CborDoc {
   }
 
  private:
+  static constexpr size_t kMaxNestingDepth = 64;
+
+  static bool encoded_integer_length(uint64_t value, size_t* out) {
+    if (value < 24) {
+      *out = 1;
+    } else if (value < 256) {
+      *out = 2;
+    } else if (value < 65536) {
+      *out = 3;
+    } else {
+      *out = 5;
+    }
+    return true;
+  }
+
   // A union is used to store the attributes for either singleton objects (i.e.,
   // UNSIGNED, NEGATIVE, PRIMITIVE), the start position and len of TEXT and
   // BYTES array, and the children information for ARRAY or MAP objects.
@@ -362,13 +434,13 @@ class CborDoc {
   // Decodes a sequence of children nodes.
   bool decode_items(CborTag t, size_t nchildren, size_t items_n,
                     const uint8_t in[], size_t len, size_t& pos,
-                    size_t offset) {
+                    size_t offset, size_t depth) {
     t_ = t;
     u_.items.n = items_n;
     u_.items.nchildren = nchildren;
     children_.resize(nchildren);
     for (size_t i = 0; i < nchildren; ++i) {
-      if (!children_[i].decode(in, len, pos, offset)) return false;
+      if (!children_[i].decode(in, len, pos, offset, depth + 1)) return false;
     }
     return true;
   }
