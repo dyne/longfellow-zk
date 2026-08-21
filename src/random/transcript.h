@@ -15,6 +15,7 @@
 #ifndef PRIVACY_PROOFS_ZK_LIB_RANDOM_TRANSCRIPT_H_
 #define PRIVACY_PROOFS_ZK_LIB_RANDOM_TRANSCRIPT_H_
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -33,7 +34,9 @@ FSPRF and Transcript together used implement the Fiat-Shamir transform.
 class FSPRF  {
  public:
   explicit FSPRF(const uint8_t key[kPRFKeySize])
-      : prf_(key), nblock_(0), rdptr_(kPRFOutputSize) {}
+      : key_{}, prf_(key), nblock_(0), rdptr_(kPRFOutputSize) {
+    std::memcpy(key_.data(), key, key_.size());
+  }
 
   // Disable copy for good measure.
   explicit FSPRF(const FSPRF&) = delete;
@@ -52,7 +55,22 @@ class FSPRF  {
     }
   }
 
+  // Explicitly clone the active PRF stream.  Copying remains disabled so a
+  // caller must opt into duplicating this sensitive state.
+  std::unique_ptr<FSPRF> clone() const {
+    return std::unique_ptr<FSPRF>(
+        new FSPRF(key_.data(), nblock_, rdptr_, saved_));
+  }
+
  private:
+  FSPRF(const uint8_t key[kPRFKeySize], uint64_t nblock, size_t rdptr,
+        const uint8_t saved[kPRFOutputSize])
+      : FSPRF(key) {
+    nblock_ = nblock;
+    rdptr_ = rdptr;
+    std::memcpy(saved_, saved, sizeof(saved_));
+  }
+
   void refill() {
     check(nblock_ < kMaxBlocks, "too many blocks");
     uint8_t in[kPRFInputSize] = {};
@@ -61,6 +79,7 @@ class FSPRF  {
     rdptr_ = 0;
   }
 
+  std::array<uint8_t, kPRFKeySize> key_;
   PRF prf_;
   uint64_t nblock_;
   size_t rdptr_;       // read pointer into saved[]
@@ -83,7 +102,9 @@ class Transcript : public RandomEngine {
   Transcript& operator=(const Transcript&) = delete;
 
   // Explicit copy to avoid accidental passing by value.
-  Transcript clone() { return Transcript(sha_, version_); }
+  Transcript clone() const {
+    return Transcript(sha_, version_, prf_.get());
+  }
 
   // Generate bytes by via the current FSPRF object.
   void bytes(uint8_t buf[/*n*/], size_t n) override {
@@ -152,8 +173,8 @@ class Transcript : public RandomEngine {
   }
 
  private:
-  explicit Transcript(const SHA256& sha, size_t version)
-      : sha_(), version_(version) {
+  explicit Transcript(const SHA256& sha, size_t version, const FSPRF* prf)
+      : sha_(), prf_(prf ? prf->clone() : nullptr), version_(version) {
     sha_.CopyState(sha);
   }
 
