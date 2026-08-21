@@ -224,6 +224,15 @@ jobs:
       run: |
         make blindzap-static-analysis
 
+  blindzap-sage-reference:
+    name: BlindZap Sage reference model
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+    - name: Run independent mathematical and differential checks
+      run: |
+        make blindzap-sage-test
+
   blindzap-sanitizers:
     name: BlindZap ASan and UBSan
     runs-on: ubuntu-latest
@@ -245,7 +254,7 @@ jobs:
 
   draft-binary-release:
     name: 📦 Pack
-    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics, blindzap-proof, blindzap-static-analysis, blindzap-sanitizers]
+    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics, blindzap-proof, blindzap-static-analysis, blindzap-sage-reference, blindzap-sanitizers]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:

@@ -177,9 +177,17 @@ void TestMalformedStatementCorpus() {
 void TestEnvelopeAndTranscript() {
   BlindzapEnvelopeV1 envelope;
   envelope.statement = Statement();
-  envelope.proof.circuit_digest[0] = 4;
+  for (size_t index = 0; index < envelope.proof.circuit_digest.size(); ++index) {
+    envelope.proof.circuit_digest[index] = static_cast<uint8_t>(index + 1);
+  }
   envelope.proof.bytes = {1, 2, 3, 4};
   const auto seed = BlindzapTranscriptSeed(envelope.statement, envelope.proof);
+  const std::array<uint8_t, 32> sage_seed = {
+      0xc2, 0xad, 0x47, 0xdf, 0x01, 0x3d, 0x42, 0x01,
+      0x73, 0xf4, 0xde, 0x56, 0xc4, 0xa5, 0x3b, 0x39,
+      0x1e, 0xe9, 0x48, 0x6a, 0xd1, 0x71, 0x5e, 0x01,
+      0x6a, 0xa1, 0xce, 0x7c, 0x08, 0x28, 0x51, 0x32};
+  Require(seed == sage_seed, "transcript seed differs from Sage vector");
   envelope.statement.nonce[0] ^= 1;
   Require(seed != BlindzapTranscriptSeed(envelope.statement, envelope.proof),
           "nonce not transcript-bound");

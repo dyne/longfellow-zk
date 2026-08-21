@@ -202,6 +202,7 @@ make blindzap-key-ownership-test
 make blindzap-sha256-test
 make blindzap-ripemd160-test
 make blindzap-proof-test
+make blindzap-sage-test
 ```
 
 The full proof gate exercises both circuit-family members with real proofs,
@@ -210,3 +211,17 @@ boundary cases, and rejects altered public inputs and tampered proof bytes.
 See [the integration README](../../blindzap/README.md) and
 [security claim matrix](../../../docs/blindzap-security.md) for protocol and
 operational boundaries.
+
+### Independent Sage oracle
+
+The [Sage reference model](../../../spec/blindzap/README.md) independently
+reconstructs the mathematical relation over `GF(p)`, compressed SEC encodings,
+SHA-256, RIPEMD-160, the canonical statement digest, and an example transcript
+seed. It checks its generated corpus against both a dedicated Sage fixture and
+the existing Python fixture. The hash compression functions are implemented
+inside the model rather than delegated to Python's `hashlib`.
+
+This oracle can reveal mathematical, boundary, padding, endian, and
+serialization disagreements. It cannot establish that every required C++
+wire is constrained, prove the Longfellow proof system sound, or replace
+adversarial witness tests and independent review.

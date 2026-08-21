@@ -75,6 +75,10 @@ blindzap-spec-test:
 	@python3 scripts/check_blindzap_spec.py
 	@python3 scripts/generate_blindzap_vectors.py | diff -u test/blindzap/testdata/blindzap_vectors.json -
 
+.PHONY: blindzap-sage-test
+blindzap-sage-test:
+	@./scripts/run_blindzap_sage.sh
+
 .PHONY: blindzap-key-ownership-test
 blindzap-key-ownership-test: test/blindzap/key_ownership_test
 	@./test/blindzap/key_ownership_test

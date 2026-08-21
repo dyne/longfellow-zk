@@ -155,6 +155,7 @@ record peak resident memory separately, and run multiple samples.
 ## Further documentation
 
 - [Circuit construction](../circuits/blindzap/README.md)
+- [Independent Sage reference model](../../spec/blindzap/README.md)
 - [Normative v1 format](../../docs/blindzap-v1.md)
 - [Operations and production controls](../../docs/blindzap-operations.md)
 - [Security claim matrix](../../docs/blindzap-security.md)
