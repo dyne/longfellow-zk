@@ -1,0 +1,433 @@
+make[1]: Entering directory '/home/gestalt/devel/dyne/longfellow-zk'
+🌉 Building for posix
+make[2]: Entering directory '/home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib'
+make --no-print-directory libzstd.a BUILD_DIR=obj/conf_7710134b5251dde1835c188a693f5c09 CPPFLAGS="-DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0 " CFLAGS="-O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" LDFLAGS=" -z noexecstack"
+mkdir -p obj/conf_7710134b5251dde1835c188a693f5c09/static
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/debug.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/debug.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/debug.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/entropy_common.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/entropy_common.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/entropy_common.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/error_private.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/error_private.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/error_private.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_decompress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_decompress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/fse_decompress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/pool.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/pool.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/pool.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/threading.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/threading.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/threading.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/xxhash.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/xxhash.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/xxhash.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_common.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_common.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/zstd_common.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_compress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_compress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/fse_compress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/hist.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/hist.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/hist.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_compress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_compress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/huf_compress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_compress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_literals.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_literals.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_compress_literals.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_sequences.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_sequences.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_compress_sequences.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_superblock.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_superblock.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_compress_superblock.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_double_fast.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_double_fast.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_double_fast.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_fast.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_fast.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_fast.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_lazy.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_lazy.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_lazy.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ldm.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ldm.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_ldm.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_opt.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_opt.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_opt.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_preSplit.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_preSplit.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_preSplit.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstdmt_compress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstdmt_compress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstdmt_compress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/huf_decompress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ddict.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ddict.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/zstd_ddict.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/zstd_decompress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress_block.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress_block.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/zstd_decompress_block.c
+AS obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress_amd64.o
+cc -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow -Wstrict-aliasing=1 -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef -Wpointer-arith -Wvla -Wformat=2 -Winit-self -Wfloat-equal -Wwrite-strings -Wredundant-decls -Wmissing-prototypes -Wc++-compat  -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress_amd64.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/huf_decompress_amd64.S
+compiling single-threaded static library 1.5.8
+ar rcs obj/conf_7710134b5251dde1835c188a693f5c09/static/libzstd.a obj/conf_7710134b5251dde1835c188a693f5c09/static/debug.o obj/conf_7710134b5251dde1835c188a693f5c09/static/entropy_common.o obj/conf_7710134b5251dde1835c188a693f5c09/static/error_private.o obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_decompress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/pool.o obj/conf_7710134b5251dde1835c188a693f5c09/static/threading.o obj/conf_7710134b5251dde1835c188a693f5c09/static/xxhash.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_common.o obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_compress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/hist.o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_compress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_literals.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_sequences.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_superblock.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_double_fast.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_fast.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_lazy.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ldm.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_opt.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_preSplit.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstdmt_compress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ddict.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress_block.o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress_amd64.o
+cp -f obj/conf_7710134b5251dde1835c188a693f5c09/static/libzstd.a libzstd.a
+make[2]: Leaving directory '/home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib'
+make[2]: Entering directory '/home/gestalt/devel/dyne/longfellow-zk/src'
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o ec/p256.cc.o ec/p256.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o algebra/nat.cc.o algebra/nat.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/sha/flatsha256_witness.cc.o circuits/sha/flatsha256_witness.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/sha/sha256_constants.cc.o circuits/sha/sha256_constants.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/tests/base64/decode_util.cc.o circuits/tests/base64/decode_util.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/mdoc/mdoc_zk.cc.o circuits/mdoc/mdoc_zk.cc
+In file included from ./gf2k/gf2_128.h:28,
+                 from ./circuits/mac/mac_witness.h:23,
+                 from circuits/mdoc/mdoc_zk.cc:32:
+./gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/mdoc/zk_spec.cc.o circuits/mdoc/zk_spec.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/mdoc/mdoc_decompress.cc.o circuits/mdoc/mdoc_decompress.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/mdoc/mdoc_generate_circuit.cc.o circuits/mdoc/mdoc_generate_circuit.cc
+In file included from ./gf2k/gf2_128.h:28,
+                 from ./circuits/logic/logic.h:26,
+                 from circuits/mdoc/mdoc_generate_circuit.cc:28:
+./gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o ec/p256k1.cc.o ec/p256k1.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o algebra/crt.cc.o algebra/crt.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/aes_ecb.cc.o util/aes_ecb.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/log.cc.o util/log.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/sha256.cc.o util/sha256.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/crypto.cc.o util/crypto.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/randombytes.cc.o util/randombytes.cc
+util/randombytes.cc:35:10: warning: "_GNU_SOURCE" redefined
+   35 | # define _GNU_SOURCE
+      |          ^~~~~~~~~~~
+<command-line>: note: this is the location of the previous definition
+util/randombytes.cc: In function ‘int randombytes(void*, size_t)’:
+util/randombytes.cc:267:48: note: ‘#pragma message: Using getrandom system call’
+  267 | #  pragma message("Using getrandom system call")
+      |                                                ^
+ar -rcs liblongfellow-zk.a ec/p256.cc.o algebra/nat.cc.o circuits/sha/flatsha256_witness.cc.o circuits/sha/sha256_constants.cc.o circuits/tests/base64/decode_util.cc.o circuits/mdoc/mdoc_zk.cc.o circuits/mdoc/zk_spec.cc.o circuits/mdoc/mdoc_decompress.cc.o circuits/mdoc/mdoc_generate_circuit.cc.o ec/p256k1.cc.o algebra/crt.cc.o  util/aes_ecb.cc.o util/log.cc.o util/sha256.cc.o util/crypto.cc.o util/randombytes.cc.o
+make[2]: Leaving directory '/home/gestalt/devel/dyne/longfellow-zk/src'
+make[2]: Entering directory '/home/gestalt/devel/dyne/longfellow-zk/src/cli'
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -c -o main.o main.cc
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -c -o encoding.o encoding.cc
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -c -o nanobench.o nanobench.cc
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -o ../../longfellow-zk main.o encoding.o nanobench.o /home/gestalt/devel/dyne/longfellow-zk/src/liblongfellow-zk.a /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib/libzstd.a
+make[2]: Leaving directory '/home/gestalt/devel/dyne/longfellow-zk/src/cli'
+make[1]: Leaving directory '/home/gestalt/devel/dyne/longfellow-zk'
+make[1]: Entering directory '/home/gestalt/devel/dyne/longfellow-zk'
+🌉 Building for posix
+make[2]: Entering directory '/home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib'
+make --no-print-directory libzstd.a BUILD_DIR=obj/conf_7710134b5251dde1835c188a693f5c09 CPPFLAGS="-DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0 " CFLAGS="-O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow" LDFLAGS=" -z noexecstack"
+mkdir -p obj/conf_7710134b5251dde1835c188a693f5c09/static
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/debug.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/debug.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/debug.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/entropy_common.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/entropy_common.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/entropy_common.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/error_private.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/error_private.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/error_private.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_decompress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_decompress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/fse_decompress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/pool.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/pool.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/pool.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/threading.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/threading.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/threading.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/xxhash.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/xxhash.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/xxhash.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_common.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_common.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//common/zstd_common.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_compress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_compress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/fse_compress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/hist.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/hist.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/hist.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_compress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_compress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/huf_compress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_compress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_literals.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_literals.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_compress_literals.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_sequences.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_sequences.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_compress_sequences.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_superblock.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_superblock.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_compress_superblock.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_double_fast.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_double_fast.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_double_fast.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_fast.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_fast.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_fast.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_lazy.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_lazy.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_lazy.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ldm.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ldm.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_ldm.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_opt.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_opt.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_opt.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_preSplit.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_preSplit.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstd_preSplit.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstdmt_compress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstdmt_compress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//compress/zstdmt_compress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/huf_decompress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ddict.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ddict.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/zstd_ddict.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/zstd_decompress.c
+CC obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress_block.o
+cc -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -MMD -MP -o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress_block.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/zstd_decompress_block.c
+AS obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress_amd64.o
+cc -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow -Wstrict-aliasing=1 -Wswitch-enum -Wdeclaration-after-statement -Wstrict-prototypes -Wundef -Wpointer-arith -Wvla -Wformat=2 -Winit-self -Wfloat-equal -Wwrite-strings -Wredundant-decls -Wmissing-prototypes -Wc++-compat  -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -DXXH_NAMESPACE=ZSTD_ -DDEBUGLEVEL=0 -DZSTD_LEGACY_SUPPORT=0   -c -o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress_amd64.o /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib//decompress/huf_decompress_amd64.S
+compiling single-threaded static library 1.5.8
+ar rcs obj/conf_7710134b5251dde1835c188a693f5c09/static/libzstd.a obj/conf_7710134b5251dde1835c188a693f5c09/static/debug.o obj/conf_7710134b5251dde1835c188a693f5c09/static/entropy_common.o obj/conf_7710134b5251dde1835c188a693f5c09/static/error_private.o obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_decompress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/pool.o obj/conf_7710134b5251dde1835c188a693f5c09/static/threading.o obj/conf_7710134b5251dde1835c188a693f5c09/static/xxhash.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_common.o obj/conf_7710134b5251dde1835c188a693f5c09/static/fse_compress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/hist.o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_compress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_literals.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_sequences.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_compress_superblock.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_double_fast.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_fast.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_lazy.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ldm.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_opt.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_preSplit.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstdmt_compress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_ddict.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress.o obj/conf_7710134b5251dde1835c188a693f5c09/static/zstd_decompress_block.o obj/conf_7710134b5251dde1835c188a693f5c09/static/huf_decompress_amd64.o
+cp -f obj/conf_7710134b5251dde1835c188a693f5c09/static/libzstd.a libzstd.a
+make[2]: Leaving directory '/home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib'
+make[2]: Entering directory '/home/gestalt/devel/dyne/longfellow-zk/src'
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o ec/p256.cc.o ec/p256.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o algebra/nat.cc.o algebra/nat.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/sha/flatsha256_witness.cc.o circuits/sha/flatsha256_witness.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/sha/sha256_constants.cc.o circuits/sha/sha256_constants.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/tests/base64/decode_util.cc.o circuits/tests/base64/decode_util.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/mdoc/mdoc_zk.cc.o circuits/mdoc/mdoc_zk.cc
+In file included from ./gf2k/gf2_128.h:28,
+                 from ./circuits/mac/mac_witness.h:23,
+                 from circuits/mdoc/mdoc_zk.cc:32:
+./gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/mdoc/zk_spec.cc.o circuits/mdoc/zk_spec.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/mdoc/mdoc_decompress.cc.o circuits/mdoc/mdoc_decompress.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o circuits/mdoc/mdoc_generate_circuit.cc.o circuits/mdoc/mdoc_generate_circuit.cc
+In file included from ./gf2k/gf2_128.h:28,
+                 from ./circuits/logic/logic.h:26,
+                 from circuits/mdoc/mdoc_generate_circuit.cc:28:
+./gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o ec/p256k1.cc.o ec/p256k1.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o algebra/crt.cc.o algebra/crt.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/aes_ecb.cc.o util/aes_ecb.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/log.cc.o util/log.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/sha256.cc.o util/sha256.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/crypto.cc.o util/crypto.cc
+g++ -std=c++17 -mpclmul -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -I../vendor/zstd/lib -c -o util/randombytes.cc.o util/randombytes.cc
+util/randombytes.cc:35:10: warning: "_GNU_SOURCE" redefined
+   35 | # define _GNU_SOURCE
+      |          ^~~~~~~~~~~
+<command-line>: note: this is the location of the previous definition
+util/randombytes.cc: In function ‘int randombytes(void*, size_t)’:
+util/randombytes.cc:267:48: note: ‘#pragma message: Using getrandom system call’
+  267 | #  pragma message("Using getrandom system call")
+      |                                                ^
+ar -rcs liblongfellow-zk.a ec/p256.cc.o algebra/nat.cc.o circuits/sha/flatsha256_witness.cc.o circuits/sha/sha256_constants.cc.o circuits/tests/base64/decode_util.cc.o circuits/mdoc/mdoc_zk.cc.o circuits/mdoc/zk_spec.cc.o circuits/mdoc/mdoc_decompress.cc.o circuits/mdoc/mdoc_generate_circuit.cc.o ec/p256k1.cc.o algebra/crt.cc.o  util/aes_ecb.cc.o util/log.cc.o util/sha256.cc.o util/crypto.cc.o util/randombytes.cc.o
+make[2]: Leaving directory '/home/gestalt/devel/dyne/longfellow-zk/src'
+make[2]: Entering directory '/home/gestalt/devel/dyne/longfellow-zk/src/cli'
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -c -o main.o main.cc
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -c -o encoding.o encoding.cc
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -c -o nanobench.o nanobench.cc
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -I. -I.. -o ../../longfellow-zk main.o encoding.o nanobench.o /home/gestalt/devel/dyne/longfellow-zk/src/liblongfellow-zk.a /home/gestalt/devel/dyne/longfellow-zk/vendor/zstd/lib/libzstd.a
+make[2]: Leaving directory '/home/gestalt/devel/dyne/longfellow-zk/src/cli'
+make[1]: Leaving directory '/home/gestalt/devel/dyne/longfellow-zk'
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -Isrc -Ivendor/zstd/lib -o test/blindzap/blindzap_test test/blindzap/blindzap_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+In file included from src/gf2k/gf2_128.h:28,
+                 from src/circuits/logic/logic.h:26,
+                 from src/blindzap/prover.h:17,
+                 from test/blindzap/blindzap_test.cc:15:
+src/gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+[INFO][+13350.607 ms] ZK Commit start
+[INFO][+33189.670 ms] ZK Commitment done
+[INFO][+ 2214.355 ms] ZK sumcheck done
+[INFO][+   82.079 ms] ZK constraints done
+[INFO][+ 6514.085 ms] Prover Done: flag
+[INFO][+   92.149 ms] com:32, sc:2870080, com_proof:88392396 [1379704 el, 896 el, 1704 d in 7 rows]: 91262508b
+[INFO][+ 4079.061 ms] verifier: recv commit
+[INFO][+    0.026 ms] verifier: verify
+[INFO][+30093.926 ms] verify done: ok
+[INFO][+ 5175.040 ms] verifier: recv commit
+[INFO][+    0.015 ms] verifier: verify
+[INFO][+ 1344.694 ms] verify done: merkle_check failed
+[INFO][+ 2282.133 ms] ZK Commit start
+[INFO][+18372.519 ms] ZK Commitment done
+[INFO][+ 1085.754 ms] ZK sumcheck done
+[INFO][+   69.883 ms] ZK constraints done
+[INFO][+ 3039.917 ms] Prover Done: flag
+[INFO][+   41.010 ms] com:32, sc:2620096, com_proof:44260396 [690178 el, 896 el, 1631 d in 7 rows]: 46880524b
+[INFO][+   58.456 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.034 ms] verifier: verify
+[INFO][+18419.966 ms] verify done: ok
+positive verify done
+[INFO][+    0.073 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+ 1032.015 ms] verify done: merkle_check failed
+[INFO][+    0.054 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+ 1058.536 ms] verify done: merkle_check failed
+[INFO][+   96.387 ms] verifier: recv commit
+[INFO][+    0.008 ms] verifier: verify
+[INFO][+ 1053.407 ms] verify done: merkle_check failed
+[INFO][+ 1678.756 ms] ZK Commit start
+[INFO][+18319.515 ms] ZK Commitment done
+[INFO][+ 1429.418 ms] ZK sumcheck done
+[INFO][+   75.125 ms] ZK constraints done
+[INFO][+ 3994.557 ms] Prover Done: flag
+[INFO][+   42.822 ms] com:32, sc:2620096, com_proof:44259884 [690178 el, 896 el, 1615 d in 7 rows]: 46880012b
+[INFO][+   63.488 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.012 ms] verifier: verify
+[INFO][+16404.253 ms] verify done: ok
+positive verify done
+[INFO][+    0.064 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  987.988 ms] verify done: merkle_check failed
+[INFO][+    0.052 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  930.751 ms] verify done: merkle_check failed
+[INFO][+   91.627 ms] verifier: recv commit
+[INFO][+    0.008 ms] verifier: verify
+[INFO][+ 1010.870 ms] verify done: merkle_check failed
+[INFO][+ 1970.652 ms] ZK Commit start
+[INFO][+23151.564 ms] ZK Commitment done
+[INFO][+ 1200.781 ms] ZK sumcheck done
+[INFO][+   68.074 ms] ZK constraints done
+[INFO][+ 3001.578 ms] Prover Done: flag
+[INFO][+   41.624 ms] com:32, sc:2620096, com_proof:44259404 [690178 el, 896 el, 1600 d in 7 rows]: 46879532b
+[INFO][+   57.715 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.012 ms] verifier: verify
+[INFO][+21383.496 ms] verify done: ok
+positive verify done
+[INFO][+    0.061 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  745.095 ms] verify done: merkle_check failed
+[INFO][+    0.055 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  732.198 ms] verify done: merkle_check failed
+[INFO][+   66.175 ms] verifier: recv commit
+[INFO][+    0.005 ms] verifier: verify
+[INFO][+  810.244 ms] verify done: merkle_check failed
+[INFO][+ 1527.579 ms] ZK Commit start
+[INFO][+47073.370 ms] ZK Commitment done
+[INFO][+ 2915.683 ms] ZK sumcheck done
+[INFO][+  209.928 ms] ZK constraints done
+[INFO][+ 7019.116 ms] Prover Done: flag
+[INFO][+   82.992 ms] com:32, sc:2620096, com_proof:44259500 [690178 el, 896 el, 1603 d in 7 rows]: 46879628b
+[INFO][+  104.321 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.020 ms] verifier: verify
+[INFO][+26694.131 ms] verify done: ok
+positive verify done
+[INFO][+    0.074 ms] verifier: recv commit
+[INFO][+    0.002 ms] verifier: verify
+[INFO][+ 1317.651 ms] verify done: merkle_check failed
+[INFO][+    0.108 ms] verifier: recv commit
+[INFO][+    0.010 ms] verifier: verify
+[INFO][+ 1294.402 ms] verify done: merkle_check failed
+[INFO][+  106.767 ms] verifier: recv commit
+[INFO][+    0.012 ms] verifier: verify
+[INFO][+ 1277.261 ms] verify done: merkle_check failed
+[INFO][+ 2671.936 ms] ZK Commit start
+[INFO][+27859.365 ms] ZK Commitment done
+[INFO][+ 1682.872 ms] ZK sumcheck done
+[INFO][+   94.019 ms] ZK constraints done
+[INFO][+ 3676.249 ms] Prover Done: flag
+[INFO][+   44.389 ms] com:32, sc:2620096, com_proof:44259180 [690178 el, 896 el, 1593 d in 7 rows]: 46879308b
+[INFO][+   63.851 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.014 ms] verifier: verify
+[INFO][+17965.037 ms] verify done: ok
+positive verify done
+[INFO][+    0.142 ms] verifier: recv commit
+[INFO][+    0.013 ms] verifier: verify
+[INFO][+ 1058.846 ms] verify done: merkle_check failed
+[INFO][+    0.066 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  734.437 ms] verify done: merkle_check failed
+[INFO][+   69.913 ms] verifier: recv commit
+[INFO][+    0.010 ms] verifier: verify
+[INFO][+  737.243 ms] verify done: merkle_check failed
+[INFO][+ 1485.930 ms] ZK Commit start
+[INFO][+19957.717 ms] ZK Commitment done
+[INFO][+ 1670.351 ms] ZK sumcheck done
+[INFO][+   97.379 ms] ZK constraints done
+[INFO][+ 3121.126 ms] Prover Done: flag
+[INFO][+   45.114 ms] com:32, sc:2620096, com_proof:44259052 [690178 el, 896 el, 1589 d in 7 rows]: 46879180b
+[INFO][+   61.978 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.014 ms] verifier: verify
+[INFO][+18281.252 ms] verify done: ok
+positive verify done
+[INFO][+    0.066 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  739.887 ms] verify done: merkle_check failed
+[INFO][+    0.050 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  743.846 ms] verify done: merkle_check failed
+[INFO][+   70.174 ms] verifier: recv commit
+[INFO][+    0.010 ms] verifier: verify
+[INFO][+  765.164 ms] verify done: merkle_check failed
+BlindZap layout tests passed
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -Isrc -Ivendor/zstd/lib -o test/blindzap/protocol_test test/blindzap/protocol_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+BlindZap protocol tests passed
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -Isrc -Ivendor/zstd/lib -o test/blindzap/integration_test test/blindzap/integration_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+BlindZap integration tests passed
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -Isrc -Ivendor/zstd/lib -o blindzap src/cli/blindzap_main.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+In file included from src/gf2k/gf2_128.h:28,
+                 from src/circuits/logic/logic.h:26,
+                 from src/blindzap/prover.h:17,
+                 from src/cli/blindzap_main.cc:10:
+src/gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -Isrc -Ivendor/zstd/lib -o test/blindzap/key_ownership_test test/blindzap/key_ownership_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+In file included from src/gf2k/gf2_128.h:28,
+                 from src/circuits/logic/logic.h:26,
+                 from test/blindzap/key_ownership_test.cc:12:
+src/gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+key ownership tests passed
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -Isrc -Ivendor/zstd/lib -o test/blindzap/compressed_key_sha256_test test/blindzap/compressed_key_sha256_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+In file included from src/gf2k/gf2_128.h:28,
+                 from src/circuits/logic/logic.h:26,
+                 from test/blindzap/compressed_key_sha256_test.cc:19:
+src/gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+metrics ownership build_ms=29 public_inputs=1 total_inputs=1539 quad_terms=23274 depth=9 crt_block_enc=24813
+metrics ownership_plus_sha256 build_ms=269 public_inputs=1 total_inputs=3011 quad_terms=285932 depth=11 crt_block_enc=288943
+compressed key SHA-256 tests passed
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -Isrc -Ivendor/zstd/lib -o test/blindzap/ripemd160_test test/blindzap/ripemd160_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+In file included from src/gf2k/gf2_128.h:28,
+                 from src/circuits/logic/logic.h:26,
+                 from test/blindzap/ripemd160_test.cc:13:
+src/gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+RIPEMD-160 tests passed
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -Isrc -Ivendor/zstd/lib -o test/secp256k1/ec_gadget_test test/secp256k1/ec_gadget_test.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+In file included from src/gf2k/gf2_128.h:28,
+                 from src/circuits/logic/logic.h:26,
+                 from test/secp256k1/ec_gadget_test.cc:6:
+src/gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+[INFO][+    3.968 ms] PANIC a != F.zero()
+[INFO][+    0.015 ms] PANIC a != F.zero()
+[INFO][+    0.531 ms] PANIC a != F.zero()
+[INFO][+    0.002 ms] PANIC a != F.zero()
+[INFO][+    0.599 ms] PANIC a != F.zero()
+[INFO][+    0.002 ms] PANIC a != F.zero()
+[INFO][+    0.000 ms] PANIC a != F.zero()
+[INFO][+    0.495 ms] PANIC a != F.zero()
+ec gadget tests passed
+g++ -std=c++17 -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow -Isrc -Itest/bip340 -Ivendor/zstd/lib -o test/bip340_test test/bip340/bip340_test.cc \
+	src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+In file included from src/gf2k/gf2_128.h:28,
+                 from src/circuits/logic/logic.h:26,
+                 from test/bip340/bip340_test.cc:32:
+src/gf2k/sysdep.h:95:52: warning: ignoring attributes on template argument ‘proofs::gf2_128_elt_t’ {aka ‘__m128i’} [-Wignored-attributes]
+   95 | using gf2_128_accum_t = std::array<gf2_128_elt_t, 3>;
+      |                                                    ^
+ok - hex parser rejects malformed input
+ok - scalar evaluation accepts and rejects witnesses
+ok - accepted circuit soundness regressions
+ok - bitcoin vectors evaluate through circuit
+ok - witness semantic facts match golden vectors
+ok - compiled circuit has expected shape
+ok - CRT guard accepts and rejects boundary sizes
+ok - zk prover/verifier accepts bitcoin vector 0
+bip340 tests passed
+BlindZap protocol tests passed
+release_gate_wall_seconds=550.27 release_gate_max_rss_kib=2754684 exit=0
+final_release_gate_exit=0
