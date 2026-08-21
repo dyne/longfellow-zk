@@ -129,6 +129,9 @@ class ZkProver : public ProverLayers<Field> {
 
     // Run sumcheck to generate a padded proof.
     inputs in;
+    // W remains needed below for public-input constraints, so this is the one
+    // required full witness copy.  eval_circuit transfers it into the last
+    // layer and ProverLayers::prove releases every completed layer promptly.
     auto V = super::eval_circuit(&in, &c_, W.clone(), f_);
     if (V == nullptr) {
       log(ERROR, "eval_circuit failed");
