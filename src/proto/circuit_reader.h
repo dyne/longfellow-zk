@@ -27,6 +27,7 @@
 #include "sumcheck/quad.h"
 #include "sumcheck/quad_builder.h"
 #include "util/ceildiv.h"
+#include "util/byte_cursor.h"
 #include "util/readbuffer.h"
 
 namespace proofs {
@@ -43,6 +44,7 @@ enum class CircuitReadErrorCode {
   kInvalidDelta,
   kInvalidIndex,
   kCircuitIdMismatch,
+  kTrailingBytes,
 };
 
 struct CircuitReadError {
@@ -76,13 +78,32 @@ class CircuitReader {
   // the serialization matches the id stored in the circuit.
   std::unique_ptr<Circuit<Field>> from_bytes(ReadBuffer& buf,
                                              bool enforce_circuit_id) {
+    ByteCursor cursor(buf.data(), buf.remaining());
+    auto result = from_bytes(cursor, enforce_circuit_id);
+    if (result) (void)buf.advance(cursor.position());
+    return result;
+  }
+
+  std::unique_ptr<Circuit<Field>> from_bytes(ByteCursor& buf,
+                                             bool enforce_circuit_id) {
+    auto result = from_record(buf, enforce_circuit_id);
+    if (result && buf.remaining() != 0) {
+      return fail(CircuitReadErrorCode::kTrailingBytes, buf);
+    }
+    return result;
+  }
+
+  // Explicit archive-only API: callers reading a concatenation must consume
+  // every record and validate end-of-archive themselves.
+  std::unique_ptr<Circuit<Field>> from_record(ByteCursor& buf,
+                                              bool enforce_circuit_id) {
     last_error_ = {};
     if (!buf.have(8 * CircuitIO::kBytesPerSizeT + 1)) {
       return fail(CircuitReadErrorCode::kTruncated, buf);
     }
 
     const uint8_t* bytes = nullptr;
-    if (!buf.read(1, &bytes)) {
+    if (!buf.take(1, &bytes)) {
       return fail(CircuitReadErrorCode::kTruncated, buf);
     }
     uint8_t version = bytes[0];
@@ -96,7 +117,10 @@ class CircuitReader {
         !read_num(buf, &nc) || !read_num(buf, &npub_in) ||
         !read_num(buf, &subfield_boundary) || !read_num(buf, &ninputs) ||
         !read_num(buf, &nl) || !read_num(buf, &numconst)) {
-      return fail(CircuitReadErrorCode::kTruncated, buf);
+      return fail(buf.error().code == ParseErrorCode::kResourceLimit
+                      ? CircuitReadErrorCode::kResourceLimit
+                      : CircuitReadErrorCode::kTruncated,
+                  buf);
     }
 
     if (fid_as_size_t != static_cast<size_t>(field_id_)) {
@@ -118,9 +142,12 @@ class CircuitReader {
       return fail(CircuitReadErrorCode::kTruncated, buf);
     }
 
+    if (!buf.consume_allocation(numconst) || !buf.consume_elements(numconst)) {
+      return fail(CircuitReadErrorCode::kResourceLimit, buf);
+    }
     auto constants = std::make_shared<std::vector<Elt>>(numconst);
     for (size_t i = 0; i < numconst; ++i) {
-      if (!buf.read(Field::kBytes, &bytes)) {
+      if (!buf.take(Field::kBytes, &bytes)) {
         return fail(CircuitReadErrorCode::kTruncated, buf);
       }
       auto vv = f_.of_bytes_field(bytes);
@@ -179,6 +206,9 @@ class CircuitReader {
         return fail(CircuitReadErrorCode::kTruncated, buf, ly);
       }
 
+      if (!buf.consume_allocation(nq) || !buf.consume_elements(nq)) {
+        return fail(CircuitReadErrorCode::kResourceLimit, buf, ly);
+      }
       auto qq = std::make_unique<Quad<Field>>(nq, constants, db.delta_table());
       size_t prevg = 0, prevhl = 0, prevhr = 0;
       for (size_t i = 0; i < nq; ++i) {
@@ -225,7 +255,7 @@ class CircuitReader {
       return fail(CircuitReadErrorCode::kInvalidDimensions, buf);
     }
     // Read the circuit name from the serialization.
-    if (!buf.read(CircuitIO::kIdSize, c->id)) {
+    if (!buf.copy(CircuitIO::kIdSize, c->id)) {
       return fail(CircuitReadErrorCode::kTruncated, buf);
     }
 
@@ -241,14 +271,14 @@ class CircuitReader {
 
  private:
   std::unique_ptr<Circuit<Field>> fail(CircuitReadErrorCode code,
-                                       const ReadBuffer& buf,
+                                       const ByteCursor& buf,
                                        size_t layer = SIZE_MAX,
                                        size_t term = SIZE_MAX) {
     last_error_ = {code, buf.position(), layer, term};
     return nullptr;
   }
 
-  static bool read_index(ReadBuffer& buf, size_t prev_ind, size_t* out) {
+  static bool read_index(ByteCursor& buf, size_t prev_ind, size_t* out) {
     size_t delta;
     if (!read_num(buf, &delta)) return false;
     size_t magnitude = delta >> 1;
@@ -265,10 +295,10 @@ class CircuitReader {
   // This routine reads bytes written by serialize_* methods, and thus
   // only needs to handle values expressed in kBytesPerSizeT.
   // On 32-bit platforms, values which do not fit are recoverable parse errors.
-  static bool read_num(ReadBuffer& buf, size_t* out) {
+  static bool read_num(ByteCursor& buf, size_t* out) {
     uint64_t r = 0;
     const uint8_t* p = nullptr;
-    if (!buf.read(CircuitIO::kBytesPerSizeT, &p)) return false;
+    if (!buf.take(CircuitIO::kBytesPerSizeT, &p)) return false;
     for (size_t i = 0; i < CircuitIO::kBytesPerSizeT; ++i) {
       r |= (static_cast<uint64_t>(p[i]) << (i * 8));
     }

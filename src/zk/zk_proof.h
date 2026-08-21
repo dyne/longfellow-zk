@@ -26,6 +26,7 @@
 #include "sumcheck/circuit.h"
 #include "util/log.h"
 #include "util/readbuffer.h"
+#include "util/byte_cursor.h"
 #include "util/serialization.h"
 #include "zk/zk_common.h"
 
@@ -129,6 +130,13 @@ struct ZkProof {
 
   // The read function returns false on error or underflow.
   bool read(ReadBuffer &buf, const Field &F) {
+    ByteCursor cursor(buf.data(), buf.remaining());
+    const bool result = read(cursor, F);
+    if (result) (void)buf.advance(cursor.position());
+    return result;
+  }
+
+  bool read(ByteCursor &buf, const Field &F) {
     last_read_error_ = {};
     if (!ZkCommon<Field>::valid_circuit(c) || !param.valid()) {
       return fail(ProofReadErrorCode::kUnsupportedGeometry,
@@ -246,7 +254,7 @@ struct ZkProof {
     }
   }
 
-  bool read_sc_proof(Proof<Field> &pr, ReadBuffer &buf, const Field &F) {
+  bool read_sc_proof(Proof<Field> &pr, ByteCursor &buf, const Field &F) {
     if (c.logc != 0) {
       return fail(ProofReadErrorCode::kUnsupportedGeometry,
                   ProofReadSection::kSumcheck, buf);
@@ -287,7 +295,7 @@ struct ZkProof {
     return true;
   }
 
-  bool read_com(LigeroCommitment<Field> &com0, ReadBuffer &buf,
+  bool read_com(LigeroCommitment<Field> &com0, ByteCursor &buf,
                 const Field &F) {
     if (!read_digest(buf, com0.root)) {
       return fail(ProofReadErrorCode::kTruncated,
@@ -296,7 +304,7 @@ struct ZkProof {
     return true;
   }
 
-  bool read_com_proof(LigeroProof<Field> &pr, ReadBuffer &buf, const Field &F) {
+  bool read_com_proof(LigeroProof<Field> &pr, ByteCursor &buf, const Field &F) {
     if (!have_elements(buf, pr.block, Field::kBytes)) {
       return fail(ProofReadErrorCode::kTruncated, ProofReadSection::kLigero,
                   buf);
@@ -450,48 +458,48 @@ struct ZkProof {
     return true;
   }
 
-  std::optional<Elt> read_elt(ReadBuffer &buf, const Field &F) const {
+  std::optional<Elt> read_elt(ByteCursor &buf, const Field &F) const {
     const uint8_t *bytes = nullptr;
-    if (!buf.read(Field::kBytes, &bytes)) return std::nullopt;
+    if (!buf.take(Field::kBytes, &bytes)) return std::nullopt;
     return F.of_bytes_field(bytes);
   }
 
-  std::optional<Elt> read_subfield_elt(ReadBuffer &buf, const Field &F) const {
+  std::optional<Elt> read_subfield_elt(ByteCursor &buf, const Field &F) const {
     const uint8_t *bytes = nullptr;
-    if (!buf.read(Field::kSubFieldBytes, &bytes)) return std::nullopt;
+    if (!buf.take(Field::kSubFieldBytes, &bytes)) return std::nullopt;
     return F.of_bytes_subfield(bytes);
   }
 
-  bool read_digest(ReadBuffer &buf, Digest &x) const {
-    return buf.read(Digest::kLength, x.data);
+  bool read_digest(ByteCursor &buf, Digest &x) const {
+    return buf.copy(Digest::kLength, x.data);
   }
 
-  bool read_nonce(ReadBuffer &buf, MerkleNonce &x) const {
-    return buf.read(MerkleNonce::kLength, x.bytes);
+  bool read_nonce(ByteCursor &buf, MerkleNonce &x) const {
+    return buf.copy(MerkleNonce::kLength, x.bytes);
   }
 
-  bool read_size(ReadBuffer &buf, size_t *out) const {
+  bool read_size(ByteCursor &buf, size_t *out) const {
     const uint8_t *bytes = nullptr;
-    if (!buf.read(4, &bytes)) return false;
+    if (!buf.take(4, &bytes)) return false;
     *out = u32_of_le(bytes);
     return true;
   }
 
-  static bool have_elements(const ReadBuffer &buf, size_t count,
+  static bool have_elements(const ByteCursor &buf, size_t count,
                             size_t width) {
     return width != 0 && count <= buf.remaining() / width;
   }
 
   bool fail(ProofReadErrorCode code, ProofReadSection section,
-            const ReadBuffer &buf) {
+            const ByteCursor &buf) {
     if (!last_read_error_) {
       last_read_error_ = {code, section, buf.position()};
     }
     return false;
   }
 
-  bool fail_field_error(ProofReadSection section, const ReadBuffer &buf) {
-    const auto code = buf.status().error == ReadBufferError::kNone
+  bool fail_field_error(ProofReadSection section, const ByteCursor &buf) {
+    const auto code = buf.error().code == ParseErrorCode::kNone
                           ? ProofReadErrorCode::kNoncanonicalFieldElement
                           : ProofReadErrorCode::kTruncated;
     return fail(code, section, buf);
