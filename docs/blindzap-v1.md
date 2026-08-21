@@ -210,3 +210,15 @@ and a complete canonical statement encoding/digest vector. Regenerate it with:
 ```
 python3 scripts/generate_blindzap_vectors.py | diff -u test/blindzap/testdata/blindzap_vectors.json -
 ```
+
+An independent Sage reference model in
+`spec/blindzap/blindzap_reference.sage` reconstructs the same shared vectors
+using Sage finite-field/elliptic-curve arithmetic and local, non-OpenSSL
+SHA-256 and RIPEMD-160 implementations. It additionally checks group-order and
+negation identities, invalid scalar boundaries, compressed-SEC rejection, and
+an example transcript seed. Run its pinned reproducibility and differential
+gate with:
+
+```sh
+make blindzap-sage-test
+```
