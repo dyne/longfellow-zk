@@ -185,10 +185,12 @@ BlindzapStatementV1 ReferenceStatement() {
 }
 
 nlohmann::json LoadFixture(const char* path) {
+  constexpr std::streamsize kMaxFixtureBytes = 1'048'576;
   std::ifstream stream(path, std::ios::binary | std::ios::ate);
   Require(stream.good(), std::string("cannot open Sage fixture: ") + path);
   const std::streamsize size = stream.tellg();
-  Require(size > 0 && size <= 1024 * 1024, "Sage fixture size is invalid");
+  Require(size > 0 && size <= kMaxFixtureBytes,
+          "Sage fixture size is invalid");
   stream.seekg(0);
   nlohmann::json fixture;
   stream >> fixture;
@@ -200,16 +202,17 @@ nlohmann::json LoadFixture(const char* path) {
 void CheckValidVector(const nlohmann::json& vector, size_t vector_index) {
   const std::string context = "Sage vector " + std::to_string(vector_index);
   const std::string scalar_text = vector.at("secret_scalar").get<std::string>();
-  const std::optional<Field::N> scalar =
+  const std::optional<Field::N> parsed_scalar =
       Field::N::of_untrusted_string(scalar_text.c_str());
-  Require(scalar.has_value(), context + " scalar does not parse");
-  const auto secret = SecretBytes(*scalar);
+  Require(parsed_scalar.has_value(), context + " scalar does not parse");
+  const Field::N scalar = parsed_scalar.value();
+  const auto secret = SecretBytes(scalar);
   BlindzapWitnessV1<Field, EC> complete_native;
   Require(complete_native.compute(p256k1, secret.data(), secret.size()),
           context + " scalar failed native input validation");
 
   OwnershipNative ownership_native;
-  ownership_native.compute(p256k1, *scalar);
+  ownership_native.compute(p256k1, scalar);
   Require(HexNat(p256k1_base.from_montgomery(ownership_native.x)) ==
               vector.at("x_coordinate").get<std::string>(),
           context + " x coordinate differs");
