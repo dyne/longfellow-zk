@@ -45,6 +45,19 @@ The gate requires exact equality with
 curve, statement, and HASH160 values with the independently generated
 `blindzap_vectors.json` fixture.
 
+The normal C++ production gate then loads `blindzap_sage_vectors.json`
+directly. For every valid vector it compares scalar multiplication, affine
+coordinates, parity, compressed SEC, SHA-256, HASH160, scriptPubKey, complete
+native witness construction, and full circuit evaluation. It also consumes
+the invalid-scalar list and the statement/transcript example. Therefore CI
+enforces the complete chain:
+
+```text
+fresh Sage computation == Sage fixture == C++ native and circuit results
+                              |
+                              +== shared independent Python fixture
+```
+
 To inspect a freshly generated corpus with an installed Sage:
 
 ```sh

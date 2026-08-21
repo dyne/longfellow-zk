@@ -79,6 +79,10 @@ blindzap-spec-test:
 blindzap-sage-test:
 	@./scripts/run_blindzap_sage.sh
 
+.PHONY: blindzap-sage-vector-test
+blindzap-sage-vector-test: test/blindzap/sage_vector_test
+	@./test/blindzap/sage_vector_test test/blindzap/testdata/blindzap_sage_vectors.json
+
 .PHONY: blindzap-key-ownership-test
 blindzap-key-ownership-test: test/blindzap/key_ownership_test
 	@./test/blindzap/key_ownership_test
@@ -111,7 +115,7 @@ blindzap-cli: blindzap
 .PHONY: blindzap-ci-test
 blindzap-ci-test: blindzap-spec-test bip340-test secp256k1-ec-gadget-test \
 		blindzap-key-ownership-test blindzap-sha256-test \
-		blindzap-ripemd160-test blindzap-protocol-test \
+		blindzap-ripemd160-test blindzap-sage-vector-test blindzap-protocol-test \
 		blindzap-integration-test blindzap-cli
 
 .PHONY: blindzap-proof-test
@@ -151,6 +155,16 @@ test/blindzap/compressed_key_sha256_test: test/blindzap/compressed_key_sha256_te
 test/blindzap/ripemd160_test: test/blindzap/ripemd160_test.cc $(wildcard src/circuits/ripemd160/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+test/blindzap/sage_vector_test: test/blindzap/sage_vector_test.cc \
+		test/blindzap/testdata/blindzap_sage_vectors.json \
+		$(wildcard src/blindzap/*.h) $(wildcard src/circuits/blindzap/*.h) \
+		$(wildcard src/circuits/ripemd160/*.h) \
+		$(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a \
+		vendor/zstd/lib/libzstd.a
+	@mkdir -p test/blindzap
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/blindzap_test: test/blindzap/blindzap_test.cc $(wildcard src/blindzap/*.h) $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/ripemd160/*.h) $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap

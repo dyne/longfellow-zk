@@ -222,3 +222,8 @@ gate with:
 ```sh
 make blindzap-sage-test
 ```
+
+`blindzap-sage-vector-test`, included in `blindzap-ci-test`, loads the checked
+Sage fixture and evaluates every valid vector through the C++ native helpers
+and the complete composed circuit; it also consumes the invalid scalar and
+statement/transcript vectors.

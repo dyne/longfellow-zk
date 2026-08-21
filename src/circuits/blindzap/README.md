@@ -221,6 +221,12 @@ seed. It checks its generated corpus against both a dedicated Sage fixture and
 the existing Python fixture. The hash compression functions are implemented
 inside the model rather than delegated to Python's `hashlib`.
 
+`sage_vector_test.cc` loads that Sage fixture directly and checks every valid
+vector against the C++ native implementation and the complete composed
+circuit. It also checks the fixture's invalid scalar boundaries and canonical
+statement/transcript example, preventing the C++ tests from drifting into a
+separate set of hardcoded vectors.
+
 This oracle can reveal mathematical, boundary, padding, endian, and
 serialization disagreements. It cannot establish that every required C++
 wire is constrained, prove the Longfellow proof system sound, or replace
