@@ -1,0 +1,133 @@
+[INFO][+20101.106 ms] ZK Commit start
+[INFO][+41891.990 ms] ZK Commitment done
+[INFO][+ 2344.627 ms] ZK sumcheck done
+[INFO][+   77.945 ms] ZK constraints done
+[INFO][+ 6763.797 ms] Prover Done: flag
+[INFO][+   91.925 ms] com:32, sc:2870080, com_proof:88392588 [1379704 el, 896 el, 1710 d in 7 rows]: 91262700b
+[INFO][+ 4248.840 ms] verifier: recv commit
+[INFO][+    0.011 ms] verifier: verify
+[INFO][+33368.364 ms] verify done: ok
+[INFO][+ 6064.461 ms] verifier: recv commit
+[INFO][+    0.021 ms] verifier: verify
+[INFO][+ 1406.790 ms] verify done: merkle_check failed
+[INFO][+ 1516.374 ms] ZK Commit start
+[INFO][+28408.597 ms] ZK Commitment done
+[INFO][+ 1227.962 ms] ZK sumcheck done
+[INFO][+   71.947 ms] ZK constraints done
+[INFO][+ 3193.315 ms] Prover Done: flag
+[INFO][+   56.477 ms] com:32, sc:2620096, com_proof:44259532 [690178 el, 896 el, 1604 d in 7 rows]: 46879660b
+[INFO][+   87.984 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.040 ms] verifier: verify
+[INFO][+26091.099 ms] verify done: ok
+positive verify done
+[INFO][+    0.092 ms] verifier: recv commit
+[INFO][+    0.002 ms] verifier: verify
+[INFO][+ 1092.242 ms] verify done: merkle_check failed
+[INFO][+    0.071 ms] verifier: recv commit
+[INFO][+    0.003 ms] verifier: verify
+[INFO][+ 1030.891 ms] verify done: merkle_check failed
+[INFO][+   88.627 ms] verifier: recv commit
+[INFO][+    0.009 ms] verifier: verify
+[INFO][+  863.612 ms] verify done: merkle_check failed
+[INFO][+ 1521.146 ms] ZK Commit start
+[INFO][+18506.227 ms] ZK Commitment done
+[INFO][+ 1281.858 ms] ZK sumcheck done
+[INFO][+   72.128 ms] ZK constraints done
+[INFO][+ 3154.773 ms] Prover Done: flag
+[INFO][+   42.809 ms] com:32, sc:2620096, com_proof:44259308 [690178 el, 896 el, 1597 d in 7 rows]: 46879436b
+[INFO][+   62.026 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.013 ms] verifier: verify
+[INFO][+17051.249 ms] verify done: ok
+positive verify done
+[INFO][+    0.067 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+ 1069.392 ms] verify done: merkle_check failed
+[INFO][+    0.071 ms] verifier: recv commit
+[INFO][+    0.002 ms] verifier: verify
+[INFO][+ 1088.026 ms] verify done: merkle_check failed
+[INFO][+   90.534 ms] verifier: recv commit
+[INFO][+    0.014 ms] verifier: verify
+[INFO][+ 1036.935 ms] verify done: merkle_check failed
+[INFO][+ 1516.318 ms] ZK Commit start
+[INFO][+18777.749 ms] ZK Commitment done
+[INFO][+ 1249.226 ms] ZK sumcheck done
+[INFO][+   71.262 ms] ZK constraints done
+[INFO][+ 3636.348 ms] Prover Done: flag
+[INFO][+   41.776 ms] com:32, sc:2620096, com_proof:44259084 [690178 el, 896 el, 1590 d in 7 rows]: 46879212b
+[INFO][+   63.239 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.011 ms] verifier: verify
+[INFO][+16497.247 ms] verify done: ok
+positive verify done
+[INFO][+    0.074 ms] verifier: recv commit
+[INFO][+    0.002 ms] verifier: verify
+[INFO][+  734.027 ms] verify done: merkle_check failed
+[INFO][+    0.049 ms] verifier: recv commit
+[INFO][+    0.002 ms] verifier: verify
+[INFO][+  810.700 ms] verify done: merkle_check failed
+[INFO][+   70.420 ms] verifier: recv commit
+[INFO][+    0.009 ms] verifier: verify
+[INFO][+  733.411 ms] verify done: merkle_check failed
+[INFO][+ 1506.425 ms] ZK Commit start
+[INFO][+17754.276 ms] ZK Commitment done
+[INFO][+ 1256.662 ms] ZK sumcheck done
+[INFO][+   71.241 ms] ZK constraints done
+[INFO][+ 3112.568 ms] Prover Done: flag
+[INFO][+   44.930 ms] com:32, sc:2620096, com_proof:44259372 [690178 el, 896 el, 1599 d in 7 rows]: 46879500b
+[INFO][+   62.104 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.013 ms] verifier: verify
+[INFO][+16121.068 ms] verify done: ok
+positive verify done
+[INFO][+    0.077 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  748.028 ms] verify done: merkle_check failed
+[INFO][+    0.065 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  749.661 ms] verify done: merkle_check failed
+[INFO][+   72.169 ms] verifier: recv commit
+[INFO][+    0.013 ms] verifier: verify
+[INFO][+  739.466 ms] verify done: merkle_check failed
+[INFO][+ 1554.666 ms] ZK Commit start
+[INFO][+20364.191 ms] ZK Commitment done
+[INFO][+ 1259.361 ms] ZK sumcheck done
+[INFO][+   83.001 ms] ZK constraints done
+[INFO][+ 3637.197 ms] Prover Done: flag
+[INFO][+   41.554 ms] com:32, sc:2620096, com_proof:44259628 [690178 el, 896 el, 1607 d in 7 rows]: 46879756b
+[INFO][+   61.717 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.012 ms] verifier: verify
+[INFO][+17966.594 ms] verify done: ok
+positive verify done
+[INFO][+    0.091 ms] verifier: recv commit
+[INFO][+    0.002 ms] verifier: verify
+[INFO][+ 1102.308 ms] verify done: merkle_check failed
+[INFO][+    0.071 ms] verifier: recv commit
+[INFO][+    0.002 ms] verifier: verify
+[INFO][+ 1023.935 ms] verify done: merkle_check failed
+[INFO][+   87.398 ms] verifier: recv commit
+[INFO][+    0.007 ms] verifier: verify
+[INFO][+  764.144 ms] verify done: merkle_check failed
+[INFO][+ 1518.781 ms] ZK Commit start
+[INFO][+28523.027 ms] ZK Commitment done
+[INFO][+ 1710.097 ms] ZK sumcheck done
+[INFO][+   77.199 ms] ZK constraints done
+[INFO][+ 3173.808 ms] Prover Done: flag
+[INFO][+   44.736 ms] com:32, sc:2620096, com_proof:44259116 [690178 el, 896 el, 1591 d in 7 rows]: 46879244b
+[INFO][+   63.690 ms] verifier: recv commit
+positive verify begin
+[INFO][+    0.014 ms] verifier: verify
+[INFO][+16134.344 ms] verify done: ok
+positive verify done
+[INFO][+    0.060 ms] verifier: recv commit
+[INFO][+    0.001 ms] verifier: verify
+[INFO][+  744.209 ms] verify done: merkle_check failed
+[INFO][+    0.045 ms] verifier: recv commit
+[INFO][+    0.002 ms] verifier: verify
+[INFO][+  738.139 ms] verify done: merkle_check failed
+[INFO][+   73.136 ms] verifier: recv commit
+[INFO][+    0.007 ms] verifier: verify
+[INFO][+  761.589 ms] verify done: merkle_check failed
+BlindZap layout tests passed

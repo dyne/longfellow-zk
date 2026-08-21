@@ -1,4 +1,6 @@
 CFLAGS ?= -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow
+SANITIZER_CC ?= clang
+SANITIZER_CXX ?= clang++
 WASI_SDK_PATH := /opt/wasi-sdk
 INCLUDES := -I. -I..
 
@@ -129,6 +131,64 @@ blindzap-proof-test: blindzap-test
 blindzap-static-analysis:
 	@./scripts/run_blindzap_static_analysis.sh
 
+# Reviewed compatibility vectors are validation-only by default.  Updating
+# them requires spelling out the overwrite acknowledgement at the command
+# line, so a normal test run can never rewrite a reviewed baseline.
+.PHONY: compatibility-vectors compatibility-vectors-update compatibility-vectors-test \
+	baseline-metrics baseline-metrics-test compile-commands baseline-static-analysis \
+	baseline-sanitizers parser-fuzz transcript-fuzz fuzz-crash-replay fuzz-smoke
+compatibility-vectors:
+	@python3 scripts/compatibility_vectors.py --implementation cpp
+	@python3 scripts/compatibility_vectors.py --implementation rust
+
+compatibility-vectors-update:
+	@python3 scripts/compatibility_vectors.py --update --allow-reviewed-overwrite
+
+compatibility-vectors-test: compatibility-vectors
+	@python3 test/compatibility/compatibility_vectors_test.py
+
+# Baseline tooling intentionally writes only generated, ignored artifacts.  The
+# checked-in scripts and seed corpora make each measurement and fuzz replay
+# command reproducible without changing protocol code.
+baseline-metrics:
+	@python3 scripts/baseline_metrics.py --runs 3 --output test/results/baseline_metrics.csv
+
+baseline-metrics-test:
+	@python3 test/tooling/baseline_tooling_test.py
+
+compile-commands:
+	@rm -f compile_commands.json
+	@bear --output compile_commands.json -- $(MAKE) -B test/security/panic_parser_test
+	@test -s compile_commands.json
+
+baseline-static-analysis:
+	@./scripts/run_baseline_static_analysis.sh
+
+baseline-sanitizers:
+	@$(MAKE) clean
+	@$(MAKE) -j$$(nproc) posix CC=$(SANITIZER_CC) CXX=$(SANITIZER_CXX) CFLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-strict-overflow"
+	@ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+		$(MAKE) panic-parser-test CC=$(SANITIZER_CC) CXX=$(SANITIZER_CXX) CFLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-strict-overflow"
+
+test/fuzz/parser_fuzz: test/fuzz/parser_fuzz.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/fuzz
+	clang++ -std=c++17 -O1 -g -DFUZZ_STANDALONE -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+test/fuzz/transcript_fuzz: test/fuzz/transcript_fuzz.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/fuzz
+	clang++ -std=c++17 -O1 -g -DFUZZ_STANDALONE -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+parser-fuzz: test/fuzz/parser_fuzz
+	@./test/fuzz/parser_fuzz test/fuzz/corpus/parser/truncated_lfc1
+
+transcript-fuzz: test/fuzz/transcript_fuzz
+	@./test/fuzz/transcript_fuzz test/fuzz/corpus/transcript/empty test/fuzz/corpus/transcript/seed
+
+fuzz-crash-replay:
+	@python3 test/fuzz/replay_seeded_crash.py
+
+fuzz-smoke: parser-fuzz transcript-fuzz fuzz-crash-replay
+
 blindzap: src/cli/blindzap_main.cc $(wildcard src/blindzap/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
@@ -200,11 +260,13 @@ clean:
 	rm -f test/bip340_test
 	rm -f test/secp256k1/ec_gadget_test
 	rm -f test/security/panic_parser_test
+	rm -f test/fuzz/parser_fuzz test/fuzz/transcript_fuzz
 	rm -f test/blindzap/blindzap_test
 	rm -f test/blindzap/compressed_key_sha256_test
 	rm -f test/blindzap/integration_test
 	rm -f test/blindzap/key_ownership_test
 	rm -f test/blindzap/protocol_test
 	rm -f test/blindzap/ripemd160_test
+	rm -f test/blindzap/sage_vector_test
 	@$(MAKE) -C src clean
 	@$(MAKE) -C vendor/zstd clean

@@ -1,0 +1,5 @@
+{
+  "format": "longfellow-zk-compatibility-manifest-v1",
+  "vectors": "vectors.json",
+  "vectors_sha256": "cefb37fb38cce8d768a999af4a0445bfeff55daee4a17e820bc218e3ecff00a3"
+}
