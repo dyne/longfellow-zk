@@ -204,7 +204,9 @@ void CheckValidVector(const nlohmann::json& vector, size_t vector_index) {
   const std::string scalar_text = vector.at("secret_scalar").get<std::string>();
   const std::optional<Field::N> parsed_scalar =
       Field::N::of_untrusted_string(scalar_text.c_str());
-  Require(parsed_scalar.has_value(), context + " scalar does not parse");
+  if (!parsed_scalar.has_value()) {
+    throw std::runtime_error(context + " scalar does not parse");
+  }
   const Field::N scalar = parsed_scalar.value();
   const auto secret = SecretBytes(scalar);
   BlindzapWitnessV1<Field, EC> complete_native;
