@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "qualification_matrix.py"
 EXPECTED = [
     "cpp20-contract", "compatibility-lfc1", "lfc2-cross-language",
-    "parser-transcript-fuzz", "ownership-boundaries", "metric-schema",
+    "parser-transcript-fuzz", "ecdsa-dense-boundaries",
+    "ownership-boundaries", "metric-schema",
 ]
 
 

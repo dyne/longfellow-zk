@@ -19,6 +19,8 @@ GATES = (
     ("compatibility-lfc1", ("make", "compatibility-vectors-test")),
     ("lfc2-cross-language", ("make", "lfc2-cross-language-test")),
     ("parser-transcript-fuzz", ("make", "fuzz-smoke")),
+    ("ecdsa-dense-boundaries", ("make", "ecdsa-module-test",
+                                "ecdsa-proof-artifact-test", "dense-test")),
     ("ownership-boundaries", ("make", "assertion-symbols-test", "compiler-ownership-test")),
     ("metric-schema", ("make", "baseline-metrics", "baseline-metrics-test")),
 )

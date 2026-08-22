@@ -18,6 +18,54 @@ void require(bool condition, const char* message) {
   if (!condition) { std::cerr << message << '\n'; std::exit(1); }
 }
 
+size_t read_varint(const std::vector<uint8_t>& bytes, size_t* position) {
+  size_t value = 0;
+  unsigned shift = 0;
+  while (*position < bytes.size() && shift < sizeof(size_t) * 8) {
+    const uint8_t byte = bytes[(*position)++];
+    value |= static_cast<size_t>(byte & 0x7f) << shift;
+    if ((byte & 0x80) == 0) return value;
+    shift += 7;
+  }
+  require(false, "test fixture contains an invalid varint");
+  return 0;
+}
+
+size_t first_delta_offset(const std::vector<uint8_t>& bytes,
+                          size_t* constant_count,
+                          size_t* delta_count_offset) {
+  require(bytes.size() >= 4 && std::memcmp(bytes.data(), "LFC2", 4) == 0,
+          "test fixture is not LFC2");
+  size_t position = 4;
+  for (size_t field = 0; field < 7; ++field)
+    (void)read_varint(bytes, &position);
+  *constant_count = read_varint(bytes, &position);
+  position += *constant_count * Field::kBytes;
+  (void)read_varint(bytes, &position);  // layer logw
+  (void)read_varint(bytes, &position);  // layer wire count
+  *delta_count_offset = position;
+  (void)read_varint(bytes, &position);  // delta count
+  require(position < bytes.size(), "test fixture has no delta table");
+  return position;
+}
+
+void replace_varint(std::vector<uint8_t>* bytes, size_t position,
+                    uint64_t replacement) {
+  size_t end = position;
+  do {
+    require(end < bytes->size(), "varint replacement is out of bounds");
+  } while ((*bytes)[end++] & 0x80);
+  std::vector<uint8_t> encoded;
+  do {
+    uint8_t byte = static_cast<uint8_t>(replacement & 0x7f);
+    replacement >>= 7;
+    if (replacement != 0) byte |= 0x80;
+    encoded.push_back(byte);
+  } while (replacement != 0);
+  bytes->erase(bytes->begin() + position, bytes->begin() + end);
+  bytes->insert(bytes->begin() + position, encoded.begin(), encoded.end());
+}
+
 proofs::Circuit<Field> make_circuit() {
   proofs::EQuad<Field> terms(2);
   terms.ec_[0] = {0, {0, 1}, proofs::p256_base.one()};
@@ -75,5 +123,30 @@ int main(int argc, char** argv) {
   proofs::ByteCursor bad(malformed.data(), malformed.size());
   require(reader.from_bytes(bad, true) == nullptr,
           "noncanonical LFC2 varint was accepted");
+
+  size_t constant_count = 0;
+  size_t delta_count_offset = 0;
+  const size_t delta_offset =
+      first_delta_offset(lfc2, &constant_count, &delta_count_offset);
+  require(lfc2[delta_offset] == 0, "fixture first delta is not zero");
+  std::vector<uint8_t> oversized_delta = lfc2;
+  replace_varint(&oversized_delta, delta_offset, uint64_t{1} << 33);
+  proofs::ByteCursor oversized(oversized_delta.data(), oversized_delta.size());
+  require(reader.from_bytes(oversized, true) == nullptr &&
+              reader.last_error().code ==
+                  proofs::CircuitReadErrorCode::kInvalidDelta,
+          "out-of-domain LFC2 zig-zag delta was narrowed and accepted");
+
+  std::vector<uint8_t> oversized_table = lfc2;
+  replace_varint(&oversized_table, delta_count_offset, 1000);
+  proofs::ByteCursor allocation_limited(
+      oversized_table.data(), oversized_table.size(),
+      {.bytes = oversized_table.size(),
+       .allocations = constant_count + 10,
+       .elements = constant_count + 10});
+  require(reader.from_bytes(allocation_limited, true) == nullptr &&
+              reader.last_error().code ==
+                  proofs::CircuitReadErrorCode::kResourceLimit,
+          "LFC2 delta table bypassed the cursor allocation budget");
   return 0;
 }
