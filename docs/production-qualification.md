@@ -17,7 +17,8 @@ cat test/results/qualification_matrix.csv
 The raw CSV is included in the native CI release package. Its fixed rows cover
 C++20 contract/negative compilation, byte-identical LFC1 vectors from both C++
 and Rust, C++↔Rust LFC2 round trips, seeded parser and transcript fuzz replay,
-compiler assertion/ownership boundaries, and the deterministic metric schema.
+ECDSA module/artifact and Dense ownership boundaries, compiler
+assertion/ownership boundaries, and the deterministic metric schema.
 Any non-`pass` row rejects the candidate; the script never writes reviewed
 vectors.
 

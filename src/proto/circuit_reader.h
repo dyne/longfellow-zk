@@ -329,32 +329,65 @@ class CircuitReader {
         return fail(CircuitReadErrorCode::kInvalidLayer, buf, layer);
       if (nw > CircuitIO::kMaxWires || ndeltas > CircuitIO::kMaxTermsPerLayer)
         return fail(CircuitReadErrorCode::kResourceLimit, buf, layer);
+      if (!buf.consume_allocation(ndeltas) ||
+          !buf.consume_elements(ndeltas))
+        return fail(CircuitReadErrorCode::kResourceLimit, buf, layer);
+      // Every delta has four non-empty varints. Reject impossible table sizes
+      // before reserve() can turn a short artifact into a large allocation.
+      if (ndeltas > buf.remaining() / 4)
+        return fail(CircuitReadErrorCode::kTruncated, buf, layer);
       struct Delta { int32_t g, h0, h1; uint32_t constant; };
       std::vector<Delta> deltas;
       deltas.reserve(ndeltas);
       for (size_t index = 0; index < ndeltas; ++index) {
         size_t g, h0, h1, constant;
-        if (!read_varint(buf, &g) || !read_varint(buf, &h0) || !read_varint(buf, &h1) || !read_varint(buf, &constant) || constant >= numconst)
+        if (!read_varint(buf, &g) || !read_varint(buf, &h0) ||
+            !read_varint(buf, &h1) || !read_varint(buf, &constant) ||
+            g > UINT32_MAX || h0 > UINT32_MAX || h1 > UINT32_MAX ||
+            constant >= numconst)
           return fail(CircuitReadErrorCode::kInvalidDelta, buf, layer, index);
-        auto unzigzag = [](size_t value) { return static_cast<int32_t>((value >> 1) ^ -static_cast<int32_t>(value & 1)); };
-        deltas.push_back({unzigzag(g), unzigzag(h0), unzigzag(h1), static_cast<uint32_t>(constant)});
+        auto unzigzag = [](uint32_t value) {
+          return (value & 1) ? -1 - static_cast<int32_t>(value >> 1)
+                             : static_cast<int32_t>(value >> 1);
+        };
+        deltas.push_back(
+            {unzigzag(static_cast<uint32_t>(g)),
+             unzigzag(static_cast<uint32_t>(h0)),
+             unzigzag(static_cast<uint32_t>(h1)),
+             static_cast<uint32_t>(constant)});
       }
       size_t nsegments;
       if (!read_varint(buf, &nsegments) || nsegments == 0 || nsegments > CircuitIO::kMaxTermsPerLayer)
         return fail(CircuitReadErrorCode::kInvalidLayer, buf, layer);
+      if (!buf.consume_allocation(nsegments) ||
+          !buf.consume_elements(nsegments))
+        return fail(CircuitReadErrorCode::kResourceLimit, buf, layer);
+      // At minimum, each segment needs its one-byte length field.
+      if (nsegments > buf.remaining())
+        return fail(CircuitReadErrorCode::kTruncated, buf, layer);
       std::vector<std::vector<uint32_t>> segments(nsegments);
       size_t nq = 0;
       for (size_t segment = 0; segment < nsegments; ++segment) {
         size_t length;
         if (!read_varint(buf, &length) || length > CircuitIO::kMaxTermsPerLayer - nq)
           return fail(CircuitReadErrorCode::kResourceLimit, buf, layer);
+        if (!buf.consume_allocation(length) || !buf.consume_elements(length))
+          return fail(CircuitReadErrorCode::kResourceLimit, buf, layer);
+        // Each dictionary item needs at least one byte on the wire.
+        if (length > buf.remaining())
+          return fail(CircuitReadErrorCode::kTruncated, buf, layer);
         nq += length; segments[segment].reserve(length);
         for (size_t item = 0; item < length; ++item) { size_t index; if (!read_varint(buf, &index) || index >= deltas.size()) return fail(CircuitReadErrorCode::kInvalidIndex, buf, layer); segments[segment].push_back(static_cast<uint32_t>(index)); }
       }
       size_t ntokens;
       if (!read_varint(buf, &ntokens) || ntokens == 0 || ntokens > CircuitIO::kMaxTermsPerLayer)
         return fail(CircuitReadErrorCode::kInvalidLayer, buf, layer);
+      if (!buf.consume_allocation(ntokens) || !buf.consume_elements(ntokens))
+        return fail(CircuitReadErrorCode::kResourceLimit, buf, layer);
+      if (ntokens > buf.remaining())
+        return fail(CircuitReadErrorCode::kTruncated, buf, layer);
       std::vector<uint32_t> sequence;
+      sequence.reserve(ntokens);
       nq = 0;
       for (size_t token = 0; token < ntokens; ++token) { size_t index; if (!read_varint(buf, &index) || index >= segments.size() || segments[index].size() > CircuitIO::kMaxTermsPerLayer - nq) return fail(CircuitReadErrorCode::kInvalidIndex, buf, layer); nq += segments[index].size(); sequence.push_back(static_cast<uint32_t>(index)); }
       if (nq == 0 || total_terms > CircuitIO::kMaxTotalTerms - nq)
