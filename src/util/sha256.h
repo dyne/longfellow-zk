@@ -1,5 +1,6 @@
 #ifndef SHA2_H
 #define SHA2_H
+#include "util/export.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -45,6 +46,6 @@ void sha256_inc_ctx_release(sha256ctx *state);
 /**
  * All-in-one sha256 function
  */
-void sha256(uint8_t *out, const uint8_t *in, size_t inlen);
+LONGFELLOW_ZK_API void sha256(uint8_t *out, const uint8_t *in, size_t inlen);
 
 #endif

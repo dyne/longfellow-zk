@@ -1,5 +1,6 @@
 #ifndef sss_RANDOMBYTES_H
 #define sss_RANDOMBYTES_H
+#include "util/export.h"
 
 #ifdef ARCH_WIN
 /* Load size_t on windows */
@@ -18,7 +19,7 @@ extern "C" {
 /*
  * Write `n` bytes of high quality random bytes to `buf`
  */
-int randombytes(void *buf, size_t n);
+LONGFELLOW_ZK_API int randombytes(void *buf, size_t n);
 
 #ifdef __cplusplus
 }
