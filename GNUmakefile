@@ -73,6 +73,14 @@ bip340-test: test/bip340_test
 secp256k1-ec-gadget-test: test/secp256k1/ec_gadget_test
 	@./test/secp256k1/ec_gadget_test
 
+.PHONY: ecdsa-module-test
+ecdsa-module-test: test/ecdsa/verify_module_test
+	@./test/ecdsa/verify_module_test
+
+.PHONY: ecdsa-proof-artifact-test
+ecdsa-proof-artifact-test: longfellow-zk
+	@./test/ecdsa/proof_artifact_test.sh
+
 .PHONY: blindzap-spec-test
 blindzap-spec-test:
 	@python3 scripts/check_blindzap_spec.py
@@ -246,6 +254,10 @@ test/secp256k1/ec_gadget_test: test/secp256k1/ec_gadget_test.cc $(wildcard src/c
 	@mkdir -p test/secp256k1
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
+test/ecdsa/verify_module_test: test/ecdsa/verify_module_test.cc $(wildcard src/circuits/ecdsa/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/ecdsa
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
 test/security/panic_parser_test: test/security/panic_parser_test.cc \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/security
@@ -309,6 +321,7 @@ clean:
 	rm -f longfellow-zk longfellow-zk.wasm
 	rm -f test/bip340_test
 	rm -f test/secp256k1/ec_gadget_test
+	rm -f test/ecdsa/verify_module_test
 	rm -f test/security/panic_parser_test
 	rm -f test/random/transcript_clone_test
 	rm -f test/fuzz/parser_fuzz test/fuzz/transcript_fuzz
