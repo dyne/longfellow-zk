@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import tempfile
 
@@ -21,8 +22,8 @@ DEFAULT = ROOT / "test" / "compatibility"
 CPP_REPORTER = ROOT / "test" / "compatibility" / "cpp_artifact_report.cc"
 RUST_REPORTER = ROOT / "test" / "compatibility" / "rust_artifact_report.rs"
 LFC1_PRODUCER = ROOT / "test" / "compatibility" / "lfc1_fixture.cc"
-CXX = os.environ.get("CXX", "g++")
-RUSTC = os.environ.get("RUSTC", str(Path.home() / ".cargo" / "bin" / "rustc"))
+CXX = shlex.split(os.environ.get("CXX", "g++"))
+RUSTC = shlex.split(os.environ.get("RUSTC", str(Path.home() / ".cargo" / "bin" / "rustc")))
 ARTIFACTS = (
     ("transcript", "transcript", "vendor/longfellow-zk/rust/runtime/random/tests/transcript_test_vector.bin"),
     ("commitment", "commitment", "test/blindzap/testdata/blindzap_vectors.json"),
@@ -38,7 +39,7 @@ def digest(path: Path) -> str:
 
 def produce_lfc1(output: Path, include_root: Path | None = None) -> None:
     """Serialize the canonical C++ circuit fixture through CircuitWriter."""
-    command = [CXX, "-std=c++20"]
+    command = [*CXX, "-std=c++20"]
     if include_root:
         command.extend(["-I", str(include_root / "src")])
     command.extend(["-Isrc", str(LFC1_PRODUCER), "src/ec/p256.cc",
@@ -68,8 +69,8 @@ def cross_check(rust_report: Path | None = None, write_rust_report: Path | None 
         directory = Path(temporary)
         cpp = directory / "cpp-report"
         rust = directory / "rust-report"
-        subprocess.run([CXX, "-std=c++20", str(CPP_REPORTER), "-o", str(cpp)], check=True)
-        subprocess.run([RUSTC, "--edition=2021", str(RUST_REPORTER), "-o", str(rust)], check=True)
+        subprocess.run([*CXX, "-std=c++20", str(CPP_REPORTER), "-o", str(cpp)], check=True)
+        subprocess.run([*RUSTC, "--edition=2021", str(RUST_REPORTER), "-o", str(rust)], check=True)
         cpp_lines = report_lines(cpp, artifacts)
         rust_lines = rust_report.read_text() if rust_report else report_lines(rust, artifacts)
         if write_rust_report:
