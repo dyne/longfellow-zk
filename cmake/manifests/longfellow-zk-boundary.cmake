@@ -1,0 +1,181 @@
+# Authoritative ownership inventory for the pre-package source tree.  Paths are
+# relative to the repository root so the verifier can compare them to Git.
+
+set(LONGFELLOW_ZK_BASE_SOURCES
+  src/algebra/crt.cc
+  src/algebra/nat.cc
+  src/circuits/sha/flatsha256_witness.cc
+  src/circuits/sha/sha256_constants.cc
+  src/ec/p256.cc
+  src/ec/p256k1.cc
+  src/util/aes_ecb.cc
+  src/util/crypto.cc
+  src/util/log.cc
+  src/util/randombytes.cc
+  src/util/sha256.cc
+)
+
+set(LONGFELLOW_ZK_NAMED_PROJECT_SOURCES
+  src/circuits/mdoc/mdoc_decompress.cc
+  src/circuits/mdoc/mdoc_generate_circuit.cc
+  src/circuits/mdoc/mdoc_zk.cc
+  src/circuits/mdoc/zk_spec.cc
+  src/cli/blindzap_main.cc
+  src/cli/encoding.cc
+  src/cli/main.cc
+  src/cli/nanobench.cc
+  src/cli/wasm.cc
+)
+
+set(LONGFELLOW_ZK_PRIVATE_TOOLING_SOURCES
+  src/circuits/tests/base64/decode_util.cc
+)
+
+set(LONGFELLOW_ZK_BASE_HEADERS
+  src/algebra/blas.h
+  src/algebra/compare.h
+  src/algebra/convolution.h
+  src/algebra/crt_convolution.h
+  src/algebra/crt.h
+  src/algebra/fft.h
+  src/algebra/fp2.h
+  src/algebra/fp_generic.h
+  src/algebra/fp.h
+  src/algebra/fp_p256.h
+  src/algebra/fp_p256k1.h
+  src/algebra/hash.h
+  src/algebra/interpolation.h
+  src/algebra/limb.h
+  src/algebra/nat.h
+  src/algebra/permutations.h
+  src/algebra/poly.h
+  src/algebra/reed_solomon.h
+  src/algebra/rfft.h
+  src/algebra/static_string.h
+  src/algebra/sysdep_aarch64.h
+  src/algebra/sysdep_arm.h
+  src/algebra/sysdep.h
+  src/algebra/twiddle.h
+  src/algebra/utility.h
+  src/arrays/affine.h
+  src/arrays/dense.h
+  src/arrays/eq.h
+  src/arrays/eqs.h
+  src/cbor/host_decoder.h
+  src/circuits/cbor_parser/cbor_byte_decoder.h
+  src/circuits/compiler/assertion_symbols.h
+  src/circuits/compiler/circuit_dump.h
+  src/circuits/compiler/compiler.h
+  src/circuits/compiler/node.h
+  src/circuits/compiler/pdqhash.h
+  src/circuits/compiler/schedule.h
+  src/circuits/logic/bit_adder.h
+  src/circuits/logic/bit_plucker_constants.h
+  src/circuits/logic/bit_plucker_encoder.h
+  src/circuits/logic/bit_plucker.h
+  src/circuits/logic/compiler_backend.h
+  src/circuits/logic/counter.h
+  src/circuits/logic/evaluation_backend.h
+  src/circuits/logic/logic.h
+  src/circuits/logic/memcmp.h
+  src/circuits/logic/polynomial.h
+  src/circuits/logic/routing.h
+  src/circuits/mac/mac_circuit.h
+  src/circuits/mac/mac_reference.h
+  src/circuits/mac/mac_witness.h
+  src/circuits/ripemd160/ripemd160_circuit.h
+  src/circuits/ripemd160/ripemd160_fixed.h
+  src/circuits/ripemd160/ripemd160.h
+  src/circuits/secp256k1/affine.h
+  src/circuits/secp256k1/ec_gadget.h
+  src/circuits/secp256k1/ec_witness.h
+  src/circuits/secp256k1/encoding.h
+  src/circuits/sha/flatsha256_circuit.h
+  src/circuits/sha/flatsha256_witness.h
+  src/circuits/sha/sha256_constants.h
+  src/ec/elliptic_curve.h
+  src/ec/p256.h
+  src/ec/p256k1.h
+  src/gf2k/gf2_128.h
+  src/gf2k/gf2poly.h
+  src/gf2k/lch14.h
+  src/gf2k/lch14_reed_solomon.h
+  src/gf2k/sysdep.h
+  src/gf2k/sysdep_wasm.h
+  src/ligero/ligero_param.h
+  src/ligero/ligero_prover.h
+  src/ligero/ligero_transcript.h
+  src/ligero/ligero_verifier.h
+  src/merkle/merkle_commitment.h
+  src/merkle/merkle_tree.h
+  src/proto/circuit_io.h
+  src/proto/circuit_reader.h
+  src/proto/circuit_writer.h
+  src/random/random.h
+  src/random/secure_random_engine.h
+  src/random/transcript.h
+  src/sumcheck/circuit.h
+  src/sumcheck/circuit_id.h
+  src/sumcheck/equad.h
+  src/sumcheck/hquad.h
+  src/sumcheck/prover_layers.h
+  src/sumcheck/quad_builder.h
+  src/sumcheck/quad.h
+  src/sumcheck/transcript_sumcheck.h
+  src/util/aes_ecb.h
+  src/util/byte_cursor.h
+  src/util/ceildiv.h
+  src/util/cpp20.h
+  src/util/crc64.h
+  src/util/crypto.h
+  src/util/log.h
+  src/util/panic.h
+  src/util/randombytes.h
+  src/util/readbuffer.h
+  src/util/serialization.h
+  src/util/sha256.h
+  src/zk/zk_common.h
+  src/zk/zk_proof.h
+  src/zk/zk_prover.h
+  src/zk/zk_verifier.h
+)
+
+set(LONGFELLOW_ZK_NAMED_PROJECT_HEADERS
+  src/blindzap/bitcoin_core.h
+  src/blindzap/chain_state.h
+  src/blindzap/encoding.h
+  src/blindzap/envelope.h
+  src/blindzap/nonce_store.h
+  src/blindzap/proof.h
+  src/blindzap/prover.h
+  src/blindzap/statement.h
+  src/blindzap/verifier.h
+  src/circuits/bip340/bip340_guard.h
+  src/circuits/bip340/bip340_verify.h
+  src/circuits/bip340/bip340_witness.h
+  src/circuits/blindzap/blindzap_circuit.h
+  src/circuits/blindzap/blindzap_witness.h
+  src/circuits/blindzap/compressed_key_sha256.h
+  src/circuits/blindzap/compressed_key_sha256_witness.h
+  src/circuits/blindzap/hash160.h
+  src/circuits/blindzap/key_ownership.h
+  src/circuits/blindzap/key_ownership_witness.h
+  src/circuits/ecdsa/verify_circuit.h
+  src/circuits/ecdsa/verify_evaluate.h
+  src/circuits/ecdsa/verify_layout.h
+  src/circuits/ecdsa/verify_types.h
+  src/circuits/ecdsa/verify_witness.h
+  src/circuits/mdoc/mdoc_attribute_ids.h
+  src/circuits/mdoc/mdoc_constants.h
+  src/circuits/mdoc/mdoc_decompress.h
+  src/circuits/mdoc/mdoc_hash.h
+  src/circuits/mdoc/mdoc_signature.h
+  src/circuits/mdoc/mdoc_witness.h
+  src/circuits/mdoc/mdoc_zk.h
+  src/cli/encoding.h
+  src/cli/nanobench.h
+)
+
+set(LONGFELLOW_ZK_PRIVATE_TOOLING_HEADERS
+  src/circuits/tests/base64/decode_util.h
+)
