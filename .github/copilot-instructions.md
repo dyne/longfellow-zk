@@ -257,8 +257,9 @@ All library code in `namespace proofs { ... }`
 
 1. **Google Longfellow-ZK** (`vendor/longfellow-zk/`):
    - Upstream source (Apache 2.0 license)
-   - Imported selectively via `scripts/import_upstream.sh`
-   - Headers copied to `src/`, implementation files to `src/circuits/mdoc/`
+   - Read-only reference and Rust interoperability dependency
+   - Its C++ source is not imported into `src/`; fork-owned C++ sources are
+     maintained in this repository
 
 2. **Zstd** (`vendor/zstd/`):
    - Facebook's Zstandard compression

@@ -91,9 +91,6 @@ jobs:
       uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
       with:
         packages: "build-essential g++ clang make jq xxd"
-    - name: Import upstream longfellow-zk
-      run: |
-        bash scripts/import_upstream.sh vendor/longfellow-zk
     - name: Build project with ${{ matrix.compiler.cxx }}
       run: |
         make clean
@@ -154,9 +151,6 @@ jobs:
         version: "33"   # specify WASI SDK version
         install-path: "/opt/wasi-sdk"
         add-to-path: true
-    - name: Import upstream longfellow-zk
-      run: |
-        bash scripts/import_upstream.sh vendor/longfellow-zk
     - name: Build project
       run: |
         make clean
@@ -189,9 +183,6 @@ jobs:
       run: |
         brew install bash
         echo "/opt/homebrew/bin/bash" >> $GITHUB_PATH
-    - name: Import upstream longfellow-zk
-      run: |
-        bash scripts/import_upstream.sh vendor/longfellow-zk
     - name: Build project
       run: |
         make clean
@@ -268,9 +259,6 @@ jobs:
         fetch-depth: 0
         submodules: recursive
     - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
-    - name: Import upstream longfellow-zk
-      run: |
-        bash scripts/import_upstream.sh vendor/longfellow-zk
     - name: Run real one-key and maximum two-key proofs
       run: |
         make blindzap-proof-test CC="ccache clang" CXX="ccache clang++"
@@ -312,9 +300,6 @@ jobs:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
         submodules: recursive
-    - name: Import upstream longfellow-zk
-      run: |
-        bash scripts/import_upstream.sh vendor/longfellow-zk
     - name: Build and run the production gate under sanitizers
       env:
         ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
