@@ -176,7 +176,7 @@ blindzap-static-analysis:
 # Reviewed compatibility vectors are validation-only by default.  Updating
 # them requires spelling out the overwrite acknowledgement at the command
 # line, so a normal test run can never rewrite a reviewed baseline.
-.PHONY: compatibility-vectors compatibility-vectors-update compatibility-vectors-test lfc2-codec-test lfc2-cross-language-test \
+.PHONY: compatibility-vectors compatibility-vectors-update compatibility-vectors-test lfc2-codec-test lfc2-interop-adapter-test lfc2-cross-language-test \
 	baseline-metrics baseline-metrics-test compile-commands baseline-static-analysis \
 	baseline-sanitizers parser-fuzz transcript-fuzz fuzz-crash-replay fuzz-smoke qualification-matrix
 compatibility-vectors:
@@ -192,11 +192,14 @@ compatibility-vectors-test: compatibility-vectors
 lfc2-codec-test: test/compatibility/lfc2_codec_test
 	@./test/compatibility/lfc2_codec_test
 
+lfc2-interop-adapter-test:
+	@cargo test --locked --manifest-path vendor/longfellow-zk-interop/Cargo.toml
+
 lfc2-cross-language-test: test/compatibility/lfc2_codec_test
 	@task_dir=$$(mktemp -d); trap 'rm -rf "$$task_dir"' EXIT; \
 	./test/compatibility/lfc2_codec_test --write "$$task_dir/cpp.lfc2"; \
-	cd vendor/longfellow-zk/rust && LFC2_CPP_FIXTURE="$$task_dir/cpp.lfc2" LFC2_RUST_FIXTURE="$$task_dir/rust.lfc2" cargo test -p core-proto test_circuit_serialization_lfc2_roundtrip -- --exact; \
-	cd ../../.. && ./test/compatibility/lfc2_codec_test --read "$$task_dir/rust.lfc2"
+	cargo run --quiet --locked --manifest-path vendor/longfellow-zk-interop/Cargo.toml -- --cpp "$$task_dir/cpp.lfc2" --rust "$$task_dir/rust.lfc2"; \
+	./test/compatibility/lfc2_codec_test --read "$$task_dir/rust.lfc2"
 
 test/compatibility/lfc2_codec_test: test/compatibility/lfc2_codec_test.cc \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a

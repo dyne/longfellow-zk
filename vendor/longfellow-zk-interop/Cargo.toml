@@ -1,0 +1,15 @@
+[package]
+name = "longfellow-zk-interop"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# This is first-party integration glue.  The paths below deliberately consume
+# the checked-out upstream submodule without making it a Cargo workspace member.
+[dependencies]
+circuits-boolean = { path = "../longfellow-zk/rust/circuits/boolean" }
+compile-algebra = { path = "../longfellow-zk/rust/compile/algebra" }
+compile-compiler = { path = "../longfellow-zk/rust/compile/compiler" }
+compile-eval = { path = "../longfellow-zk/rust/compile/eval" }
+compile-logic = { path = "../longfellow-zk/rust/compile/logic" }
+core-proto = { path = "../longfellow-zk/rust/core/proto" }
