@@ -128,11 +128,18 @@ dense-test: test/arrays/dense_test
 transcript-clone-test: test/random/transcript_clone_test
 	@./test/random/transcript_clone_test
 
-.PHONY: assertion-symbols-test
+.PHONY: assertion-symbols-test compiler-ownership-test
 assertion-symbols-test: test/compiler/assertion_symbols_test
 	@./test/compiler/assertion_symbols_test
 
+compiler-ownership-test: test/compiler/compiler_ownership_test
+	@./test/compiler/compiler_ownership_test
+
 test/compiler/assertion_symbols_test: test/compiler/assertion_symbols_test.cc $(wildcard src/circuits/compiler/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/compiler
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
+test/compiler/compiler_ownership_test: test/compiler/compiler_ownership_test.cc $(wildcard src/circuits/compiler/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/compiler
 	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 

@@ -75,6 +75,8 @@ class QuadCircuit {
   size_t nwires_;
   size_t nquad_terms_;
   size_t nwires_overhead_;
+  bool scheduler_temporary_storage_released_;
+  bool scheduler_renaming_scratch_released_;
 
   explicit QuadCircuit(const Field& f)
       : f_(f),
@@ -87,7 +89,9 @@ class QuadCircuit {
         nwires_not_needed_(0),
         nwires_(-1),  // undefined until set in mkcircuit()
         nquad_terms_(-1),
-        nwires_overhead_(-1) {
+        nwires_overhead_(-1),
+        scheduler_temporary_storage_released_(false),
+        scheduler_renaming_scratch_released_(false) {
     // make sure that Elt(0) is represented as index 0 in the constant
     // table.
     size_t ki0 = kstore(f.zero());
@@ -278,6 +282,8 @@ class QuadCircuit {
     nwires_ = sched.nwires_;
     nquad_terms_ = sched.nquad_terms_;
     nwires_overhead_ = sched.nwires_overhead_;
+    scheduler_temporary_storage_released_ = sched.temporary_storage_released_;
+    scheduler_renaming_scratch_released_ = sched.renaming_scratch_released_;
 
     c->ninputs = ninput();
     c->npub_in = npub_input_;

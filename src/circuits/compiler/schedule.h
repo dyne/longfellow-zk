@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <memory_resource>
 #include <string>
 #include <vector>
 
@@ -50,6 +51,10 @@ class Scheduler {
   size_t nwires_;
   size_t nquad_terms_;
   size_t nwires_overhead_;
+  // These are deliberately observable in debug and test builds: no pointer
+  // into a scheduler pass may escape with the compiled Circuit.
+  bool temporary_storage_released_;
+  bool renaming_scratch_released_;
 
   Scheduler(const std::vector<node>& nodes, const Field& f,
             const std::vector<std::vector<std::string>>* assertion_paths)
@@ -58,7 +63,9 @@ class Scheduler {
         assertion_paths_(assertion_paths),
         nwires_(0),
         nquad_terms_(0),
-        nwires_overhead_(0) {}
+        nwires_overhead_(0),
+        temporary_storage_released_(false),
+        renaming_scratch_released_(false) {}
 
   std::unique_ptr<Circuit<Field>> mkcircuit(const std::vector<Elt>& constants,
                                             size_t depth_ub, size_t nc) {
@@ -80,7 +87,6 @@ class Scheduler {
     // compiler anyway.
     //
     assign_wire_ids(lnodes);
-    fill_layers(c.get(), depth_ub, lnodes);
     auto symbols = std::make_shared<AssertionSymbols>();
     for (size_t depth = 0; depth < lnodes.size(); ++depth) {
       for (const lnode& ln : lnodes[depth]) {
@@ -94,10 +100,38 @@ class Scheduler {
     }
     if (!symbols->entries.empty()) c->assertion_symbols = symbols;
 
+    // fill_layers consumes each source layer immediately after its final
+    // use.  Circuit owns the compressed quads, so no scheduler allocation
+    // may remain live when this pass returns.
+    fill_layers(c.get(), depth_ub, lnodes);
+
     return c;
   }
 
  private:
+  // A pass arena owns only scratch values.  `release()` is explicit so debug
+  // builds catch both forgotten releases and use-after-release through the
+  // sole resource accessor.  Nothing allocated from it is returned.
+  class PassArena {
+   public:
+    std::pmr::memory_resource* resource() {
+      check(!released_, "scheduler pass arena used after release");
+      return &resource_;
+    }
+
+    void release() {
+      check(!released_, "scheduler pass arena released twice");
+      resource_.release();
+      released_ = true;
+    }
+
+    ~PassArena() { check(released_, "scheduler pass arena not released"); }
+
+   private:
+    std::pmr::monotonic_buffer_resource resource_;
+    bool released_ = false;
+  };
+
   // per-layer representation of nodes and terms
   struct lterm {
     Elt k;
@@ -248,15 +282,15 @@ class Scheduler {
     quad_corner_t desired_wire_id_;
     quad_corner_t original_wire_index_;
     bool is_copy_wire_;
-    std::vector<renamed_lterm> rlterms_;
+    std::pmr::vector<renamed_lterm> rlterms_;
 
     renamed_lnode(quad_corner_t desired_wire_id,
                   quad_corner_t original_wire_index, bool is_copy_wire,
-                  const std::vector<renamed_lterm>& rlterms)
+                  std::pmr::memory_resource* resource)
         : desired_wire_id_(desired_wire_id),
           original_wire_index_(original_wire_index),
           is_copy_wire_(is_copy_wire),
-          rlterms_(rlterms) {}
+          rlterms_(resource) {}
 
     bool operator==(const renamed_lnode& y) const {
       if (is_copy_wire_ != y.is_copy_wire_) return false;
@@ -311,8 +345,8 @@ class Scheduler {
     }
   };
 
-  template <class T>
-  bool uniq(const std::vector<T>& sorted) {
+  template <class T, class Allocator>
+  bool uniq(const std::vector<T, Allocator>& sorted) {
     for (size_t i = 0; i + 1 < sorted.size(); ++i) {
       if (sorted[i] == sorted[i + 1]) return false;
     }
@@ -331,63 +365,56 @@ class Scheduler {
       // the LOP's are mapped to their desired wire id's
       // at the previous layer.  We use different types
       // to avoid any possibility of confusion.
-      std::vector<renamed_lnode> renamed_at_d;
+      PassArena rename_arena;
+      {
+        std::pmr::vector<renamed_lnode> renamed_at_d(rename_arena.resource());
+        renamed_at_d.reserve(lnodes_at_d.size());
 
-      quad_corner_t original_wire_index(0);
-      for (const lnode& ln : lnodes_at_d) {
-        std::vector<renamed_lterm> rlterms;
+        quad_corner_t original_wire_index(0);
+        for (const lnode& ln : lnodes_at_d) {
+          renamed_at_d.emplace_back(ln.desired_wire_id, original_wire_index,
+                                    ln.is_copy_wire, rename_arena.resource());
+          auto& rlterms = renamed_at_d.back().rlterms_;
+          rlterms.reserve(ln.lterms.size());
+          for (const lterm& lt : ln.lterms) {
+            rlterms.emplace_back(
+                lt.k,
+                lnodes_at_dm1.at(static_cast<size_t>(lt.lop0)).desired_wire_id,
+                lnodes_at_dm1.at(static_cast<size_t>(lt.lop1)).desired_wire_id);
+          }
 
-        // rename all terms
-        rlterms.reserve(ln.lterms.size());
-        for (const lterm& lt : ln.lterms) {
-          rlterms.push_back(renamed_lterm(
-              lt.k,
-              lnodes_at_dm1.at(static_cast<size_t>(lt.lop0)).desired_wire_id,
-              lnodes_at_dm1.at(static_cast<size_t>(lt.lop1)).desired_wire_id));
+          std::sort(rlterms.begin(), rlterms.end(),
+                    [&](const renamed_lterm& a, const renamed_lterm& b) {
+                      return renamed_lterm::compare(a, b, f_);
+                    });
+          check(uniq(rlterms), "rlterms not unique");
+          ++original_wire_index;
         }
 
-        // canonicalize the terms order
-        std::sort(rlterms.begin(), rlterms.end(),
-                  [&](const renamed_lterm& a, const renamed_lterm& b) {
-                    return renamed_lterm::compare(a, b, f_);
+        check(renamed_at_d.size() == lnodes_at_d.size(),
+              "renamed_at_d.size() == lnodes_at_d.size()");
+        std::sort(renamed_at_d.begin(), renamed_at_d.end(),
+                  [&](const renamed_lnode& a, const renamed_lnode& b) {
+                    return renamed_lnode::compare(a, b, f_);
                   });
+        check(uniq(renamed_at_d), "renamed_at_d not unique");
 
-        // Terms must be unique, otherwise the canonicalization is
-        // ill-defined.  Uniqueness is guaranteed by the algebraic
-        // simplifier, but assert it for good measure.
-        check(uniq(rlterms), "rlterms not unique");
-
-        renamed_at_d.push_back(renamed_lnode(
-            ln.desired_wire_id, original_wire_index, ln.is_copy_wire, rlterms));
-        ++original_wire_index;
-      }
-
-      check(renamed_at_d.size() == lnodes_at_d.size(),
-            "renamed_at_d.size() == lnodes_at_d.size()");
-
-      std::sort(renamed_at_d.begin(), renamed_at_d.end(),
-                [&](const renamed_lnode& a, const renamed_lnode& b) {
-                  return renamed_lnode::compare(a, b, f_);
-                });
-
-      // Nodes must be unique, otherwise the canonicalization is
-      // ill-defined.
-      check(uniq(renamed_at_d), "renamed_at_d not unique");
-
-      quad_corner_t wid(0);
-      std::vector<lnode>& wlnodes_at_d = lnodes.at(d);
-
-      for (const renamed_lnode& ln : renamed_at_d) {
-        lnode& lnpi =
-            wlnodes_at_d.at(static_cast<size_t>(ln.original_wire_index_));
-        if (lnpi.desired_wire_id != nodeinfo::kWireIdUndefined) {
-          // We must have computed the same wire id
-          check(wid == lnpi.desired_wire_id, "wid == lnpi.desired_wire_id");
-        } else {
-          lnpi.desired_wire_id = wid;
+        quad_corner_t wid(0);
+        std::vector<lnode>& wlnodes_at_d = lnodes.at(d);
+        for (const renamed_lnode& ln : renamed_at_d) {
+          lnode& lnpi = wlnodes_at_d.at(
+              static_cast<size_t>(ln.original_wire_index_));
+          if (lnpi.desired_wire_id != nodeinfo::kWireIdUndefined) {
+            check(wid == lnpi.desired_wire_id,
+                  "wid == lnpi.desired_wire_id");
+          } else {
+            lnpi.desired_wire_id = wid;
+          }
+          wid++;
         }
-        wid++;
       }
+      rename_arena.release();
+      renaming_scratch_released_ = true;
     }
   }
 
@@ -399,7 +426,7 @@ class Scheduler {
   }
 
   void fill_layers(Circuit<Field>* c, size_t depth_ub,
-                   const std::vector<std::vector<lnode>>& lnodes) {
+                   std::vector<std::vector<lnode>>& lnodes) {
     check(depth_ub == lnodes.size(), "depth_ub == lnodes.size()");
 
     corner_t nv = corner_t(lnodes.at(depth_ub - 1).size());
@@ -419,7 +446,15 @@ class Scheduler {
           Layer<Field>{.nw = nw,
                        .logw = lg(nw),
                        .quad = mkquad(lnodes.at(d), lnodes.at(d - 1))});
+      // Layer d is never read after its quad is compressed.  Swap rather
+      // than clear so its node and term capacity is returned before the next
+      // output layer is materialized.
+      std::vector<lnode>().swap(lnodes.at(d));
     }
+    std::vector<lnode>().swap(lnodes.at(0));
+    for (const auto& layer : lnodes)
+      check(layer.empty(), "scheduler temporary layer retained after use");
+    temporary_storage_released_ = true;
   }
 
   std::unique_ptr<const Quad<Field>> mkquad(
