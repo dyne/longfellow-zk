@@ -17,6 +17,7 @@
 
 #include <stddef.h>
 
+#include "circuits/ecdsa/verify_layout.h"
 #include "circuits/logic/bit_plucker.h"
 
 namespace proofs {
@@ -37,34 +38,7 @@ class VerifyCircuit {
   using Bitvec = typename LogicCircuit::v256;
 
  public:
-  struct Witness {
-    EltW rx, ry;
-    EltW pre[8];
-    EltW rx_inv, s_inv, pk_inv;
-    EltW bi[kBits];
-    EltW int_x[kBits - 1];
-    EltW int_y[kBits - 1];
-    EltW int_z[kBits - 1];
-
-    void input(const LogicCircuit& lc) {
-      rx = lc.eltw_input();
-      ry = lc.eltw_input();
-      rx_inv = lc.eltw_input();
-      s_inv = lc.eltw_input();
-      pk_inv = lc.eltw_input();
-      for (size_t i = 0; i < 8; ++i) {
-        pre[i] = lc.eltw_input();
-      }
-      for (size_t i = 0; i < kBits; ++i) {
-        bi[i] = lc.eltw_input();
-        if (i < kBits - 1) {
-          int_x[i] = lc.eltw_input();
-          int_y[i] = lc.eltw_input();
-          int_z[i] = lc.eltw_input();
-        }
-      }
-    }
-  };
+  using Witness = VerifyCircuitWitness<LogicCircuit, EC>;
 
   VerifyCircuit(const LogicCircuit& lc, const EC& ec, const Nat& order)
       : lc_(lc), ec_(ec), k2_(lc_.elt(2)), k3_(lc_.elt(3)) {
