@@ -1,4 +1,5 @@
 CFLAGS ?= -O3 -fstack-protector-all -D_FORTIFY_SOURCE=2 -fno-strict-overflow
+CPP_STANDARD ?= -std=c++20
 SANITIZER_CC ?= clang
 SANITIZER_CXX ?= clang++
 WASI_SDK_PATH := /opt/wasi-sdk
@@ -8,22 +9,22 @@ posix: ARCHFLAGS := -mpclmul
 posix:
 	$(info 🌉 Building for $@)
 	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CFLAGS)" CC="$(CC)" VERBOSE=1
-	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
-	@$(MAKE) -C src/cli CXXFLAGS="-std=c++17 $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
+	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) $(CPP_STANDARD) $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
+	@$(MAKE) -C src/cli CXXFLAGS="$(CPP_STANDARD) $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
 
 osx-arm64: ARCHFLAGS := -arch arm64 -march=armv8.1-a+crypto
 osx-arm64:
 	$(info 🌉 Building for $@)
 	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CFLAGS)" CC="$(CC)" VERBOSE=1
-	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
-	@$(MAKE) -C src/cli CXXFLAGS="-std=c++17 $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
+	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) $(CPP_STANDARD) $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
+	@$(MAKE) -C src/cli CXXFLAGS="$(CPP_STANDARD) $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
 
 osx-x86: ARCHFLAGS := -arch x86_64 -mpclmul
 osx-x86:
 	$(info 🌉 Building for $@)
 	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CFLAGS)" CC="$(CC)" VERBOSE=1
-	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) -std=c++17 $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
-	@$(MAKE) -C src/cli CXXFLAGS="-std=c++17 $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
+	@$(MAKE) -C src CXXFLAGS="$(ARCHFLAGS) $(CPP_STANDARD) $(CFLAGS) $(INCLUDES) -I../vendor/zstd/lib"
+	@$(MAKE) -C src/cli CXXFLAGS="$(CPP_STANDARD) $(CFLAGS) $(INCLUDES)" LDADD="$(CURDIR)/src/liblongfellow-zk.a $(CURDIR)/vendor/zstd/lib/libzstd.a"
 
 wasm: CXX := /opt/wasi-sdk/bin/clang++
 wasm: CC := /opt/wasi-sdk/bin/clang
@@ -33,8 +34,8 @@ wasm:
 	@$(MAKE) -C vendor/zstd/lib libzstd.a ZSTD_LIB_DICTBUILDER=0 ZSTD_LEGACY_SUPPORT=0 CFLAGS="$(CXXFLAGS)" CC="$(CC)" VERBOSE=1
 	@$(MAKE) -C src CXXFLAGS="-nostdlib -msimd128 $(CXXFLAGS) $(INCLUDES) -I../vendor/zstd/lib" CXX="$(CXX)"
 	/opt/wasi-sdk/bin/llvm-ranlib src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
-	$(CXX) -msimd128 ${CXXFLAGS} -Isrc -c -o src/cli/wasm.o src/cli/wasm.cc
-	/opt/wasi-sdk/bin/clang++ -msimd128 ${CXXFLAGS} --target=wasm32-wasi --sysroot=/opt/wasi-sdk/share/wasi-sysroot \
+	$(CXX) $(CPP_STANDARD) -msimd128 ${CXXFLAGS} -Isrc -c -o src/cli/wasm.o src/cli/wasm.cc
+	/opt/wasi-sdk/bin/clang++ $(CPP_STANDARD) -msimd128 ${CXXFLAGS} --target=wasm32-wasi --sysroot=/opt/wasi-sdk/share/wasi-sysroot \
 		-Wl,--no-entry -nostartfiles \
 		-Wl,--initial-memory=536870912 -Wl,--max-memory=4294967296 -Wl,--stack-first -Wl,-z,stack-size=16777216 \
 		-Wl,--export=wasm_generate_circuit \
@@ -136,6 +137,16 @@ dense-test: test/arrays/dense_test
 transcript-clone-test: test/random/transcript_clone_test
 	@./test/random/transcript_clone_test
 
+.PHONY: cpp20-contract-test
+cpp20-contract-test: test/modern_cpp/cpp20_contract_test
+	@./test/modern_cpp/cpp20_contract_test
+	@./test/modern_cpp/negative_compile_test.sh "$(CXX)"
+
+test/modern_cpp/cpp20_contract_test: test/modern_cpp/cpp20_contract_test.cc \
+		src/util/byte_cursor.h src/util/cpp20.h test/modern_cpp/negative_compile_test.sh
+	@mkdir -p test/modern_cpp
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -o $@ $<
+
 .PHONY: assertion-symbols-test compiler-ownership-test
 assertion-symbols-test: test/compiler/assertion_symbols_test
 	@./test/compiler/assertion_symbols_test
@@ -145,11 +156,11 @@ compiler-ownership-test: test/compiler/compiler_ownership_test
 
 test/compiler/assertion_symbols_test: test/compiler/assertion_symbols_test.cc $(wildcard src/circuits/compiler/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/compiler
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/compiler/compiler_ownership_test: test/compiler/compiler_ownership_test.cc $(wildcard src/circuits/compiler/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/compiler
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 .PHONY: panic-parser-test
 panic-parser-test: test/security/panic_parser_test
@@ -190,7 +201,7 @@ lfc2-cross-language-test: test/compatibility/lfc2_codec_test
 test/compatibility/lfc2_codec_test: test/compatibility/lfc2_codec_test.cc \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/compatibility
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 # Baseline tooling intentionally writes only generated, ignored artifacts.  The
@@ -218,11 +229,11 @@ baseline-sanitizers:
 
 test/fuzz/parser_fuzz: test/fuzz/parser_fuzz.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/fuzz
-	clang++ -std=c++17 -O1 -g -DFUZZ_STANDALONE -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	clang++ $(CPP_STANDARD) -O1 -g -DFUZZ_STANDALONE -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/fuzz/transcript_fuzz: test/fuzz/transcript_fuzz.cc src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/fuzz
-	clang++ -std=c++17 -O1 -g -DFUZZ_STANDALONE -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	clang++ $(CPP_STANDARD) -O1 -g -DFUZZ_STANDALONE -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 parser-fuzz: test/fuzz/parser_fuzz
 	@./test/fuzz/parser_fuzz test/fuzz/corpus/parser/truncated_lfc1
@@ -236,7 +247,7 @@ fuzz-crash-replay:
 fuzz-smoke: parser-fuzz transcript-fuzz fuzz-crash-replay
 
 blindzap: src/cli/blindzap_main.cc $(wildcard src/blindzap/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 BIP340_DEPS := $(wildcard src/circuits/bip340/*.h) \
 	$(wildcard src/circuits/secp256k1/*.h) \
@@ -247,46 +258,46 @@ src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a:
 
 test/bip340_test: test/bip340/bip340_test.cc $(BIP340_DEPS) \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Itest/bip340 -Ivendor/zstd/lib -o $@ $< \
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Itest/bip340 -Ivendor/zstd/lib -o $@ $< \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/secp256k1/ec_gadget_test: test/secp256k1/ec_gadget_test.cc $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/secp256k1
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/ecdsa/verify_module_test: test/ecdsa/verify_module_test.cc $(wildcard src/circuits/ecdsa/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/ecdsa
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/security/panic_parser_test: test/security/panic_parser_test.cc \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/security
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/random/transcript_clone_test: test/random/transcript_clone_test.cc \
 		src/random/transcript.h src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/random
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/arrays/dense_test: test/arrays/dense_test.cc src/arrays/dense.h \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/arrays
-	$(CXX) -std=c++17 $(CFLAGS) -DPROOFS_DENSE_TESTING -Isrc -Ivendor/zstd/lib -o $@ $< \
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -DPROOFS_DENSE_TESTING -Isrc -Ivendor/zstd/lib -o $@ $< \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/key_ownership_test: test/blindzap/key_ownership_test.cc $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/compressed_key_sha256_test: test/blindzap/compressed_key_sha256_test.cc $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/secp256k1/*.h) $(wildcard src/circuits/sha/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/ripemd160_test: test/blindzap/ripemd160_test.cc $(wildcard src/circuits/ripemd160/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/sage_vector_test: test/blindzap/sage_vector_test.cc \
 		test/blindzap/testdata/blindzap_sage_vectors.json \
@@ -295,20 +306,20 @@ test/blindzap/sage_vector_test: test/blindzap/sage_vector_test.cc \
 		$(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a \
 		vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/blindzap_test: test/blindzap/blindzap_test.cc $(wildcard src/blindzap/*.h) $(wildcard src/circuits/blindzap/*.h) $(wildcard src/circuits/ripemd160/*.h) $(wildcard src/circuits/secp256k1/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/protocol_test: test/blindzap/protocol_test.cc $(wildcard src/blindzap/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 test/blindzap/integration_test: test/blindzap/integration_test.cc $(wildcard src/blindzap/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 	@mkdir -p test/blindzap
-	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 clean-vendor: clean
 	$(info 🌉 Clean up build and all imported vendor sources)
@@ -324,6 +335,7 @@ clean:
 	rm -f test/ecdsa/verify_module_test
 	rm -f test/security/panic_parser_test
 	rm -f test/random/transcript_clone_test
+	rm -f test/modern_cpp/cpp20_contract_test
 	rm -f test/fuzz/parser_fuzz test/fuzz/transcript_fuzz
 	rm -f test/blindzap/blindzap_test
 	rm -f test/blindzap/compressed_key_sha256_test

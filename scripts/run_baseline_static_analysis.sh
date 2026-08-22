@@ -19,9 +19,9 @@ readonly sources=(src/proto/circuit_reader.h src/random/transcript.h src/util/re
 for source in "${sources[@]}"; do
   clang-tidy -checks='clang-analyzer-*,bugprone-*,performance-*,-bugprone-easily-swappable-parameters,-performance-enum-size' \
     -warnings-as-errors='clang-analyzer-*,bugprone-*' "$source" -- \
-    -x c++ -std=c++17 -Isrc -Ivendor/zstd/lib
+    -x c++ -std=c++20 -Isrc -Ivendor/zstd/lib
 done
-cppcheck --enable=warning,performance,portability --language=c++ --std=c++17 \
+cppcheck --enable=warning,performance,portability --language=c++ --std=c++20 \
   --error-exitcode=1 --suppress=missingIncludeSystem -Isrc "${sources[@]}"
 shellcheck scripts/run_baseline_static_analysis.sh
 printf 'baseline static analysis passed (no first-party blanket suppressions)\n'

@@ -493,7 +493,7 @@ struct ZkProof {
   bool fail(ProofReadErrorCode code, ProofReadSection section,
             const ByteCursor &buf) {
     if (!last_read_error_) {
-      last_read_error_ = {code, section, buf.position()};
+      last_read_error_ = {code, section, buf.offset().value};
     }
     return false;
   }

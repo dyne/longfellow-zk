@@ -15,6 +15,7 @@
 #ifndef PRIVACY_PROOFS_ZK_LIB_PROTO_CIRCUIT_IO_H_
 #define PRIVACY_PROOFS_ZK_LIB_PROTO_CIRCUIT_IO_H_
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -46,7 +47,7 @@ enum FieldID {
 
 struct CircuitIO {
   static constexpr uint8_t kLfc1Version = 1;
-  static constexpr uint8_t kLfc2Magic[4] = {'L', 'F', 'C', '2'};
+  static constexpr std::array<uint8_t, 4> kLfc2Magic = {'L', 'F', 'C', '2'};
   // The reader and writer classes implement an optimization by which
   // internal indices for wire and gate labels and circuit size
   // statistics are stored in a configurable number of bytes
