@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+project(LongfellowZKSharedConsumer LANGUAGES CXX)
+find_package(LongfellowZK CONFIG REQUIRED)
+add_executable(consumer main.cc)
+target_link_libraries(consumer PRIVATE LongfellowZK::shared)
+target_link_options(consumer PRIVATE -Wl,--no-undefined)

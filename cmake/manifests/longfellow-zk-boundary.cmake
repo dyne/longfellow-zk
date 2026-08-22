@@ -128,6 +128,7 @@ set(LONGFELLOW_ZK_BASE_HEADERS
   src/util/cpp20.h
   src/util/crc64.h
   src/util/crypto.h
+  src/util/export.h
   src/util/log.h
   src/util/panic.h
   src/util/randombytes.h
