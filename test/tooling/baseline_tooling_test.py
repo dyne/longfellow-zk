@@ -34,7 +34,7 @@ def main() -> None:
         warning.write_text("int main() { int uninitialized; return uninitialized; }\n")
         result = subprocess.run([
             "clang-tidy", "-checks=clang-analyzer-core.uninitialized.*",
-            "-warnings-as-errors=clang-analyzer-core.uninitialized.*", str(warning), "--", "-std=c++17",
+            "-warnings-as-errors=clang-analyzer-core.uninitialized.*", str(warning), "--", "-std=c++20",
         ], capture_output=True, text=True, check=False)
         assert result.returncode != 0 and "uninitialized" in (result.stdout + result.stderr)
     print("baseline tooling: CSV schema, three runs, and deterministic replay verified")

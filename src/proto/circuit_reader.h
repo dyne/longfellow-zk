@@ -98,9 +98,9 @@ class CircuitReader {
   std::unique_ptr<Circuit<Field>> from_record(ByteCursor& buf,
                                               bool enforce_circuit_id) {
     last_error_ = {};
-    if (buf.have(sizeof(CircuitIO::kLfc2Magic)) &&
-        std::memcmp(buf.data(), CircuitIO::kLfc2Magic,
-                    sizeof(CircuitIO::kLfc2Magic)) == 0) {
+    if (buf.have(CircuitIO::kLfc2Magic.size()) &&
+        std::memcmp(buf.data(), CircuitIO::kLfc2Magic.data(),
+                    CircuitIO::kLfc2Magic.size()) == 0) {
       return from_lfc2_record(buf, enforce_circuit_id);
     }
     if (!buf.have(8 * CircuitIO::kBytesPerSizeT + 1)) {
@@ -281,7 +281,7 @@ class CircuitReader {
   std::unique_ptr<Circuit<Field>> from_lfc2_record(ByteCursor& buf,
                                                     bool enforce_circuit_id) {
     const uint8_t* bytes = nullptr;
-    if (!buf.take(sizeof(CircuitIO::kLfc2Magic), &bytes))
+    if (!buf.take(CircuitIO::kLfc2Magic.size(), &bytes))
       return fail(CircuitReadErrorCode::kTruncated, buf);
 
     size_t fid, nv, nc, npub, boundary, ninputs, nl, numconst;
@@ -432,7 +432,7 @@ class CircuitReader {
                                        const ByteCursor& buf,
                                        size_t layer = SIZE_MAX,
                                        size_t term = SIZE_MAX) {
-    last_error_ = {code, buf.position(), layer, term};
+    last_error_ = {code, buf.offset().value, layer, term};
     return nullptr;
   }
 

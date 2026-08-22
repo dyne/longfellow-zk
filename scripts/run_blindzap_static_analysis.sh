@@ -27,13 +27,13 @@ for source in "${translation_units[@]}"; do
     -header-filter="${header_filter}" \
     -warnings-as-errors='clang-analyzer-*,bugprone-*' \
     "${source}" -- \
-    -std=c++17 -Isrc -Ivendor/zstd/lib
+    -std=c++20 -Isrc -Ivendor/zstd/lib
 done
 
 cppcheck \
   --enable=warning,performance,portability \
   --language=c++ \
-  --std=c++17 \
+  --std=c++20 \
   --inline-suppr \
   --relative-paths=. \
   --suppress=missingIncludeSystem \

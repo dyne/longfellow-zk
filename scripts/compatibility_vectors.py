@@ -38,7 +38,7 @@ def digest(path: Path) -> str:
 
 def produce_lfc1(output: Path, include_root: Path | None = None) -> None:
     """Serialize the canonical C++ circuit fixture through CircuitWriter."""
-    command = [CXX, "-std=c++17"]
+    command = [CXX, "-std=c++20"]
     if include_root:
         command.extend(["-I", str(include_root / "src")])
     command.extend(["-Isrc", str(LFC1_PRODUCER), "src/ec/p256.cc",
@@ -68,7 +68,7 @@ def cross_check(rust_report: Path | None = None, write_rust_report: Path | None 
         directory = Path(temporary)
         cpp = directory / "cpp-report"
         rust = directory / "rust-report"
-        subprocess.run([CXX, "-std=c++17", str(CPP_REPORTER), "-o", str(cpp)], check=True)
+        subprocess.run([CXX, "-std=c++20", str(CPP_REPORTER), "-o", str(cpp)], check=True)
         subprocess.run([RUSTC, "--edition=2021", str(RUST_REPORTER), "-o", str(rust)], check=True)
         cpp_lines = report_lines(cpp, artifacts)
         rust_lines = rust_report.read_text() if rust_report else report_lines(rust, artifacts)

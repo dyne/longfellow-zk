@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include <array>
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -28,6 +29,7 @@
 #include "algebra/poly.h"
 #include "arrays/affine.h"
 #include "util/panic.h"
+#include "util/cpp20.h"
 
 namespace proofs {
 // ------------------------------------------------------------
@@ -54,6 +56,15 @@ class Dense {
   explicit Dense(const Field& F) : n0_(1), n1_(1), v_(1) {
     track_allocation();
     v_[0] = F.zero();
+  }
+
+  // Factory for the common public/witness one-row boundary.  A caller cannot
+  // accidentally construct the invalid zero-width row through this API.
+  static Dense from_row(Span<const Elt> values) {
+    check(!values.empty(), "Dense row must not be empty");
+    Dense dense(1, values.size());
+    std::copy(values.begin(), values.end(), dense.v_.begin());
+    return dense;
   }
 
   // initialize dense array from P[i1*ldp+i0]
@@ -153,6 +164,11 @@ class Dense {
   }
 
   Elt at(corner_t j) const { return v_[j]; }
+
+  // Narrow bounded view for callers that need contiguous witness elements.
+  // Dimensions remain owned by Dense; this does not permit reshaping.
+  Span<const Elt> values() const noexcept { return v_; }
+  Span<Elt> values() noexcept { return v_; }
 
   // Scale all elements by x, except for the last element in
   // the n0_ dimension, which is scaled by x_last.  This "last" quirk

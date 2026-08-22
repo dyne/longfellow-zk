@@ -32,4 +32,4 @@ clean:
 
 # hard-code build information
 %.cc.o: %.cc
-	$(CXX) -std=c++17 $(CXXFLAGS) -c -o $@ $<
+	$(CXX) -std=c++20 $(CXXFLAGS) -c -o $@ $<

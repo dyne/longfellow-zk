@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <cstring>
 
+#include "util/cpp20.h"
+
 namespace proofs {
 
 // Stable diagnostics for readers at an untrusted byte boundary.
@@ -32,6 +34,13 @@ struct ParseLimits {
   size_t elements = 32 * 1024 * 1024;
 };
 
+// A cursor-relative offset is deliberately not interchangeable with a byte
+// count.  This stays internal to parser APIs and prevents accidental use as a
+// buffer length without spelling out `.value`.
+struct ByteOffset {
+  size_t value;
+};
+
 // Span-like cursor. Failed operations never advance the cursor.
 class ByteCursor {
  public:
@@ -42,9 +51,16 @@ class ByteCursor {
       error_ = {ParseErrorCode::kInvalidInput, 0, size, 0};
     }
   }
+  ByteCursor(Span<const uint8_t> bytes, ParseLimits limits = {})
+      : ByteCursor(bytes.data(), bytes.size(), limits) {}
+  ByteCursor(std::nullptr_t, size_t, ParseLimits = {}) = delete;
   bool have(size_t count) const { return count <= remaining(); }
   size_t remaining() const { return size_ - offset_; }
+  // Legacy source-compatible count accessor.
   size_t position() const { return offset_; }
+  // Strong offset for parser code where a position must not be used as a
+  // generic byte count without an explicit `.value` conversion.
+  ByteOffset offset() const { return {offset_}; }
   const uint8_t* data() const { return data_ == nullptr ? nullptr : data_ + offset_; }
   const ParseError& error() const { return error_; }
   bool take(size_t count, const uint8_t** out) {

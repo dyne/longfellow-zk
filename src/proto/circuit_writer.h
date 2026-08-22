@@ -156,8 +156,8 @@ class CircuitWriter {
   }
 
   void to_lfc2_bytes(const Circuit<Field>& sc_c, std::vector<uint8_t>& bytes) {
-    bytes.insert(bytes.end(), CircuitIO::kLfc2Magic,
-                 CircuitIO::kLfc2Magic + sizeof(CircuitIO::kLfc2Magic));
+    bytes.insert(bytes.end(), CircuitIO::kLfc2Magic.begin(),
+                 CircuitIO::kLfc2Magic.end());
     KvecBuilder<Field> kb(f_);
     for (const auto& layer : sc_c.l)
       for (const auto& term : *layer.quad) kb.kstore(term.v);

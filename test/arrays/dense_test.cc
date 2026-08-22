@@ -52,6 +52,7 @@ void test_move_and_clone_contract() {
                 "Dense transfer assignment must be noexcept");
 
   Dense<Field> dense(2, 2);
+  static_assert(std::is_same_v<decltype(dense.values()), std::span<Field::Elt>>);
   dense.v_[0] = p256_base.one();
   auto copy = dense.clone();
   copy->v_[0] = p256_base.zero();
@@ -64,6 +65,14 @@ void test_move_and_clone_contract() {
   assigned = std::move(moved);
   require(assigned.n0_ == 2 && assigned.n1_ == 2 && assigned.v_.size() == 4,
           "move assignment lost dimensions or values");
+}
+
+void test_row_factory_contract() {
+  const std::array<Field::Elt, 2> values = {p256_base.one(), p256_base.zero()};
+  auto dense = Dense<Field>::from_row(values);
+  require(dense.n0_ == 1 && dense.n1_ == values.size(), "row factory dimensions");
+  require(dense.values()[0] == p256_base.one(), "row factory values");
+  require_abort([] { (void)Dense<Field>::from_row(std::span<const Field::Elt>{}); }, "empty row factory accepted");
 }
 
 void test_lifetime_counters() {
@@ -99,5 +108,6 @@ int main() {
   proofs::test_move_and_clone_contract();
   proofs::test_lifetime_counters();
   proofs::test_dimensions_are_checked();
+  proofs::test_row_factory_contract();
   return 0;
 }
