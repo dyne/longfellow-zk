@@ -44,6 +44,7 @@ wasm:
 		-Wl,--export=longfellow_zk_generate_proof_tobuf \
 		-Wl,--export=longfellow_zk_verify_proof_tobuf \
 		-Wl,--export=longfellow_zk_bip340_smoke_tobuf \
+		-Wl,--export=longfellow_zk_bip340_smoke_format_tobuf \
     -o longfellow-zk.wasm src/cli/wasm.o \
 		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
@@ -141,7 +142,7 @@ blindzap-static-analysis:
 # Reviewed compatibility vectors are validation-only by default.  Updating
 # them requires spelling out the overwrite acknowledgement at the command
 # line, so a normal test run can never rewrite a reviewed baseline.
-.PHONY: compatibility-vectors compatibility-vectors-update compatibility-vectors-test \
+.PHONY: compatibility-vectors compatibility-vectors-update compatibility-vectors-test lfc2-codec-test lfc2-cross-language-test \
 	baseline-metrics baseline-metrics-test compile-commands baseline-static-analysis \
 	baseline-sanitizers parser-fuzz transcript-fuzz fuzz-crash-replay fuzz-smoke
 compatibility-vectors:
@@ -153,6 +154,21 @@ compatibility-vectors-update:
 
 compatibility-vectors-test: compatibility-vectors
 	@python3 test/compatibility/compatibility_vectors_test.py
+
+lfc2-codec-test: test/compatibility/lfc2_codec_test
+	@./test/compatibility/lfc2_codec_test
+
+lfc2-cross-language-test: test/compatibility/lfc2_codec_test
+	@task_dir=$$(mktemp -d); trap 'rm -rf "$$task_dir"' EXIT; \
+	./test/compatibility/lfc2_codec_test --write "$$task_dir/cpp.lfc2"; \
+	cd vendor/longfellow-zk/rust && LFC2_CPP_FIXTURE="$$task_dir/cpp.lfc2" LFC2_RUST_FIXTURE="$$task_dir/rust.lfc2" cargo test -p core-proto test_circuit_serialization_lfc2_roundtrip -- --exact; \
+	cd ../../.. && ./test/compatibility/lfc2_codec_test --read "$$task_dir/rust.lfc2"
+
+test/compatibility/lfc2_codec_test: test/compatibility/lfc2_codec_test.cc \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/compatibility
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< \
+		src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 # Baseline tooling intentionally writes only generated, ignored artifacts.  The
 # checked-in scripts and seed corpora make each measurement and fuzz replay

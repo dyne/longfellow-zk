@@ -21,6 +21,15 @@
 
 namespace proofs {
 
+// LFC1 remains the default wire format. LFC2 is a storage-only, canonical
+// varint encoding of the identical Circuit object; it never changes IDs,
+// transcripts, or proof encodings.
+enum class CircuitFormat : uint8_t { kLfc1, kLfc2 };
+
+inline const char* circuit_format_name(CircuitFormat format) {
+  return format == CircuitFormat::kLfc2 ? "LFC2" : "LFC1";
+}
+
 enum FieldID {
   NONE = 0,
   P256_ID = 1,
@@ -36,6 +45,8 @@ enum FieldID {
 };
 
 struct CircuitIO {
+  static constexpr uint8_t kLfc1Version = 1;
+  static constexpr uint8_t kLfc2Magic[4] = {'L', 'F', 'C', '2'};
   // The reader and writer classes implement an optimization by which
   // internal indices for wire and gate labels and circuit size
   // statistics are stored in a configurable number of bytes

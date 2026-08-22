@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <array>
 #include <vector>
 
 #include "proto/circuit_io.h"
@@ -36,7 +37,12 @@ class CircuitWriter {
   explicit CircuitWriter(const Field& f, FieldID field_id)
       : f_(f), field_id_(field_id) {}
 
-  void to_bytes(const Circuit<Field>& sc_c, std::vector<uint8_t>& bytes) {
+  void to_bytes(const Circuit<Field>& sc_c, std::vector<uint8_t>& bytes,
+                CircuitFormat format = CircuitFormat::kLfc1) {
+    if (format == CircuitFormat::kLfc2) {
+      to_lfc2_bytes(sc_c, bytes);
+      return;
+    }
     KvecBuilder<Field> kb(f_);
     // Collect constants
     for (const auto& layer : sc_c.l) {
@@ -46,7 +52,7 @@ class CircuitWriter {
     }
 
     // Write header
-    bytes.push_back(0x1);  // version
+    bytes.push_back(CircuitIO::kLfc1Version);
     serialize_field_id(bytes, field_id_);
     serialize_size(bytes, sc_c.nv);
     serialize_size(bytes, sc_c.nc);
@@ -130,6 +136,72 @@ class CircuitWriter {
       g >>= 8;
     }
     bytes.insert(bytes.end(), tmp, tmp + CircuitIO::kBytesPerSizeT);
+  }
+
+  static void serialize_varint(std::vector<uint8_t>& bytes, size_t value) {
+    do {
+      uint8_t byte = static_cast<uint8_t>(value & 0x7f);
+      value >>= 7;
+      if (value != 0) byte |= 0x80;
+      bytes.push_back(byte);
+    } while (value != 0);
+  }
+
+  static void serialize_delta(std::vector<uint8_t>& bytes, QuadCorner index,
+                              QuadCorner previous) {
+    const size_t value = static_cast<size_t>(index);
+    const size_t prev = static_cast<size_t>(previous);
+    serialize_varint(bytes, value >= prev ? 2 * (value - prev)
+                                          : 2 * (prev - value) + 1);
+  }
+
+  void to_lfc2_bytes(const Circuit<Field>& sc_c, std::vector<uint8_t>& bytes) {
+    bytes.insert(bytes.end(), CircuitIO::kLfc2Magic,
+                 CircuitIO::kLfc2Magic + sizeof(CircuitIO::kLfc2Magic));
+    KvecBuilder<Field> kb(f_);
+    for (const auto& layer : sc_c.l)
+      for (const auto& term : *layer.quad) kb.kstore(term.v);
+    for (size_t value : {static_cast<size_t>(field_id_), sc_c.nv, sc_c.nc,
+                         sc_c.npub_in, sc_c.subfield_boundary, sc_c.ninputs,
+                         sc_c.l.size(), kb.kvec()->size()})
+      serialize_varint(bytes, value);
+    for (const auto& value : *kb.kvec()) serialize_elt(bytes, value, f_);
+    for (const auto& layer : sc_c.l) {
+      serialize_varint(bytes, layer.logw);
+      serialize_varint(bytes, layer.nw);
+      struct Delta { int32_t g, h0, h1; uint32_t constant; };
+      std::vector<Delta> deltas;
+      std::vector<uint32_t> tokens;
+      QuadCorner previous_g(0), previous_h0(0), previous_h1(0);
+      for (const auto& term : *layer.quad) {
+        Delta delta{static_cast<int32_t>(static_cast<uint32_t>(term.g) - static_cast<uint32_t>(previous_g)),
+                    static_cast<int32_t>(static_cast<uint32_t>(term.h[0]) - static_cast<uint32_t>(previous_h0)),
+                    static_cast<int32_t>(static_cast<uint32_t>(term.h[1]) - static_cast<uint32_t>(previous_h1)),
+                    static_cast<uint32_t>(kb.kload(term.v))};
+        size_t index = 0;
+        for (; index < deltas.size(); ++index) {
+          const auto& old = deltas[index];
+          if (old.g == delta.g && old.h0 == delta.h0 && old.h1 == delta.h1 && old.constant == delta.constant) break;
+        }
+        if (index == deltas.size()) deltas.push_back(delta);
+        tokens.push_back(static_cast<uint32_t>(index));
+        previous_g = term.g;
+        previous_h0 = term.h[0];
+        previous_h1 = term.h[1];
+      }
+      serialize_varint(bytes, deltas.size());
+      for (const auto& delta : deltas) {
+        auto zigzag = [](int32_t value) { return static_cast<uint32_t>((static_cast<uint32_t>(value) << 1) ^ static_cast<uint32_t>(value >> 31)); };
+        serialize_varint(bytes, zigzag(delta.g)); serialize_varint(bytes, zigzag(delta.h0));
+        serialize_varint(bytes, zigzag(delta.h1)); serialize_varint(bytes, delta.constant);
+      }
+      serialize_varint(bytes, 1);  // one canonical segment containing the term stream
+      serialize_varint(bytes, tokens.size());
+      for (uint32_t token : tokens) serialize_varint(bytes, token);
+      serialize_varint(bytes, 1);  // execute segment 0 once
+      serialize_varint(bytes, 0);
+    }
+    bytes.insert(bytes.end(), sc_c.id, sc_c.id + CircuitIO::kIdSize);
   }
 
   const Field& f_;
