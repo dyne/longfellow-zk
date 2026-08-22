@@ -56,16 +56,6 @@ wasm:
 # 	--export=run_mdoc_prover --export=run_mdoc_verifier \
 # 	src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
-import-vendor:
-	$(info 🌉 Importing source from upstream)
-	@bash scripts/import_upstream.sh vendor/longfellow-zk
-
-BIP340_UPSTREAM ?= vendor/longfellow-zk
-.PHONY: import-bip340
-import-bip340:
-	$(info 🌉 Importing BIP-340 from $(BIP340_UPSTREAM))
-	@bash scripts/import_upstream.sh bip340 "$(BIP340_UPSTREAM)"
-
 .PHONY: bip340-test
 bip340-test: test/bip340_test
 	@./test/bip340_test
@@ -330,8 +320,7 @@ test/blindzap/integration_test: test/blindzap/integration_test.cc $(wildcard src
 	$(CXX) $(CPP_STANDARD) $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
 
 clean-vendor: clean
-	$(info 🌉 Clean up build and all imported vendor sources)
-	@bash scripts/import_upstream.sh clean
+	$(info 🌉 Clean up vendor build artifacts)
 	@$(MAKE) -C vendor/zstd clean
 
 clean:
