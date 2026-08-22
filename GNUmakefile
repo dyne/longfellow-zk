@@ -178,7 +178,7 @@ blindzap-static-analysis:
 # line, so a normal test run can never rewrite a reviewed baseline.
 .PHONY: compatibility-vectors compatibility-vectors-update compatibility-vectors-test lfc2-codec-test lfc2-cross-language-test \
 	baseline-metrics baseline-metrics-test compile-commands baseline-static-analysis \
-	baseline-sanitizers parser-fuzz transcript-fuzz fuzz-crash-replay fuzz-smoke
+	baseline-sanitizers parser-fuzz transcript-fuzz fuzz-crash-replay fuzz-smoke qualification-matrix
 compatibility-vectors:
 	@python3 scripts/compatibility_vectors.py --implementation cpp
 	@python3 scripts/compatibility_vectors.py --implementation rust
@@ -212,6 +212,11 @@ baseline-metrics:
 
 baseline-metrics-test:
 	@python3 test/tooling/baseline_tooling_test.py
+
+# This gate writes an ignored, machine-readable release-candidate record.  It
+# deliberately validates reviewed vectors and never updates them.
+qualification-matrix:
+	@python3 scripts/qualification_matrix.py --output test/results/qualification_matrix.csv
 
 compile-commands:
 	@rm -f compile_commands.json

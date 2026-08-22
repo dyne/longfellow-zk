@@ -116,6 +116,9 @@ jobs:
     - name: Run BlindZap production gate
       run: |
         make -j$(nproc) blindzap-ci-test CC="ccache ${{ matrix.compiler.cc }}" CXX="ccache ${{ matrix.compiler.cxx }}"
+    - name: Publish portable qualification matrix
+      run: |
+        make qualification-matrix CC="ccache ${{ matrix.compiler.cc }}" CXX="ccache ${{ matrix.compiler.cxx }}"
     - name: Pack build results
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
