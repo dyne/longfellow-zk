@@ -147,7 +147,9 @@ static long elapsed_ms(Clock::time_point start, Clock::time_point finish) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count();
 }
 
-static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
+static int run_bip340_smoke(json &output, char *err_buf, size_t err_len,
+                            proofs::CircuitFormat storage_format =
+                                proofs::CircuitFormat::kLfc1) {
     constexpr size_t kRate = 4;
     constexpr size_t kQueries = 128;
     using Field = proofs::Fp256k1Base;
@@ -197,7 +199,7 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
 
     std::vector<uint8_t> circuit_bytes;
     proofs::CircuitWriter<Field> writer(proofs::p256k1_base, proofs::SECP_ID);
-    writer.to_bytes(*circuit, circuit_bytes);
+    writer.to_bytes(*circuit, circuit_bytes, storage_format);
 
     proofs::ByteCursor rb(circuit_bytes.data(), circuit_bytes.size());
     proofs::CircuitReader<Field> reader(proofs::p256k1_base, proofs::SECP_ID);
@@ -209,7 +211,8 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
     auto phase_finish = Clock::now();
     steps.push_back({{"phase", "build_serialize_circuit"},
                      {"ms", elapsed_ms(phase_start, phase_finish)},
-                     {"compressed_bytes", circuit_bytes.size()}});
+                     {"storage_bytes", circuit_bytes.size()},
+                     {"storage_format", proofs::circuit_format_name(storage_format)}});
 
     auto pub = std::make_unique<proofs::Dense<Field>>(1, decoded->npub_in);
     auto witness_values = std::make_unique<proofs::Dense<Field>>(1, decoded->ninputs);
@@ -334,6 +337,7 @@ static int run_bip340_smoke(json &output, char *err_buf, size_t err_len) {
     output["circuit_data_hex"] = bytes_to_hex(circuit_bytes.data(), circuit_bytes.size());
     output["proof_data_hex"] = bytes_to_hex(proof_bytes.data(), proof_bytes.size());
     output["_circuit_size"] = circuit_bytes.size();
+    output["_circuit_format"] = proofs::circuit_format_name(storage_format);
     output["_proof_size"] = proof_bytes.size();
     output["public_inputs"] = circuit->npub_in;
     output["total_inputs"] = circuit->ninputs;
@@ -598,6 +602,20 @@ int longfellow_zk_bip340_smoke_tobuf(
     int rc = run_bip340_smoke(output, err_buf, err_len);
     if (rc != 0) return rc;
 
+    return buf_copy_or_err(out_buf, out_len, err_buf, err_len, output.dump());
+}
+
+int longfellow_zk_bip340_smoke_format_tobuf(
+    int storage_format, char *out_buf, size_t out_len,
+    char *err_buf, size_t err_len) {
+    buf_ok(out_buf, out_len);
+    if (storage_format != 1 && storage_format != 2)
+        return buf_err(err_buf, err_len, "storage_format must be 1 (LFC1) or 2 (LFC2)");
+    json output;
+    int rc = run_bip340_smoke(
+        output, err_buf, err_len,
+        storage_format == 2 ? proofs::CircuitFormat::kLfc2 : proofs::CircuitFormat::kLfc1);
+    if (rc != 0) return rc;
     return buf_copy_or_err(out_buf, out_len, err_buf, err_len, output.dump());
 }
 

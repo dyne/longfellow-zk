@@ -257,7 +257,9 @@ int circuit_gen(const std::string& circuit_file, const std::string& zkspec_str) 
         circuit_json["_generated"] = std::time(nullptr);
         circuit_json["_metadata"] = {
             {"description", "ZK circuit for mDoc verification"},
-            {"format", "base64-encoded compressed circuit"}
+            {"format", "LFC1"},
+            {"storage_format", "LFC1"},
+            {"rollback", "LFC1 is the legacy/default format; LFC2 is opt-in where the producer exposes it"}
         };
 
         // Write circuit JSON to file
