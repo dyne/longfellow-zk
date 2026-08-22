@@ -128,6 +128,14 @@ dense-test: test/arrays/dense_test
 transcript-clone-test: test/random/transcript_clone_test
 	@./test/random/transcript_clone_test
 
+.PHONY: assertion-symbols-test
+assertion-symbols-test: test/compiler/assertion_symbols_test
+	@./test/compiler/assertion_symbols_test
+
+test/compiler/assertion_symbols_test: test/compiler/assertion_symbols_test.cc $(wildcard src/circuits/compiler/*.h) src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+	@mkdir -p test/compiler
+	$(CXX) -std=c++17 $(CFLAGS) -Isrc -Ivendor/zstd/lib -o $@ $< src/liblongfellow-zk.a vendor/zstd/lib/libzstd.a
+
 .PHONY: panic-parser-test
 panic-parser-test: test/security/panic_parser_test
 	@./test/security/panic_parser_test
