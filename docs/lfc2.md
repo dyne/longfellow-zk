@@ -26,6 +26,22 @@ rejects truncated data, a bad magic, non-minimal or overflowing
 varints, delta underflow/overflow, invalid indices, noncanonical field
 elements, invalid dimensions, ID mismatches, and trailing bytes.
 
+## Read-only upstream Rust interop
+
+The Google `vendor/longfellow-zk` submodule is read-only.  Reciprocal fixture
+coverage lives in the first-party `vendor/longfellow-zk-interop` Cargo adapter,
+which uses local path dependencies to the published upstream crates without
+changing their source.  `make lfc2-cross-language-test` writes the C++ fixture,
+has the adapter validate its ID and exact consumption, emits the canonical Rust
+fixture, and then has C++ validate the reciprocal file.  The qualification
+matrix invokes this target.
+
+If a development checkout retains an unpublished detached submodule object,
+restore the parent repository's published gitlink and run `git submodule update
+--init --recursive vendor/longfellow-zk`.  Do not patch, commit, or publish the
+submodule to recover the test.  The adapter's own build artifacts are separate;
+leave existing `vendor/longfellow-zk/rust/target/` contents untouched.
+
 Operators opt in by passing `CircuitFormat::kLfc2` to `CircuitWriter`; the
 default is `kLfc1`.  The magic is sufficient to identify files for metrics or
 rollback.  Reverting that selection writes LFC1 again; no circuit conversion,
