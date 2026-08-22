@@ -40,7 +40,7 @@
 namespace proofs {
 using BlindzapField = Fp256k1Base; using BlindzapEC = P256k1; using BlindzapBackend = CompilerBackend<BlindzapField>; using BlindzapLogic = Logic<BlindzapField, BlindzapBackend>; using BlindzapRelation = BlindzapCircuitV1<BlindzapLogic, BlindzapField, BlindzapEC>;
 template <size_t Keys>
-inline std::unique_ptr<Circuit<BlindzapField>> BlindzapBuildCircuit(QuadCircuit<BlindzapField>* q) { BlindzapBackend b(q); BlindzapLogic l(&b,p256k1_base); BlindzapMultiCircuitV1<BlindzapLogic, BlindzapField, BlindzapEC, Keys> r(l,p256k1); std::array<std::array<BlindzapLogic::EltW,20>, Keys> p; for(auto& key:p)for(auto& x:key)x=l.eltw_input(); q->private_input(); std::array<typename BlindzapRelation::Witness, Keys> w; for(auto& x:w)x.input(l); r.assert_programs(p,w); return q->mkcircuit(1); }
+inline std::unique_ptr<Circuit<BlindzapField>> BlindzapBuildCircuit(QuadCircuit<BlindzapField>* q) { BlindzapBackend b(q); BlindzapLogic l(&b,p256k1_base); BlindzapMultiCircuitV1<BlindzapLogic, BlindzapField, BlindzapEC, Keys> r(l,p256k1); std::array<std::array<BlindzapLogic::EltW,20>, Keys> p; for(auto& key:p)for(auto& x:key)x=l.eltw_input(); q->private_input(); std::array<typename BlindzapRelation::Witness, Keys> w; for(auto& x:w)x.input(l); auto symbol_scope=q->assertion_scope("blindzap/programs/relations"); r.assert_programs(p,w); return q->mkcircuit(1); }
 inline std::unique_ptr<Circuit<BlindzapField>> BlindzapBuildCircuit(QuadCircuit<BlindzapField>* q) { return BlindzapBuildCircuit<1>(q); }
 inline size_t BlindzapBlock(const Circuit<BlindzapField>& c, const QuadCircuit<BlindzapField>& q) { return c.ninputs-c.npub_in+q.nquad_terms_+1; }
 template <size_t Keys>

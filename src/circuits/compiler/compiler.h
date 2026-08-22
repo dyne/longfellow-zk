@@ -20,10 +20,12 @@
 
 #include <algorithm>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "algebra/hash.h"
 #include "circuits/compiler/node.h"
+#include "circuits/compiler/assertion_symbols.h"
 #include "circuits/compiler/pdqhash.h"
 #include "circuits/compiler/schedule.h"
 #include "sumcheck/circuit.h"
@@ -174,6 +176,22 @@ class QuadCircuit {
   // The node has the form 0*(1*op), which does not normally
   // appear in circuits.
   size_t assert0(size_t op) {
+    const AssertionSourceId source = assertion_tracker_.current();
+    const size_t asserted = assert0_internal(op);
+    if (source.value() != 0) {
+      if (assertion_paths_.size() <= asserted) assertion_paths_.resize(asserted + 1);
+      const std::string* path = assertion_tracker_.path(source);
+      if (path != nullptr && std::find(assertion_paths_[asserted].begin(), assertion_paths_[asserted].end(), *path) == assertion_paths_[asserted].end()) assertion_paths_[asserted].push_back(*path);
+    }
+    return asserted;
+  }
+
+  AssertionSymbolTracker::Scope assertion_scope(std::string path) {
+    return assertion_tracker_.scope(std::move(path));
+  }
+
+ private:
+  size_t assert0_internal(size_t op) {
     const node* n = &nodes_[op];
     if (n->zero()) {
       // Identically zero, so nothing to generate.
@@ -188,7 +206,7 @@ class QuadCircuit {
       if (n->terms[0].ki == 0) {
         return op;
       } else {
-        return assert0(n->terms[0].op1);
+        return assert0_internal(n->terms[0].op1);
       }
     } else {
       typename term::assert0_type_hack hack;
@@ -200,6 +218,7 @@ class QuadCircuit {
     }
   }
 
+ public:
   // Wrappers to avoid creating unnecessary wires.  The
   // compiler will discard them anyway, but they still take
   // time and space.
@@ -251,7 +270,7 @@ class QuadCircuit {
     fixup_last_layer_assertions(depth_ub);
     compute_needed(depth_ub);
 
-    Scheduler<Field> sched(nodes_, f_);
+    Scheduler<Field> sched(nodes_, f_, &assertion_paths_);
     std::unique_ptr<Circuit<Field>> c =
         sched.mkcircuit(constants_, depth_ub, nc);
 
@@ -370,6 +389,8 @@ class QuadCircuit {
 
   std::vector<node> nodes_;
   PdqHash cse_;
+  AssertionSymbolTracker assertion_tracker_;
+  std::vector<std::vector<std::string>> assertion_paths_;
 
   size_t kstore(const Elt& k) {
     uint64_t d = elt_hash(k, f_);
@@ -426,11 +447,18 @@ class QuadCircuit {
 
   void fixup_last_layer_assertions(size_t depth_ub) {
     // convert assertions in the last layer into outputs
-    for (auto& n : nodes_) {
+    for (size_t i = 0; i < nodes_.size(); ++i) {
+      auto& n = nodes_[i];
       if (!n.info.is_output && n.info.is_assert0 && n.info.depth == depth_ub &&
           n.linearp()) {
         n.info.is_assert0 = false;
-        output_internal(n.terms[0].op1, nodeinfo::kWireIdUndefined);
+        const size_t operand = n.terms[0].op1;
+        output_internal(operand, nodeinfo::kWireIdUndefined);
+        if (i < assertion_paths_.size() && !assertion_paths_[i].empty()) {
+          if (assertion_paths_.size() <= operand) assertion_paths_.resize(operand + 1);
+          for (const auto& path : assertion_paths_[i])
+            if (std::find(assertion_paths_[operand].begin(), assertion_paths_[operand].end(), path) == assertion_paths_[operand].end()) assertion_paths_[operand].push_back(path);
+        }
       }
     }
   }

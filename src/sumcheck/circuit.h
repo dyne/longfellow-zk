@@ -23,6 +23,7 @@
 
 #include "algebra/poly.h"
 #include "arrays/affine.h"
+#include "circuits/compiler/assertion_symbols.h"
 #include "sumcheck/quad.h"
 
 namespace proofs {
@@ -51,6 +52,7 @@ struct Circuit {
   std::vector<Layer<Field>> l;  // layers
 
   uint8_t id[32];  // unique id for the circuit, created by the compiler
+  std::shared_ptr<const AssertionSymbols> assertion_symbols;
 
   size_t nterms() const {
     size_t n = 0;

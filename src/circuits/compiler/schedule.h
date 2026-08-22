@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "algebra/compare.h"
@@ -43,15 +44,18 @@ class Scheduler {
 
   const Field& f_;
   const std::vector<node>& nodes_;
+  const std::vector<std::vector<std::string>>* assertion_paths_;
 
  public:
   size_t nwires_;
   size_t nquad_terms_;
   size_t nwires_overhead_;
 
-  Scheduler(const std::vector<node>& nodes, const Field& f)
+  Scheduler(const std::vector<node>& nodes, const Field& f,
+            const std::vector<std::vector<std::string>>* assertion_paths)
       : f_(f),
         nodes_(nodes),
+        assertion_paths_(assertion_paths),
         nwires_(0),
         nquad_terms_(0),
         nwires_overhead_(0) {}
@@ -77,6 +81,18 @@ class Scheduler {
     //
     assign_wire_ids(lnodes);
     fill_layers(c.get(), depth_ub, lnodes);
+    auto symbols = std::make_shared<AssertionSymbols>();
+    for (size_t depth = 0; depth < lnodes.size(); ++depth) {
+      for (const lnode& ln : lnodes[depth]) {
+        if (ln.source_node >= assertion_paths_->size() ||
+            (*assertion_paths_)[ln.source_node].empty()) continue;
+        const size_t layer = depth_ub - 1 - depth;
+        symbols->entries.push_back(AssertionSymbol{
+            layer, static_cast<uint32_t>(ln.desired_wire_id),
+            (*assertion_paths_)[ln.source_node]});
+      }
+    }
+    if (!symbols->entries.empty()) c->assertion_symbols = symbols;
 
     return c;
   }
@@ -101,13 +117,15 @@ class Scheduler {
     // to write, it seems simpler to just handle this case
     // uniformly.
     bool is_copy_wire;
+    size_t source_node;
 
     std::vector<lterm> lterms;
 
-    lnode(quad_corner_t desired_wire_id, bool is_copy_wire,
+    lnode(quad_corner_t desired_wire_id, bool is_copy_wire, size_t source_node,
           const std::vector<lterm>& lterms)
         : desired_wire_id(desired_wire_id),
           is_copy_wire(is_copy_wire),
+          source_node(source_node),
           lterms(lterms) {}
   };
 
@@ -158,7 +176,7 @@ class Scheduler {
             lterms.push_back(lt);
           }
           lnodes.at(d).push_back(lnode(nfo.desired_wire_id(d, depth_ub),
-                                       /*is_copy_wire=*/false, lterms));
+                                       /*is_copy_wire=*/false, op, lterms));
         }
 
         // create copy wires
@@ -180,7 +198,7 @@ class Scheduler {
           };
           lterms.push_back(lt);
           lnodes.at(d).push_back(lnode(nfo.desired_wire_id(d, depth_ub),
-                                       /*is_copy_wire=*/true, lterms));
+                                       /*is_copy_wire=*/true, SIZE_MAX, lterms));
           ++nwires_overhead_;
         }  // for copy wires
       }  // if needed
