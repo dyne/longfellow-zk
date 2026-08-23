@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "util/export.h"
+
 #define AES_BLOCKLEN 16 // Block length in bytes - AES is 128b block only
 
 #define AES_KEYLEN 32
@@ -18,8 +20,8 @@ struct AES_ctx
   uint8_t RoundKey[AES_keyExpSize];
 };
 
-void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key);
+LONGFELLOW_ZK_API void AES_init_ctx(struct AES_ctx* ctx, const uint8_t* key);
 
-void AES_ECB_encrypt(const struct AES_ctx* ctx, uint8_t* buf);
+LONGFELLOW_ZK_API void AES_ECB_encrypt(const struct AES_ctx* ctx, uint8_t* buf);
 
 #endif

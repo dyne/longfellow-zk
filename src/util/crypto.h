@@ -28,6 +28,7 @@
 #include <cstring>
 
 #include "util/panic.h"
+#include "util/export.h"
 
 #include "util/sha256.h" // Replace OpenSSL includes with this
 #include "util/aes_ecb.h" // Replace OpenSSL includes with this
@@ -155,9 +156,9 @@ namespace proofs {
 
 // Generate n random bytes, following the openssl API convention.
 // This method will panic if the openssl library fails.
-void rand_bytes(uint8_t out[/*n*/], size_t n);
+LONGFELLOW_ZK_API void rand_bytes(uint8_t out[/*n*/], size_t n);
 
-void hex_to_str(char out[/* 2*n + 1*/], const uint8_t in[/*n*/], size_t n);
+LONGFELLOW_ZK_API void hex_to_str(char out[/* 2*n + 1*/], const uint8_t in[/*n*/], size_t n);
 
 }  // namespace proofs
 

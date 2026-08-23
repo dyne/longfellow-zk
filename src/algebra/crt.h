@@ -21,6 +21,7 @@
 
 #include "algebra/fp.h"
 #include "algebra/nat.h"
+#include "util/export.h"
 #include "util/panic.h"
 
 // The idea behind this class is to mimic the Field interface for F_p with
@@ -40,8 +41,8 @@ namespace crt {
 static constexpr size_t kBasisSize = 17;
 static constexpr uint64_t kOmegaOrder = 1ull << 22;
 
-extern const uint64_t kPrimes17[kBasisSize];
-extern const uint64_t kOmega17[kBasisSize];
+extern LONGFELLOW_ZK_API const uint64_t kPrimes17[kBasisSize];
+extern LONGFELLOW_ZK_API const uint64_t kOmega17[kBasisSize];
 }  // namespace crt
 
 // ==========================================
