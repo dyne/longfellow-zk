@@ -11,7 +11,7 @@
       "bytes": 4603,
       "kind": "commitment",
       "name": "commitment",
-      "path": "test/blindzap/testdata/blindzap_vectors.json",
+      "path": "projects/blindzap/tests/blindzap/testdata/blindzap_vectors.json",
       "sha256": "37b59a14415eb1add49578736c71525c48d342eb51b99b5f96839eba8b7c863f"
     },
     {

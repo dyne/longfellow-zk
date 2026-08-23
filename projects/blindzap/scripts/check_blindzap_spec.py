@@ -4,7 +4,8 @@
 from pathlib import Path
 import sys
 
-text = Path("docs/blindzap-v1.md").read_text(encoding="utf-8")
+ROOT = Path(__file__).resolve().parents[3]
+text = (ROOT / "docs/blindzap-v1.md").read_text(encoding="utf-8")
 required = [
     "## 1. Conventions and constants",
     "## 2. Network identifiers",
@@ -30,14 +31,14 @@ if missing:
 order = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"
 prime = "fffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"
 source_text = "\n".join(
-    Path(path).read_text(encoding="utf-8").lower()
-    for path in ("src/ec/p256k1.cc", "src/ec/p256k1.h", "src/circuits/bip340/bip340_witness.h")
+    (ROOT / path).read_text(encoding="utf-8").lower()
+    for path in ("src/ec/p256k1.cc", "src/ec/p256k1.h", "projects/bip340/include/circuits/bip340/bip340_witness.h")
 )
 if order not in source_text or prime not in source_text:
     print("repository secp256k1 constants no longer match the normative specification", file=sys.stderr)
     sys.exit(1)
 
-statement_source = Path("src/blindzap/statement.h").read_text(encoding="utf-8")
+statement_source = (ROOT / "projects/blindzap/include/blindzap/statement.h").read_text(encoding="utf-8")
 required_source = [
     "kTestnet3 = 1",
     "kSignet = 2",

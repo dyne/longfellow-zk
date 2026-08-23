@@ -16,16 +16,16 @@ testing.
 Build the CLI and run the production-oriented test gate:
 
 ```sh
-make -j"$(nproc)" blindzap
-make -j"$(nproc)" blindzap-ci-test
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/longfellow-prefix
+cmake --build build -j"$(nproc)"
+ctest --test-dir build --output-on-failure
 ```
 
 The real proof test is intentionally separate because it is memory- and
 CPU-intensive:
 
-```sh
-make blindzap-proof-test
-```
+The `blindzap-test` CTest target includes the real one- and two-key proof
+round trips; it is intentionally memory- and CPU-intensive.
 
 The CLI supports `mainnet`, `testnet3` (and the `testnet` alias), `testnet4`,
 `signet`, and `regtest`. It always passes the corresponding explicit network

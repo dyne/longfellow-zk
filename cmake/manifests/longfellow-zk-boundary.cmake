@@ -20,7 +20,7 @@ set(LONGFELLOW_ZK_NAMED_PROJECT_SOURCES
   projects/mdoc/src/mdoc_generate_circuit.cc
   projects/mdoc/src/mdoc_zk.cc
   projects/mdoc/src/zk_spec.cc
-  src/cli/blindzap_main.cc
+  projects/blindzap/src/blindzap_main.cc
   projects/mdoc/src/encoding.cc
   projects/mdoc/src/main.cc
   projects/mdoc/src/nanobench.cc
@@ -142,25 +142,25 @@ set(LONGFELLOW_ZK_BASE_HEADERS
 )
 
 set(LONGFELLOW_ZK_NAMED_PROJECT_HEADERS
-  src/blindzap/bitcoin_core.h
-  src/blindzap/chain_state.h
-  src/blindzap/encoding.h
-  src/blindzap/envelope.h
-  src/blindzap/nonce_store.h
-  src/blindzap/proof.h
-  src/blindzap/prover.h
-  src/blindzap/statement.h
-  src/blindzap/verifier.h
+  projects/blindzap/include/blindzap/bitcoin_core.h
+  projects/blindzap/include/blindzap/chain_state.h
+  projects/blindzap/include/blindzap/encoding.h
+  projects/blindzap/include/blindzap/envelope.h
+  projects/blindzap/include/blindzap/nonce_store.h
+  projects/blindzap/include/blindzap/proof.h
+  projects/blindzap/include/blindzap/prover.h
+  projects/blindzap/include/blindzap/statement.h
+  projects/blindzap/include/blindzap/verifier.h
   projects/bip340/include/circuits/bip340/bip340_guard.h
   projects/bip340/include/circuits/bip340/bip340_verify.h
   projects/bip340/include/circuits/bip340/bip340_witness.h
-  src/circuits/blindzap/blindzap_circuit.h
-  src/circuits/blindzap/blindzap_witness.h
-  src/circuits/blindzap/compressed_key_sha256.h
-  src/circuits/blindzap/compressed_key_sha256_witness.h
-  src/circuits/blindzap/hash160.h
-  src/circuits/blindzap/key_ownership.h
-  src/circuits/blindzap/key_ownership_witness.h
+  projects/blindzap/include/circuits/blindzap/blindzap_circuit.h
+  projects/blindzap/include/circuits/blindzap/blindzap_witness.h
+  projects/blindzap/include/circuits/blindzap/compressed_key_sha256.h
+  projects/blindzap/include/circuits/blindzap/compressed_key_sha256_witness.h
+  projects/blindzap/include/circuits/blindzap/hash160.h
+  projects/blindzap/include/circuits/blindzap/key_ownership.h
+  projects/blindzap/include/circuits/blindzap/key_ownership_witness.h
   projects/ecdsa/include/circuits/ecdsa/verify_circuit.h
   projects/ecdsa/include/circuits/ecdsa/verify_evaluate.h
   projects/ecdsa/include/circuits/ecdsa/verify_layout.h
