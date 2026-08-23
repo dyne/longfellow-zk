@@ -16,15 +16,15 @@ set(LONGFELLOW_ZK_BASE_SOURCES
 )
 
 set(LONGFELLOW_ZK_NAMED_PROJECT_SOURCES
-  src/circuits/mdoc/mdoc_decompress.cc
-  src/circuits/mdoc/mdoc_generate_circuit.cc
-  src/circuits/mdoc/mdoc_zk.cc
-  src/circuits/mdoc/zk_spec.cc
+  projects/mdoc/src/mdoc_decompress.cc
+  projects/mdoc/src/mdoc_generate_circuit.cc
+  projects/mdoc/src/mdoc_zk.cc
+  projects/mdoc/src/zk_spec.cc
   src/cli/blindzap_main.cc
-  src/cli/encoding.cc
-  src/cli/main.cc
-  src/cli/nanobench.cc
-  src/cli/wasm.cc
+  projects/mdoc/src/encoding.cc
+  projects/mdoc/src/main.cc
+  projects/mdoc/src/nanobench.cc
+  projects/mdoc/src/wasm.cc
 )
 
 set(LONGFELLOW_ZK_PRIVATE_TOOLING_SOURCES
@@ -151,9 +151,9 @@ set(LONGFELLOW_ZK_NAMED_PROJECT_HEADERS
   src/blindzap/prover.h
   src/blindzap/statement.h
   src/blindzap/verifier.h
-  src/circuits/bip340/bip340_guard.h
-  src/circuits/bip340/bip340_verify.h
-  src/circuits/bip340/bip340_witness.h
+  projects/bip340/include/circuits/bip340/bip340_guard.h
+  projects/bip340/include/circuits/bip340/bip340_verify.h
+  projects/bip340/include/circuits/bip340/bip340_witness.h
   src/circuits/blindzap/blindzap_circuit.h
   src/circuits/blindzap/blindzap_witness.h
   src/circuits/blindzap/compressed_key_sha256.h
@@ -161,20 +161,20 @@ set(LONGFELLOW_ZK_NAMED_PROJECT_HEADERS
   src/circuits/blindzap/hash160.h
   src/circuits/blindzap/key_ownership.h
   src/circuits/blindzap/key_ownership_witness.h
-  src/circuits/ecdsa/verify_circuit.h
-  src/circuits/ecdsa/verify_evaluate.h
-  src/circuits/ecdsa/verify_layout.h
-  src/circuits/ecdsa/verify_types.h
-  src/circuits/ecdsa/verify_witness.h
-  src/circuits/mdoc/mdoc_attribute_ids.h
-  src/circuits/mdoc/mdoc_constants.h
-  src/circuits/mdoc/mdoc_decompress.h
-  src/circuits/mdoc/mdoc_hash.h
-  src/circuits/mdoc/mdoc_signature.h
-  src/circuits/mdoc/mdoc_witness.h
-  src/circuits/mdoc/mdoc_zk.h
-  src/cli/encoding.h
-  src/cli/nanobench.h
+  projects/ecdsa/include/circuits/ecdsa/verify_circuit.h
+  projects/ecdsa/include/circuits/ecdsa/verify_evaluate.h
+  projects/ecdsa/include/circuits/ecdsa/verify_layout.h
+  projects/ecdsa/include/circuits/ecdsa/verify_types.h
+  projects/ecdsa/include/circuits/ecdsa/verify_witness.h
+  projects/mdoc/include/circuits/mdoc/mdoc_attribute_ids.h
+  projects/mdoc/include/circuits/mdoc/mdoc_constants.h
+  projects/mdoc/include/circuits/mdoc/mdoc_decompress.h
+  projects/mdoc/include/circuits/mdoc/mdoc_hash.h
+  projects/mdoc/include/circuits/mdoc/mdoc_signature.h
+  projects/mdoc/include/circuits/mdoc/mdoc_witness.h
+  projects/mdoc/include/circuits/mdoc/mdoc_zk.h
+  projects/mdoc/src/encoding.h
+  projects/mdoc/src/nanobench.h
 )
 
 set(LONGFELLOW_ZK_PRIVATE_TOOLING_HEADERS

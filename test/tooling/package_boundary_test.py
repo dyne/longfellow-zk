@@ -15,13 +15,15 @@ def cmake_list(name: str) -> list[str]:
     match = re.search(rf"set\({name}\s*(.*?)\n\)", text, re.S)
     if not match:
         raise AssertionError(f"missing {name}")
-    return re.findall(r"^\s*(src/[^\s)]+)\s*$", match.group(1), re.M)
+    return re.findall(r"^\s*((?:src|projects)/[^\s)]+)\s*$", match.group(1), re.M)
 
 def tracked_production() -> set[str]:
-    output = subprocess.check_output(
-        ["git", "ls-files", "src/**/*.cc", "src/**/*.h"], cwd=ROOT, text=True
-    )
-    return {path for path in output.splitlines() if path}
+    roots = (ROOT / "src", ROOT / "projects")
+    return {path.relative_to(ROOT).as_posix()
+            for root in roots if root.exists()
+            for path in root.rglob("*")
+            if path.is_file() and path.suffix in {".cc", ".h"}
+            and (root.name == "src" or "/tests/" not in path.relative_to(ROOT).as_posix())}
 
 def assert_unique(label: str, paths: list[str]) -> None:
     duplicate = sorted({path for path in paths if paths.count(path) > 1})
