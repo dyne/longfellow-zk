@@ -43,7 +43,7 @@ if [[ ${LONGFELLOW_ZK_SANITIZERS:-OFF} == ON ]]; then
     "${configure_args[@]}"
     "-DLONGFELLOW_ZK_ENABLE_SANITIZERS=ON"
   )
-  ctest_args+=(--timeout 3600)
+  ctest_args+=(--timeout 5400)
 fi
 
 cmake -S "$root" -B "$work/base" -G Ninja \
