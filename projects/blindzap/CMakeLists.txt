@@ -40,7 +40,8 @@ write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/LongfellowZKBlindZa
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/LongfellowZKBlindZapConfig.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/LongfellowZKBlindZapConfigVersion.cmake
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/LongfellowZKBlindZap)
-install(FILES README.md docs-circuit.md DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/LongfellowZKBlindZap)
+install(FILES README.md docs-circuit.md package-metadata.json
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/LongfellowZKBlindZap)
 
 if(BUILD_TESTING)
   function(add_blindzap_test target source)
@@ -49,6 +50,9 @@ if(BUILD_TESTING)
     add_test(NAME ${target} COMMAND ${target} ${ARGN})
   endfunction()
   add_blindzap_test(blindzap-test tests/blindzap/blindzap_test.cc)
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/test/results")
+  set_tests_properties(blindzap-test PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
   add_blindzap_test(compressed-key-sha256-test tests/blindzap/compressed_key_sha256_test.cc)
   add_blindzap_test(key-ownership-test tests/blindzap/key_ownership_test.cc)
   add_blindzap_test(ripemd160-test tests/blindzap/ripemd160_test.cc)

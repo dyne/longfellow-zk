@@ -1,0 +1,10 @@
+{
+  "name": "longfellow-zk-blindzap",
+  "version": "0.1.0",
+  "license": "GPL-3.0-or-later",
+  "requires": [
+    "LongfellowZK >= 0.1.0",
+    "LongfellowZKBIP340 >= 0.1.0"
+  ],
+  "cmakeTarget": "LongfellowZKBlindZap::blindzap"
+}

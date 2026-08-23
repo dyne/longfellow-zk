@@ -1,0 +1,18 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+  "configurePresets": [
+    { "name": "base", "hidden": true, "generator": "Ninja", "binaryDir": "${sourceDir}/build/${presetName}", "cacheVariables": { "CMAKE_EXPORT_COMPILE_COMMANDS": "ON", "LONGFELLOW_ZK_BUILD_TESTING": "ON" } },
+    { "name": "release", "displayName": "Native release", "inherits": "base", "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" } },
+    { "name": "debug", "displayName": "Native debug", "inherits": "base", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "sanitizers", "displayName": "Clang/GCC sanitizers", "inherits": "base", "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "LONGFELLOW_ZK_ENABLE_SANITIZERS": "ON" } },
+    { "name": "unix-makefiles", "displayName": "Unix Makefiles release", "inherits": "release", "generator": "Unix Makefiles" },
+    { "name": "wasi", "displayName": "WASI static library", "inherits": "base", "binaryDir": "${sourceDir}/build/wasi", "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "BUILD_SHARED_LIBS": "OFF", "LONGFELLOW_ZK_BUILD_TESTING": "OFF", "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchains/wasi.cmake" } }
+  ],
+  "buildPresets": [
+    { "name": "release", "configurePreset": "release" }, { "name": "debug", "configurePreset": "debug" }, { "name": "sanitizers", "configurePreset": "sanitizers" }, { "name": "unix-makefiles", "configurePreset": "unix-makefiles" }, { "name": "wasi", "configurePreset": "wasi", "targets": ["longfellow-zk-static", "longfellow-zk-wasi-smoke"] }
+  ],
+  "testPresets": [
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true } }, { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } }, { "name": "sanitizers", "configurePreset": "sanitizers", "output": { "outputOnFailure": true } }
+  ]
+}

@@ -7,13 +7,18 @@ include(CMakePackageConfigHelpers)
 include(CTest)
 
 option(LONGFELLOW_ZK_BUILD_TESTING "Build Longfellow ZK qualification tests" ON)
+option(LONGFELLOW_ZK_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 
 include(cmake/manifests/longfellow-zk-sources.cmake)
 include(cmake/manifests/longfellow-zk-public-headers.cmake)
 
 add_library(longfellow-zk-objects OBJECT ${LONGFELLOW_ZK_SOURCES})
 add_library(longfellow-zk-static STATIC $<TARGET_OBJECTS:longfellow-zk-objects>)
-add_library(longfellow-zk-shared SHARED $<TARGET_OBJECTS:longfellow-zk-objects>)
+set(LONGFELLOW_ZK_LIBRARY_TARGETS longfellow-zk-static)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  add_library(longfellow-zk-shared SHARED $<TARGET_OBJECTS:longfellow-zk-objects>)
+  list(APPEND LONGFELLOW_ZK_LIBRARY_TARGETS longfellow-zk-shared)
+endif()
 
 set_target_properties(longfellow-zk-objects PROPERTIES
   POSITION_INDEPENDENT_CODE ON
@@ -22,17 +27,31 @@ set_target_properties(longfellow-zk-static PROPERTIES
   OUTPUT_NAME longfellow-zk
   EXPORT_NAME static
 )
-set_target_properties(longfellow-zk-shared PROPERTIES
-  OUTPUT_NAME longfellow-zk
-  EXPORT_NAME shared
-  VERSION ${PROJECT_VERSION}
-  SOVERSION ${PROJECT_VERSION_MAJOR}
-)
+if(TARGET longfellow-zk-shared)
+  set_target_properties(longfellow-zk-shared PROPERTIES
+    OUTPUT_NAME longfellow-zk
+    EXPORT_NAME shared
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+  )
+endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
   target_compile_options(longfellow-zk-objects PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
 endif()
 
-foreach(target longfellow-zk-objects longfellow-zk-static longfellow-zk-shared)
+if(LONGFELLOW_ZK_ENABLE_SANITIZERS)
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    message(FATAL_ERROR "LONGFELLOW_ZK_ENABLE_SANITIZERS requires GCC or Clang")
+  endif()
+  target_compile_options(longfellow-zk-objects PRIVATE
+    -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1)
+  target_link_options(longfellow-zk-static INTERFACE -fsanitize=address,undefined)
+  if(TARGET longfellow-zk-shared)
+    target_link_options(longfellow-zk-shared INTERFACE -fsanitize=address,undefined)
+  endif()
+endif()
+
+foreach(target longfellow-zk-objects ${LONGFELLOW_ZK_LIBRARY_TARGETS})
   target_compile_features(${target} PUBLIC cxx_std_20)
   target_include_directories(${target}
     PUBLIC
@@ -48,9 +67,19 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
 endif()
 
 add_library(LongfellowZK::static ALIAS longfellow-zk-static)
-add_library(LongfellowZK::shared ALIAS longfellow-zk-shared)
+if(TARGET longfellow-zk-shared)
+  add_library(LongfellowZK::shared ALIAS longfellow-zk-shared)
+endif()
 
-install(TARGETS longfellow-zk-static longfellow-zk-shared
+if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  add_executable(longfellow-zk-wasi-smoke cmake/wasi_smoke.cc)
+  target_link_libraries(longfellow-zk-wasi-smoke PRIVATE LongfellowZK::static)
+  target_link_options(longfellow-zk-wasi-smoke PRIVATE
+    -Wl,--no-entry -Wl,--export=longfellow_zk_wasi_smoke)
+  set_target_properties(longfellow-zk-wasi-smoke PROPERTIES SUFFIX ".wasm")
+endif()
+
+install(TARGETS ${LONGFELLOW_ZK_LIBRARY_TARGETS}
   EXPORT LongfellowZKTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -86,7 +115,15 @@ install(FILES
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LongfellowZK"
 )
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/LongfellowZK)
-install(FILES docs/abi.md DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/LongfellowZK)
+install(FILES docs/abi.md docs/packaging.md
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/LongfellowZK)
+
+set(CPACK_PACKAGE_NAME "longfellow-zk")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_VENDOR "Dyne.org Foundation")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_GENERATOR "TGZ")
+include(CPack)
 
 if(BUILD_TESTING AND LONGFELLOW_ZK_BUILD_TESTING)
   add_subdirectory(test/cmake)

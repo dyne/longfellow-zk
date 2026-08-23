@@ -93,29 +93,12 @@ jobs:
         packages: "build-essential g++ clang make jq xxd"
     - name: Build project with ${{ matrix.compiler.cxx }}
       run: |
-        make clean
-        make -j$(nproc) CC="ccache ${{ matrix.compiler.cc }}" CXX="ccache ${{ matrix.compiler.cxx }}"
-    - name: Verify binaries
+        cmake --preset release -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        cmake --build --preset release --parallel
+        ctest --preset release
+    - name: Verify installed package consumers
       run: |
-        ls -lh longfellow-zk
-        file longfellow-zk
-        ldd longfellow-zk || true
-    - name: Run CLI help
-      run: |
-        ./longfellow-zk --help
-    - name: List ZK specs
-      run: |
-        ./longfellow-zk circuit_gen --zkspec list
-    - name: Run tests
-      run: |
-        cd test
-        ./bats/bin/bats mdoc.bats
-    - name: Run BlindZap production gate
-      run: |
-        make -j$(nproc) blindzap-ci-test CC="ccache ${{ matrix.compiler.cc }}" CXX="ccache ${{ matrix.compiler.cxx }}"
-    - name: Publish portable qualification matrix
-      run: |
-        make qualification-matrix CC="ccache ${{ matrix.compiler.cc }}" CXX="ccache ${{ matrix.compiler.cxx }}"
+        bash scripts/ci-installed-package.sh
     - name: Pack build results
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
@@ -124,7 +107,8 @@ jobs:
       with:
         name: ${{ github.job }}
         path: |
-          longfellow-zk_${{ github.job }}.zip
+          longfellow-zk_${{ github.job }}.tar.gz
+          longfellow-zk_${{ github.job }}.tar.gz.sha256
     outputs:
        git_sha_short: ${{ steps.sha.outputs.git_sha_short }}
 
@@ -153,20 +137,20 @@ jobs:
         add-to-path: true
     - name: Build project
       run: |
-        make clean
-        make -j$(nproc) wasm CC="ccache /opt/wasi-sdk/bin/clang" CXX="ccache /opt/wasi-sdk/bin/clang++"
-    - name: Run WASM tests
-      run: |
-        node test/wasm_test.mjs
+        WASI_SDK_PATH=/opt/wasi-sdk cmake --preset wasi
+        cmake --build --preset wasi --parallel
+    - name: Run WASI Node smoke
+      run: node test/wasi_smoke.mjs build/wasi/longfellow-zk-wasi-smoke.wasm
     - name: Pack build results
       run: |
-        bash scripts/pack_release.sh ${{ github.job }}
+        LONGFELLOW_ZK_BUILD_DIR=build/wasi bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ${{ github.job }}
         path: |
-          longfellow-zk_${{ github.job }}.zip
+          longfellow-zk_${{ github.job }}.tar.gz
+          longfellow-zk_${{ github.job }}.tar.gz.sha256
 
   apple-osx:
     name: Build & Test on Apple OSX 15 ARM64
@@ -185,26 +169,11 @@ jobs:
         echo "/opt/homebrew/bin/bash" >> $GITHUB_PATH
     - name: Build project
       run: |
-        make clean
-        make -j$(nproc) osx-arm64 CC="ccache clang" CXX="ccache clang++"
-    - name: Verify binaries
-      run: |
-        ls -lh longfellow-zk
-        file longfellow-zk
-        otool -L longfellow-zk || true
-    - name: Run CLI help
-      run: |
-        ./longfellow-zk --help
-    - name: List ZK specs
-      run: |
-        ./longfellow-zk circuit_gen --zkspec list
-    - name: Run tests
-      run: |
-        cd test
-        ./bats/bin/bats mdoc.bats
-    - name: Run BlindZap portability gate
-      run: |
-        make -j$(sysctl -n hw.ncpu) blindzap-ci-test CC="ccache clang" CXX="ccache clang++"
+        cmake --preset release -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        cmake --build --preset release --parallel
+        ctest --preset release
+    - name: Verify installed package consumers
+      run: bash scripts/ci-installed-package.sh
     - name: Pack build results
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
@@ -213,7 +182,8 @@ jobs:
       with:
         name: ${{ github.job }}
         path: |
-          longfellow-zk_${{ github.job }}.zip
+          longfellow-zk_${{ github.job }}.tar.gz
+          longfellow-zk_${{ github.job }}.tar.gz.sha256
 
   bip340-metrics:
     name: Render BIP340 metrics
@@ -224,7 +194,7 @@ jobs:
     - name: Install metrics tooling
       run: |
         sudo apt-get update
-        sudo apt-get install -y gnuplot-nox unzip
+        sudo apt-get install -y gnuplot-nox
     - name: Download build artifacts
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
@@ -233,7 +203,7 @@ jobs:
     - name: Render BIP340 metrics
       run: |
         mkdir -p metrics-input release-metrics
-        find release -name '*.zip' -type f -exec unzip -q -d metrics-input {} \;
+        find release -name '*.tar.gz' -type f -exec tar -xzf {} -C metrics-input \;
         bash scripts/aggregate_bip340_metrics.sh \
           metrics-input \
           release-metrics \
@@ -261,7 +231,7 @@ jobs:
     - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
     - name: Run real one-key and maximum two-key proofs
       run: |
-        make blindzap-proof-test CC="ccache clang" CXX="ccache clang++"
+        bash scripts/ci-installed-package.sh
 
   blindzap-static-analysis:
     name: BlindZap static analysis
@@ -278,7 +248,7 @@ jobs:
         sudo apt-get install -y clang-tidy cppcheck shellcheck
     - name: Run analyzers
       run: |
-        make blindzap-static-analysis
+        bash projects/blindzap/scripts/run_blindzap_static_analysis.sh
 
   blindzap-sage-reference:
     name: BlindZap Sage reference model
@@ -305,9 +275,9 @@ jobs:
         ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
         UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
       run: |
-        make clean
-        make -j$(nproc) posix CC=clang CXX=clang++ CFLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-strict-overflow"
-        make -j$(nproc) blindzap-ci-test CC=clang CXX=clang++ CFLAGS="-O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-strict-overflow"
+        cmake --preset sanitizers -DCMAKE_CXX_COMPILER=clang++
+        cmake --build --preset sanitizers --parallel
+        ctest --preset sanitizers
 
   draft-binary-release:
     name: 📦 Pack

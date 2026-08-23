@@ -13,12 +13,12 @@ require_tool cppcheck
 require_tool shellcheck
 
 readonly checks='clang-analyzer-*,bugprone-*,performance-*,-bugprone-easily-swappable-parameters,-bugprone-reserved-identifier'
-readonly header_filter='(^|.*/)(src/blindzap/|src/cli/blindzap_main\.cc|test/blindzap/)'
+readonly header_filter='(^|.*/)(projects/blindzap/(include|src|tests)/)'
 readonly translation_units=(
-  test/blindzap/protocol_test.cc
-  test/blindzap/integration_test.cc
-  test/blindzap/sage_vector_test.cc
-  src/cli/blindzap_main.cc
+  projects/blindzap/tests/blindzap/protocol_test.cc
+  projects/blindzap/tests/blindzap/integration_test.cc
+  projects/blindzap/tests/blindzap/sage_vector_test.cc
+  projects/blindzap/src/blindzap_main.cc
 )
 
 for source in "${translation_units[@]}"; do
@@ -27,7 +27,7 @@ for source in "${translation_units[@]}"; do
     -header-filter="${header_filter}" \
     -warnings-as-errors='clang-analyzer-*,bugprone-*' \
     "${source}" -- \
-    -std=c++20 -Isrc -Ivendor/zstd/lib
+    -std=c++20 -Isrc -Iprojects/blindzap/include -Iprojects/bip340/include
 done
 
 cppcheck \
@@ -46,17 +46,18 @@ cppcheck \
   '--suppress=*:src/algebra/*' \
   '--suppress=*:src/zk/*' \
   '--suppress=*:src/sumcheck/*' \
-  '--suppress=*:src/cli/json.hpp' \
+  '--suppress=*:projects/blindzap/src/json.hpp' \
   --error-exitcode=1 \
-  -Isrc \
-  src/blindzap/statement.h \
-  src/blindzap/envelope.h \
-  src/blindzap/chain_state.h \
-  src/blindzap/bitcoin_core.h \
-  src/blindzap/nonce_store.h \
-  src/blindzap/verifier.h \
-  src/cli/blindzap_main.cc
+  -Isrc -Iprojects/blindzap/include -Iprojects/bip340/include \
+  projects/blindzap/include/blindzap/statement.h \
+  projects/blindzap/include/blindzap/envelope.h \
+  projects/blindzap/include/blindzap/chain_state.h \
+  projects/blindzap/include/blindzap/bitcoin_core.h \
+  projects/blindzap/include/blindzap/nonce_store.h \
+  projects/blindzap/include/blindzap/verifier.h \
+  projects/blindzap/src/blindzap_main.cc
 
-shellcheck test/blindzap/cli_test.sh scripts/run_blindzap_sage.sh \
-  scripts/run_blindzap_static_analysis.sh
+shellcheck projects/blindzap/tests/blindzap/cli_test.sh \
+  projects/blindzap/scripts/run_blindzap_sage.sh \
+  projects/blindzap/scripts/run_blindzap_static_analysis.sh
 printf 'BlindZap static analysis passed\n'
