@@ -1,50 +1,92 @@
 #!/usr/bin/env bash
-# Build the base once, then ensure every named project consumes only its staged
-# package prefix.  This is shared by CI and the transitional `make` target.
+# Build the base once, then ensure every named project consumes only a staged,
+# relocatable package prefix in both supported native linkage modes.  This is
+# shared by CI and the transitional `make` target.
 set -Eeuo pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 work=$(mktemp -d "${TMPDIR:-/tmp}/longfellow-zk-package.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-prefix="$work/prefix"
+base_prefix="$work/base-prefix"
+build_type=${LONGFELLOW_ZK_BUILD_TYPE:-Release}
+linkages=${LONGFELLOW_ZK_LINKAGES:-"static shared"}
+
+case " $linkages " in
+  *" static "*|*" shared "*) ;;
+  *)
+    printf '%s\n' 'LONGFELLOW_ZK_LINKAGES must contain static and/or shared' >&2
+    exit 64
+    ;;
+esac
+
+if command -v sha256sum >/dev/null 2>&1; then
+  checksum() { sha256sum "$1"; }
+elif command -v shasum >/dev/null 2>&1; then
+  checksum() { shasum -a 256 "$1"; }
+else
+  printf '%s\n' 'SHA-256 tool not found (need sha256sum or shasum)' >&2
+  exit 69
+fi
+
+configure_args=("-DCMAKE_BUILD_TYPE=$build_type")
+base_configure_args=("${configure_args[@]}")
+ctest_args=(--output-on-failure)
+if [[ ${LONGFELLOW_ZK_SANITIZERS:-OFF} == ON ]]; then
+  sanitizer_flags='-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1'
+  configure_args+=(
+    "-DCMAKE_CXX_FLAGS=$sanitizer_flags"
+    "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
+    "-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined"
+  )
+  base_configure_args=(
+    "${configure_args[@]}"
+    "-DLONGFELLOW_ZK_ENABLE_SANITIZERS=ON"
+  )
+  ctest_args+=(--timeout 3600)
+fi
 
 cmake -S "$root" -B "$work/base" -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
+  "${base_configure_args[@]}" \
   -DLONGFELLOW_ZK_BUILD_TESTING=ON \
-  -DCMAKE_INSTALL_PREFIX="$prefix"
+  -DCMAKE_INSTALL_PREFIX="$base_prefix"
 cmake --build "$work/base" --parallel
-ctest --test-dir "$work/base" --output-on-failure
+ctest --test-dir "$work/base" "${ctest_args[@]}"
 cmake --install "$work/base"
 
-for project in ecdsa bip340; do
-  cmake -S "$root/projects/$project" -B "$work/$project" -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$prefix" \
-    -DCMAKE_INSTALL_PREFIX="$prefix"
-  cmake --build "$work/$project" --parallel
-  ctest --test-dir "$work/$project" --output-on-failure
-  cmake --install "$work/$project"
-done
+for linkage in $linkages; do
+  case "$linkage" in
+    static|shared) ;;
+    *)
+      printf 'unsupported linkage: %s\n' "$linkage" >&2
+      exit 64
+      ;;
+  esac
 
-for project in mdoc blindzap; do
-  cmake -S "$root/projects/$project" -B "$work/$project" -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$prefix" \
-    -DCMAKE_INSTALL_PREFIX="$prefix"
-  cmake --build "$work/$project" --parallel
-  ctest --test-dir "$work/$project" --output-on-failure
-  cmake --install "$work/$project"
-done
+  prefix="$work/$linkage/prefix"
+  cmake -E copy_directory "$base_prefix" "$prefix"
 
-# A relocated base package must still configure independent static and shared
-# consumers without a repository source include path.
-relocated="$work/relocated"
-cmake -E copy_directory "$prefix" "$relocated"
-for linkage in static shared; do
+  for project in ecdsa bip340 mdoc blindzap; do
+    project_build="$work/$linkage/$project"
+    cmake -S "$root/projects/$project" -B "$project_build" -G Ninja \
+      "${configure_args[@]}" \
+      -DCMAKE_PREFIX_PATH="$prefix" \
+      -DCMAKE_INSTALL_PREFIX="$prefix" \
+      -DLONGFELLOW_ZK_TARGET="LongfellowZK::$linkage"
+    cmake --build "$project_build" --parallel
+    ctest --test-dir "$project_build" "${ctest_args[@]}"
+    cmake --install "$project_build"
+  done
+
+  # Relocation must preserve the selected base and named-project package graph.
+  relocated="$work/$linkage/relocated"
+  cmake -E copy_directory "$prefix" "$relocated"
   cmake -S "$root/test/cmake/consumer-$linkage" -B "$work/consumer-$linkage" -G Ninja \
     -DCMAKE_PREFIX_PATH="$relocated"
   cmake --build "$work/consumer-$linkage" --parallel
   "$work/consumer-$linkage/consumer"
-done
 
-cmake -E tar cf "$work/longfellow-zk.tar.gz" --format=gnutar "$prefix"
-sha256sum "$work/longfellow-zk.tar.gz" > "$work/longfellow-zk.tar.gz.sha256"
-test -s "$work/longfellow-zk.tar.gz.sha256"
+  archive="$work/longfellow-zk-$linkage.tar.gz"
+  cmake -E tar cf "$archive" --format=gnutar "$prefix"
+  checksum "$archive" > "$archive.sha256"
+  test -s "$archive.sha256"
+done
