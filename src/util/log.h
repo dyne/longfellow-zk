@@ -17,6 +17,8 @@
 
 // Simple, self-contained logger for this library.
 
+#include "util/export.h"
+
 namespace proofs {
 
 enum LogLevel {
@@ -25,9 +27,9 @@ enum LogLevel {
   INFO = 100,
 };
 
-void set_log_level(enum LogLevel l);
+LONGFELLOW_ZK_API void set_log_level(enum LogLevel l);
 
-void log(enum LogLevel l, const char* format, ...);
+LONGFELLOW_ZK_API void log(enum LogLevel l, const char* format, ...);
 }  // namespace proofs
 
 #endif  // PRIVACY_PROOFS_ZK_LIB_UTIL_LOG_H_

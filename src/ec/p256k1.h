@@ -35,6 +35,7 @@ n = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 #include "algebra/fp.h"
 #include "algebra/fp_p256k1.h"
 #include "ec/elliptic_curve.h"
+#include "util/export.h"
 
 namespace proofs {
 
@@ -43,17 +44,17 @@ using Fp256k1Scalar = Fp<4, true>;
 using Fp256k1Nat = Fp256k1Base::N;
 
 // This is the base field of the curve.
-extern const Fp256k1Base p256k1_base;
+extern LONGFELLOW_ZK_API const Fp256k1Base p256k1_base;
 
 // Order of the curve.
-extern const Fp256k1Nat n256k1_order;
+extern LONGFELLOW_ZK_API const Fp256k1Nat n256k1_order;
 
 // This field allows operations mod the order of the curve.
-extern const Fp256k1Scalar p256k1_scalar;
+extern LONGFELLOW_ZK_API const Fp256k1Scalar p256k1_scalar;
 
 typedef EllipticCurve<Fp256k1Base, 4, 256> P256k1;
 
-extern const P256k1 p256k1;
+extern LONGFELLOW_ZK_API const P256k1 p256k1;
 
 }  // namespace proofs
 

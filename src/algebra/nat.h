@@ -24,6 +24,7 @@
 #include "algebra/limb.h"
 #include "algebra/static_string.h"
 #include "algebra/sysdep.h"
+#include "util/export.h"
 #include "util/panic.h"
 
 namespace proofs {
@@ -54,7 +55,7 @@ static limb_t inv_mod_b(limb_t a) {
 }
 
 // This function should only be called on static input known at compile time.
-unsigned digit(char c, size_t base);
+LONGFELLOW_ZK_API unsigned digit(char c, size_t base);
 
 template <size_t W64>
 class Nat : public Limb<W64> {

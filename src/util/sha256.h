@@ -19,29 +19,29 @@ typedef struct {
 /**
  * Initialize the incremental hashing API
  */
-void sha256_inc_init(sha256ctx *state);
+LONGFELLOW_ZK_API void sha256_inc_init(sha256ctx *state);
 
 /**
  * Copy the hashing state
  */
-void sha256_inc_ctx_clone(sha256ctx *stateout, const sha256ctx *statein);
+LONGFELLOW_ZK_API void sha256_inc_ctx_clone(sha256ctx *stateout, const sha256ctx *statein);
 
 /**
  * Absorb blocks
  */
-void sha256_inc_blocks(sha256ctx *state, const uint8_t *in, size_t inblocks);
+LONGFELLOW_ZK_API void sha256_inc_blocks(sha256ctx *state, const uint8_t *in, size_t inblocks);
 
 /**
  * Finalize and obtain the digest
  *
  * If applicable, this function will free the memory associated with the sha256ctx.
  */
-void sha256_inc_finalize(uint8_t *out, sha256ctx *state, const uint8_t *in, size_t inlen);
+LONGFELLOW_ZK_API void sha256_inc_finalize(uint8_t *out, sha256ctx *state, const uint8_t *in, size_t inlen);
 
 /**
  * Destroy the state. Make sure to use this, as this API may not always be stack-based.
  */
-void sha256_inc_ctx_release(sha256ctx *state);
+LONGFELLOW_ZK_API void sha256_inc_ctx_release(sha256ctx *state);
 
 /**
  * All-in-one sha256 function

@@ -274,11 +274,11 @@ void sha256_inc_ctx_clone(sha256ctx *stateout, const sha256ctx *statein) {
     }
 }
 
-/* Destroy the hash state. 
+/* The incremental state is caller-owned, so releasing it is intentionally a
+ * no-op.  Keep this function for the public incremental API contract. */
 void sha256_inc_ctx_release(sha256ctx *state) {
-    free(state->ctx);
+    (void)state;
 }
-*/
 void sha256_inc_blocks(sha256ctx *state, const uint8_t *in, size_t inblocks) {
     uint64_t bytes = load_bigendian_64(state->ctx + 32);
 
