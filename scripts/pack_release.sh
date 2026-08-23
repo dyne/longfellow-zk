@@ -1,33 +1,24 @@
-#!/bin/sh
+#!/usr/bin/env bash
+# Assemble a release artifact from CMake's installed package, never from a
+# source-tree build product.  Publishing remains a CI/release decision.
+set -Eeuo pipefail
 
-set -e
+tag=${1:?usage: pack_release.sh TAG}
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+build=${LONGFELLOW_ZK_BUILD_DIR:-"$root/build/release"}
+stage="$root/longfellow-zk_${tag}"
+archive="$root/longfellow-zk_${tag}.tar.gz"
 
-# setup
-TAG="$1"
-DST="longfellow-zk_${TAG}"
+if command -v sha256sum >/dev/null 2>&1; then
+  checksum() { sha256sum "$1"; }
+elif command -v shasum >/dev/null 2>&1; then
+  checksum() { shasum -a 256 "$1"; }
+else
+  printf '%s\n' 'SHA-256 tool not found (need sha256sum or shasum)' >&2
+  exit 69
+fi
 
-# create and copy inside
-mkdir -p ${DST}
-[[ -r longfellow-zk ]] && cp longfellow-zk ${DST}/
-[[ -r longfellow-zk.wasm ]] && cp longfellow-zk.wasm ${DST}/
-[[ -r src/liblongfellow-zk.a ]] && cp src/liblongfellow-zk.a ${DST}/
-cp README.md ${DST}/
-cp -r test   ${DST}/
-mkdir -p ${DST}/test/results
-cat <<'EOF' >  ${DST}/GNUmakefile
-all:
-	$(info Running Longfellow-zk tests)
-	cd test && ./bats/bin/bats .
-
-clean:
-	cd test && rm -f circuit*.json proof*.json
-EOF
-
-# cleanup test
-cd ${DST}/test
-rm -f circuit*.json proof*.json
-rm -f GNUmakefile extract* circuit*.json proof*.json
-cd -
-
-# zip it
-zip -r longfellow-zk_${TAG}.zip ${DST}
+cmake --install "$build" --prefix "$stage"
+cmake -E tar cf "$archive" --format=gnutar -- "$stage"
+checksum "$archive" > "$archive.sha256"
+test -s "$archive" && test -s "$archive.sha256"
