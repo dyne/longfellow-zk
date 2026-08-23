@@ -77,7 +77,8 @@ jobs:
       fail-fast: false
       matrix:
         compiler:
-          - { cc: clang, cxx: clang++ }
+          - { id: gcc, cc: gcc, cxx: g++ }
+          - { id: clang, cc: clang, cxx: clang++ }
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
@@ -98,17 +99,17 @@ jobs:
         ctest --preset release
     - name: Verify installed package consumers
       run: |
-        bash scripts/ci-installed-package.sh
+        CC=${{ matrix.compiler.cc }} CXX=${{ matrix.compiler.cxx }} bash scripts/ci-installed-package.sh
     - name: Pack build results
       run: |
-        bash scripts/pack_release.sh ${{ github.job }}
+        bash scripts/pack_release.sh ${{ github.job }}-${{ matrix.compiler.id }}
     - name: Upload artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
-        name: ${{ github.job }}
+        name: ${{ github.job }}-${{ matrix.compiler.id }}
         path: |
-          longfellow-zk_${{ github.job }}.tar.gz
-          longfellow-zk_${{ github.job }}.tar.gz.sha256
+          longfellow-zk_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz
+          longfellow-zk_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz.sha256
     outputs:
        git_sha_short: ${{ steps.sha.outputs.git_sha_short }}
 
@@ -166,7 +167,7 @@ jobs:
     - name: Install latest Bash via Homebrew
       run: |
         brew install bash
-        echo "/opt/homebrew/bin/bash" >> $GITHUB_PATH
+        echo "/opt/homebrew/bin" >> $GITHUB_PATH
     - name: Build project
       run: |
         cmake --preset release -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
@@ -275,9 +276,11 @@ jobs:
         ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
         UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
       run: |
-        cmake --preset sanitizers -DCMAKE_CXX_COMPILER=clang++
-        cmake --build --preset sanitizers --parallel
-        ctest --preset sanitizers
+        CC=clang CXX=clang++ \
+          LONGFELLOW_ZK_BUILD_TYPE=Debug \
+          LONGFELLOW_ZK_LINKAGES=shared \
+          LONGFELLOW_ZK_SANITIZERS=ON \
+          bash scripts/ci-installed-package.sh
 
   draft-binary-release:
     name: 📦 Pack
@@ -299,7 +302,7 @@ jobs:
       uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
       with:
         files: |
-          release/posix-x86/*
+          release/posix-x86-*/*
           release/wasm-wasi/*
           release/apple-osx/*
           release/bip340-metrics/longfellow-zk_bip340_metrics.csv
