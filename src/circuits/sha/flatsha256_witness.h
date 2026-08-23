@@ -18,6 +18,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "util/export.h"
+
 namespace proofs {
 
 uint32_t SHA256_ru32be(const uint8_t *d);
@@ -36,10 +38,9 @@ class FlatSHA256Witness {
                                           uint32_t outw[48], uint32_t oute[64],
                                           uint32_t outa[64], uint32_t H1[8]);
 
-  static void transform_and_witness_message(size_t n, const uint8_t msg[/*n*/],
-                                            size_t max, uint8_t &numb,
-                                            uint8_t in[/* 64*max */],
-                                            BlockWitness bw[/*max*/]);
+  LONGFELLOW_ZK_API static void transform_and_witness_message(
+      size_t n, const uint8_t msg[/*n*/], size_t max, uint8_t &numb,
+      uint8_t in[/* 64*max */], BlockWitness bw[/*max*/]);
 };
 
 }  // namespace proofs

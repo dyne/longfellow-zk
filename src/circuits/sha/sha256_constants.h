@@ -17,11 +17,13 @@
 
 #include <cstdint>
 
+#include "util/export.h"
+
 namespace proofs {
 
 // Array of round constants used to define SHA256.
 // See FIPS 180-4, section 4.2.2.
-extern const uint32_t kSha256Round[64];
+extern LONGFELLOW_ZK_API const uint32_t kSha256Round[64];
 
 }  // namespace proofs
 #endif  // PRIVACY_PROOFS_ZK_LIB_CIRCUITS_SHA_SHA256_CONSTANTS_H_
