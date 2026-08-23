@@ -4,11 +4,11 @@ set -Eeuo pipefail
 readonly SAGE_IMAGE='docker.io/sagemath/sagemath@sha256:19995db6194f4a4bab18ce9a88556fd15b9ed5e916b4504fefe618a7796ddbdb'
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly SCRIPT_DIR
-REPOSITORY_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
+REPOSITORY_ROOT="$(cd -- "${SCRIPT_DIR}/../../.." && pwd -P)"
 readonly REPOSITORY_ROOT
 readonly MODEL='spec/blindzap/blindzap_reference.sage'
-readonly SAGE_FIXTURE='test/blindzap/testdata/blindzap_sage_vectors.json'
-readonly PYTHON_FIXTURE='test/blindzap/testdata/blindzap_vectors.json'
+readonly SAGE_FIXTURE='projects/blindzap/tests/blindzap/testdata/blindzap_sage_vectors.json'
+readonly PYTHON_FIXTURE='projects/blindzap/tests/blindzap/testdata/blindzap_vectors.json'
 
 for required_file in "${MODEL}" "${SAGE_FIXTURE}" "${PYTHON_FIXTURE}"; do
   if [[ ! -f "${REPOSITORY_ROOT}/${required_file}" ]]; then
