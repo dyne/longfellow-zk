@@ -99,7 +99,9 @@ jobs:
         ctest --preset release
     - name: Verify installed package consumers
       run: |
-        CC=${{ matrix.compiler.cc }} CXX=${{ matrix.compiler.cxx }} bash scripts/ci-installed-package.sh
+        CC=${{ matrix.compiler.cc }} CXX=${{ matrix.compiler.cxx }} \
+          LONGFELLOW_ZK_PACKAGE_OUTPUT_DIR=build/qualified-packages \
+          bash scripts/ci-installed-package.sh
     - name: Pack build results
       run: |
         bash scripts/pack_release.sh ${{ github.job }}-${{ matrix.compiler.id }}
@@ -110,6 +112,9 @@ jobs:
         path: |
           longfellow-zk_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz
           longfellow-zk_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz.sha256
+          longfellow-zk-blindzap_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz
+          longfellow-zk-blindzap_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz.sha256
+          build/qualified-packages/metrics/*_bip340_metrics.csv
     outputs:
        git_sha_short: ${{ steps.sha.outputs.git_sha_short }}
 
@@ -174,7 +179,9 @@ jobs:
         cmake --build --preset release --parallel
         ctest --preset release
     - name: Verify installed package consumers
-      run: bash scripts/ci-installed-package.sh
+      run: |
+        LONGFELLOW_ZK_PACKAGE_OUTPUT_DIR=build/qualified-packages \
+          bash scripts/ci-installed-package.sh
     - name: Pack build results
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
@@ -185,6 +192,9 @@ jobs:
         path: |
           longfellow-zk_${{ github.job }}.tar.gz
           longfellow-zk_${{ github.job }}.tar.gz.sha256
+          longfellow-zk-blindzap_${{ github.job }}.tar.gz
+          longfellow-zk-blindzap_${{ github.job }}.tar.gz.sha256
+          build/qualified-packages/metrics/*_bip340_metrics.csv
 
   bip340-metrics:
     name: Render BIP340 metrics
@@ -203,10 +213,9 @@ jobs:
           release
     - name: Render BIP340 metrics
       run: |
-        mkdir -p metrics-input release-metrics
-        find release -name '*.tar.gz' -type f -exec tar -xzf {} -C metrics-input \;
+        mkdir -p release-metrics
         bash scripts/aggregate_bip340_metrics.sh \
-          metrics-input \
+          release \
           release-metrics \
           "${{ needs.posix-x86.outputs.git_sha_short }}" \
           "${{ github.repository }}"
