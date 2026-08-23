@@ -13,11 +13,16 @@ def main():
                for _, owner, target in entries), "invalid owner or replacement target"
     tracked = subprocess.check_output(["git", "ls-files", "scripts", "test", "spec"],
                                       cwd=ROOT, text=True).splitlines()
+    project_tests = [path.relative_to(ROOT).as_posix()
+                     for path in (ROOT / "projects").glob("*/tests/**/*")
+                     if path.is_file()]
     # Bats and bats-assert are vendored generic runners; result logs are outputs,
     # and the specification README is documentation rather than a test asset.
     exclusions = ("test/bats/", "test/test_helper/", "test/results/", "test/bats_setup",
+                  "test/cmake/", "test/tooling/test_ownership_manifest_test.py",
                   "spec/blindzap/README.md")
-    eligible = {path for path in tracked if not path.startswith(exclusions)}
+    eligible = {path for path in tracked if (ROOT / path).is_file()
+                and not path.startswith(exclusions)} | set(project_tests)
     owned = set(paths)
     # During this uncommitted migration the two package inventory tests are
     # deliberately already owned; once committed they join `eligible` above.

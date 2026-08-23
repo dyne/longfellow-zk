@@ -1,0 +1,4 @@
+@PACKAGE_INIT@
+include(CMakeFindDependencyMacro)
+find_dependency(LongfellowZK CONFIG REQUIRED)
+include("${CMAKE_CURRENT_LIST_DIR}/LongfellowZKBIP340Targets.cmake")
