@@ -10,6 +10,7 @@ trap 'rm -rf "$work"' EXIT
 base_prefix="$work/base-prefix"
 build_type=${LONGFELLOW_ZK_BUILD_TYPE:-Release}
 linkages=${LONGFELLOW_ZK_LINKAGES:-"static shared"}
+package_output=${LONGFELLOW_ZK_PACKAGE_OUTPUT_DIR:-}
 
 case " $linkages " in
   *" static "*|*" shared "*) ;;
@@ -75,6 +76,23 @@ for linkage in $linkages; do
     cmake --build "$project_build" --parallel
     ctest --test-dir "$project_build" "${ctest_args[@]}"
     cmake --install "$project_build"
+
+    if [[ -n "$package_output" && "$project" == bip340 ]]; then
+      metrics_dir="$package_output/metrics"
+      mkdir -p "$metrics_dir"
+      metrics_file="$project_build/results/native_bip340_metrics.csv"
+      [[ -s "$metrics_file" ]] || {
+        printf 'BIP340 test did not produce metrics: %s\n' "$metrics_file" >&2
+        exit 1
+      }
+      cmake -E copy "$metrics_file" \
+        "$metrics_dir/${linkage}_native_bip340_metrics.csv"
+    fi
+
+    if [[ -n "$package_output" && "$project" == blindzap ]]; then
+      cmake --install "$project_build" \
+        --prefix "$package_output/$linkage/blindzap"
+    fi
   done
 
   # Relocation must preserve the selected base and named-project package graph.
@@ -86,7 +104,8 @@ for linkage in $linkages; do
   "$work/consumer-$linkage/consumer"
 
   archive="$work/longfellow-zk-$linkage.tar.gz"
-  cmake -E tar cf "$archive" --format=gnutar "$prefix"
+  cmake -E tar czf "$archive" --format=gnutar "$prefix"
+  cmake -E tar tzf "$archive" >/dev/null
   checksum "$archive" > "$archive.sha256"
   test -s "$archive.sha256"
 done

@@ -64,7 +64,7 @@ while IFS= read -r -d '' file; do
       "$line" >> "$metrics_csv"
   done < <(tail -n +2 "$file")
   found=1
-done < <(find "$release_dir" -path '*/test/results/*_bip340_metrics.csv' -type f -print0 | sort -z)
+done < <(find "$release_dir" -name '*_bip340_metrics.csv' -type f -print0 | sort -z)
 
 if [[ "$found" -ne 1 ]]; then
   printf 'no BIP340 metrics CSV files found under %s\n' "$release_dir" >&2

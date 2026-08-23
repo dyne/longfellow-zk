@@ -6,8 +6,7 @@ set -Eeuo pipefail
 tag=${1:?usage: pack_release.sh TAG}
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 build=${LONGFELLOW_ZK_BUILD_DIR:-"$root/build/release"}
-stage="$root/longfellow-zk_${tag}"
-archive="$root/longfellow-zk_${tag}.tar.gz"
+package_output=${LONGFELLOW_ZK_PACKAGE_OUTPUT_DIR:-"$root/build/qualified-packages"}
 
 if command -v sha256sum >/dev/null 2>&1; then
   checksum() { sha256sum "$1"; }
@@ -18,7 +17,28 @@ else
   exit 69
 fi
 
-cmake --install "$build" --prefix "$stage"
-cmake -E tar cf "$archive" --format=gnutar -- "$stage"
-checksum "$archive" > "$archive.sha256"
-test -s "$archive" && test -s "$archive.sha256"
+pack_directory() {
+  local source=$1
+  local name=$2
+  local stage="$root/$name"
+  local archive="$root/$name.tar.gz"
+
+  if [[ "$source" != "$stage" ]]; then
+    cmake -E remove_directory "$stage"
+    cmake -E copy_directory "$source" "$stage"
+  fi
+  cmake -E tar czf "$archive" --format=gnutar -- "$stage"
+  cmake -E tar tzf "$archive" >/dev/null
+  checksum "$archive" > "$archive.sha256"
+  test -s "$archive" && test -s "$archive.sha256"
+}
+
+base_stage="$root/longfellow-zk_${tag}"
+cmake -E remove_directory "$base_stage"
+cmake --install "$build" --prefix "$base_stage"
+pack_directory "$base_stage" "longfellow-zk_${tag}"
+
+if [[ -d "$package_output/static/blindzap" ]]; then
+  pack_directory "$package_output/static/blindzap" \
+    "longfellow-zk-blindzap_${tag}"
+fi
