@@ -1,0 +1,153 @@
+---
+title: Protocol test vectors
+description: Canonical fixtures for Merkle trees, Fiat–Shamir, circuits, sumcheck, Ligero, and libzk.
+outline: deep
+---
+
+# Protocol test vectors
+
+::: info Source mirror
+Mirrored from `vendor/longfellow-zk/docs/specs/testvectors.md`. These vectors are
+reviewed compatibility inputs; implementations must not regenerate them merely
+to accommodate changed behavior.
+:::
+
+
+This section contains test vectors. Each test vector in specifies the configuration information and inputs. All values are encoded in hexadecimal strings.
+
+## Test Vectors for Merkle Tree
+
+### Vector 1
+
+- Leaves:
+  4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a
+  dbc1b4c900ffe48d575b5da5c638040125f65db0fe3e24494b76ea986457d986
+  084fed08b978af4d7d196a7446a86b58009e636b611db16211b65a9aadff29c5
+  e52d9c508c502347344d8c07ad91cbd6068afc75ff6292f062a09ca381c89e71
+  e77b9a9ae9e30b0dbdb6f510a264ef9de781501d7b6b92ae89eb059c5ab743db
+- Root: f22f4501ffd3bdffcecc9e4cd6828a4479aeedd6aa484eb7c1f808ccf71c6e76
+- Proof for leaves (0,1):
+  084fed08b978af4d7d196a7446a86b58009e636b611db16211b65a9aadff29c5
+  f03808f5b8088c61286d505e8e93aa378991d9889ae2d874433ca06acabcd493
+- Proof for leaves (1,3):
+  e77b9a9ae9e30b0dbdb6f510a264ef9de781501d7b6b92ae89eb059c5ab743db
+  084fed08b978af4d7d196a7446a86b58009e636b611db16211b65a9aadff29c5
+  4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a
+
+## Test Vectors for Fiat-Shamir
+
+Let `p=115792089237316195423570985008687907853269984665640564039457584007908834671663` and `Fp` be the 4-word field defined by `p`.
+
+### Vector 1: WriteBytes
+
+- Description: Using `Fp`, the test steps are to (a) initialize the transcript object with the 4-byte string `test`; (b) write an array of bytes of size 100 that contains the integers 0, 1, 2, ..., 99;  (c) generate 16 field elements:
+  - 0x8b297f0bffd583c6c6b6796385d5fd20a08665733b833970ebdd1054bbbc1b14
+  - 0x0667c08ad7f38efec5f30dc8aa4f20d749cdcf96d63a770f9810ac5c0ca8dcb1
+  - 0xc8037fc12d4da00b5dc7597e3042f33f72a06f970cb71fb6b103ebb5419d8a6b
+  - 0xfbbcfa1eac48728fbfdacc1c21e2f78119457e0846337e46140e38e62856c4c5
+  - 0x5358ae603691cc759faeb572fb6642654ea1c3dbc8f81d00276dd8c4df95aa58
+  - 0x5266158c3c895dede5a23b6ce85a9f564b8059ebfcd1741f54497ec58189873e
+  - 0x3ecea4b2343c007fc32f2aff40dc7320945f101ecae5d52494db21ad326e9739
+  - 0x6462dd575e6b874118607212feec7ce5417ae3bf0f2e86604596f35d48bbaea2
+  - 0x6d56c703c369edea3595db6b958241580ae9b4a76fead961413ed9e9e5852dcd
+  - 0x6d31073cee650212a71b7b13e9f951e00ef3b14a008a79dd95047b26a4a83d06
+  - 0x1b9e2a6666da63c43e52227d91a8a7f0bd5311f63c2e3a18839133375639e6cb
+  - 0x332ea49dd23dd4745631ecbb15696192b1fa127256baf7a0483fd27db6f09a48
+  - 0x43e735927ccbdc4d5ce912675d638d6d3dc8eef3def34504304e938846f157d6
+  - 0xdc4a8868ae75e733a7257a8589230392a98d78594836dfccd01304742b5b3ad5
+  - 0x976353931711c634f2691e507b119fd7f6e653d419a2620676122db08db18765
+  - 0x332729ab436dca654866a9382deaee0add6fb7e90a80261f1488e56598e8bc99
+
+### Vector 2: WriteFieldElement
+-  Starting from the state at the end of Vector 1, (a) write the field element '7' in Fp; (b) generate 16 field elements
+
+  - 0x609db3e9a8f548df038519fa46cef23eb8c6553d3c1f698604e60a51613a738e
+  - 0x1cb69cb31999eb88e83c7586aac53f5e3286b084b0cf9e43619b48df01e0a310
+  - 0x3bf36e3ddc690a1b12b417628c115959b373d056c90c42dc2417baf46f538868
+  - 0xe336594f29dcda52e48896517b5cdb2d062ffd861ab02db5f8ca197aacc635f6
+  - 0xc1f396a8bad16bb0f57da6d380402a25b571bd4691226d11449a741440e325c8
+  - 0x5195336ec73751de066e3a8939b40c3c5555f1a513486dfc50dcf4c2d47e6ff2
+  - 0x8dcf872f3ded2b7ed1d1ee9a2b125bedc6eacd3c09b3a4a5286d8fc2fc3a6634
+  - 0x950dd2ef7be25eab686a6688497962ee4ad521da12b9ff3d8e56ad9435885b12
+  - 0xe14389d1d8448678cac33fdbc9aab20dba019e75149d170dd2f353891cd4b84f
+  - 0xe84906c09cd6423865baf64e48027cc598d52bdb90b17524c87ea892e53b5200
+  - 0x493cea587f1ec5622c04221cd6e5a41c26c1c1c24c0375f7aaa367d9678d83bc
+  - 0x5aca0010aced30bcb3b84a7f10ea39c4269ab7c92fcb6cff52958d8921ef2cc5
+  - 0x4498fa8340f41467c0fa813bd0ca83ef6e1c4b85c7b1168a94339fd9e8296139
+  - 0xf9a95b738a8e775421b1baa503abbeed2d283b236ebba25e1954b3c993d30a3d
+  - 0x98178711d03a0b1204ebb56b37bd3a2724dfb08e4dc925609391768b126d21f2
+  - 0x79251f49534f5c4b10b798b2dbf6e80a3b07593f616ce6a9617ccc61040aac78
+
+### Vector 3: WriteFieldElementArray
+- Starting from the state at the end of Vector 2, (a) write the 2-long array of field elements `[8, 9]`; (b) generate 16 field elements:
+
+  - 0xae1a921288590205fc24543303ff527476359b8db4a983b2886a133b02f3217e
+  - 0x8c5d52a04b295f9fdb45ab66100fa00ca32c9634aa87cbbdb2bc3e1912459feb
+  - 0x12f82963b5b242156f6e9eb756eddee7652b60c7d6394403f7bd995e0b9bcd9c
+  - 0x880aa50b049b3939055deb7933749d338bb3fb5f64a9adf95019e6cfc232995c
+  - 0xf8558f693f0fa6df20a37147a898fb4c678831f566d80113bbe2cdcd18285da2
+  - 0xbbcc8d9b46f88bc8c6cec0ad2d5e49508b7db91d548548eddc61800de1329e1c
+  - 0x479a17244398caae8155a73438a22583df7de10a8a2e12ad53ddd3bc7305fac9
+  - 0x9ba1917f1227932250288a843f64b4e7b7f47a5fbc16c111f6e1f76235ccf38c
+  - 0xd1582138045d1636fb7f677c9e8a4a4143ce2b2bb54fb4f49fb0ad1fee5df6b4
+  - 0x5331e5b8508f79c017a8dfbbb805f3f8c5e3e4bc417e44849b9212439646331
+  - 0xb6b95862194ca52dcaa9ee651b7fc5b708f43feae108bb9a7f95213f4d069048
+  - 0xe86b1602f0a54c4e237867ebaf05e7581464fd238e50f6ed9c3cea63909c8e60
+  - 0xb7280439f3b21b113ff29cefe39292d5e2d137709c3d3cec36473a0f97a24e62
+  - 0xbeaa5e08257d232506fb3e46c6daa29e0859c34c7d0cd673bc6706ee261ae059
+  - 0x691ead55728cd087a1952b22b6628ba4e26fbefc8debeec5e6fbc3a16f637be
+  - 0x47dc31f6d8bc9c44290781176df3e4b95ac8793a4a42fa5859c564d92d6d5af5
+
+### Vector 4: Nat
+- Starting from the state at the end of Vector 3, (a) write the 4-byte string "nats"; (b) call `generate_nat` with the following list of parameters: `[1, 1, 1, 2, 2, 2, 7, 7,7, 7, 32, 32, 32, 32, 256, 256, 256, 256, 1000, 10000, 60000, 65535, 100000, 100000]`. The result of each call should correspond to the list of results:
+  - `[0, 0, 0, 0, 0, 0, 3, 0, 4, 5, 10, 30, 27, 22, 100, 189, 3, 92, 999, 3105, 40886, 51590, 56367, 10678]`
+
+### Vector 5: Choice
+- Starting from the state at the end of Vector 4, (a) write the 6-byte string "choice"; (b) perform the following calls to `generate_natgenerate_nats_wo_replacement`
+  - `m=31, k=20`:  `[10, 29, 30, 11, 4, 15, 16, 28, 19, 21, 25, 18, 17, 3, 5, 23, 24, 22, 6, 1]`
+  - `m=32, k=20`: `[3, 17, 18, 8, 30, 7, 14, 19, 25, 23, 12, 4, 31, 16, 0, 6, 20, 27, 11, 10]`
+  - `m=63, k=20`: `[9, 56, 61, 45, 35, 53, 51, 3, 39, 32, 31, 6, 59, 58, 54, 22, 27, 62, 55, 19]`
+  - `m=64, k=20`: `[12, 52, 39, 17, 51, 38, 58, 2, 28, 27, 46, 63, 61, 50, 40, 55, 47, 13, 56, 32]`
+  - `m=1000, k=20`: `[157, 668, 572, 138, 913, 994, 797, 249, 440, 723, 489, 241, 383, 108, 710, 341, 406, 585, 42, 692]`
+  - `m=65535, k=20`: `[40745, 48408, 17108, 44500, 53993, 10008, 24910, 52200, 61265, 54989, 41237, 25958, 28697, 61187, 34729, 3525, 9005, 38627, 9724, 12169]`
+
+## Test Vectors for Circuit
+
+### Vector 1
+
+- Description: Circuit C(n, m, s) = 0 if and only if n is the m-th s-gonal number in F_p128.  This circuit verifies that 2n = (s-2)m^2 - (s - 4)*m.
+- Field: 2^128^ - 2^108^ + 1 (Field ID 6)
+- Depth: 3 Quads: 11 Terms: 11
+- Serialization: 01060000010000010000020000040000020000040000ffffffffffffffffffffffffffefffff00000000000000000000000000f0ffff01000000000000000000000000000000fdffffffffffffffffffffffffefffff030000060000030000000000020000000000000000000000080000040000010000000000030000020000020000020000040000080000000000000000000000020000060000000000000000000000040000000000000000030000090000020000000000020000020000020000000000020000020000020000000000020000040000000000000000020000030000030000040000020000
+
+## Test Vectors for Sumcheck
+### Vector 1
+
+- Description: Circuit C(n, m, s) = 0 if and only if n is the m-th s-gonal number in F_p128.  This circuit verifies that 2n = (s-2)m^2 - (s - 4)*m.
+- Field: 2^128^ - 2^108^ + 1 (Field id 6)
+- Fiat-Shamir initialized with
+- Serialization: 90e734c42b5f14ee432a0ed95ba2ada05c3f9ecc9b026ded61f00bf57434f93c6f70e9c8b6e3de005ba8b4da93b5fa35fc3efae1e6068399c7f7d009ab5a2711084c97cd5a6e28dd30c598907b328d81915e487c34dbf80aa5da14f0621011a33d838a7b0d9a03533c63c6606f5360f88cf97c728630afdcb9755894a6f5c9068e1fc29f97efc125ba580de64089c6e72433de2a3267b90daeaf418ac8a3df3bbddc6cb141c764c8262346baac2e28033778b1a71f153ba571e80ab29951f9440ba93fede225a35accf6e0114d5240ae92df02d2870e5258ebba416f3d815e1554b05627998fc9d3bf354b89394b27b39f69c6538dbc968a779369e47f214252e0955624e9f4d6dc2a95cf41c57703b8749b959315458d4076f0daf5fdbde23e16c10394ac884ab9cad0782e8f472cb4edb69682d17465363691aafc31b83cd764fb909b50e2fe907fd2137566ddb8c47cc13974957e7f76180860571035f7a4d2658a82e1be8fe155353bc10feae9541365926f0646b4a5351907cbd5d9dbb4
+
+## Test Vectors for Ligero
+
+### Vector 1
+
+- Description: Circuit C(n, m, s) = 0 if and only if n is the m-th s-gonal number in F_p128.  This circuit verifies that 2n = (s-2)m^2 - (s - 4)*m.
+- Field: 2^128^ - 2^108^ + 1 (Field id 6)
+- Witness vector: [1, 45, 5, 6]
+- Pad elements: [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 4]
+- Parameters:
+    - NREQ: 6
+    - RATE: 4
+    - WR: 20
+    - QR: 2
+    - NROW: 7
+    - NQ: 1
+    - BLOCK: 51
+- Commitment: 738d2ffb3a8bf24e7aedb94be59041fb2dc13da30fe6b05ebe5126ef8fc36ec2
+- Proof size: 3180 bytes
+- Proof: fa8d88a73b3a0f9c067658c45bb394a602000000000000000000000000000000fa8d8...2cd5f61cd2b2eb84c79e1707cbad0048fcd820c716584f31991cf1628fb041
+
+
+
+## Test Vectors for libzk
