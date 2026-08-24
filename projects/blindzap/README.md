@@ -11,7 +11,7 @@ or protocol audit. Do not use it to authorize production funds or minting.
 Use signet for public integration testing and regtest for deterministic local
 testing.
 
-## Build and test
+## Testing
 
 Build the CLI and run the production-oriented test gate:
 
@@ -21,11 +21,27 @@ cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 ```
 
-The real proof test is intentionally separate because it is memory- and
-CPU-intensive:
-
 The `blindzap-test` CTest target includes the real one- and two-key proof
 round trips; it is intentionally memory- and CPU-intensive.
+
+The ASan/UBSan package test is optional and disabled in normal push and pull
+request CI. To run it in GitHub Actions, open the **CI** workflow, choose
+**Run workflow**, select the branch, enable **Run the optional BlindZap
+ASan/UBSan package test**, and start the workflow. Leaving the option disabled
+skips the sanitizer job.
+
+To run the same sanitizer gate manually from the repository root, use Clang
+and allow roughly 90 minutes for the real proof test:
+
+```sh
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+CC=clang CXX=clang++ \
+LONGFELLOW_ZK_BUILD_TYPE=Debug \
+LONGFELLOW_ZK_LINKAGES=shared \
+LONGFELLOW_ZK_SANITIZERS=ON \
+bash scripts/ci-installed-package.sh
+```
 
 The CLI supports `mainnet`, `testnet3` (and the `testnet` alias), `testnet4`,
 `signet`, and `regtest`. It always passes the corresponding explicit network

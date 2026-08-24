@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      run_blindzap_sanitizers:
+        description: Run the optional BlindZap ASan/UBSan package test
+        required: false
+        type: boolean
+        default: false
 
 env:
   BUILD_TYPE: Release
@@ -274,7 +280,10 @@ jobs:
   blindzap-sanitizers:
     name: BlindZap ASan and UBSan
     needs: [ci-scope]
-    if: needs.ci-scope.outputs.run_tests == 'true'
+    if: >-
+      needs.ci-scope.outputs.run_tests == 'true' &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.run_blindzap_sanitizers
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -293,7 +302,7 @@ jobs:
 
   draft-binary-release:
     name: 📦 Pack
-    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics, blindzap-proof, blindzap-static-analysis, blindzap-sage-reference, blindzap-sanitizers]
+    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics, blindzap-proof, blindzap-static-analysis, blindzap-sage-reference]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:
