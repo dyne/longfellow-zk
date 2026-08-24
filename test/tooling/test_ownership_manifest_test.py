@@ -9,7 +9,7 @@ def main():
     paths = [entry[0] for entry in entries]
     assert len(paths) == len(set(paths)), "duplicate test ownership"
     assert all((ROOT / path).is_file() for path in paths), "missing owned test asset"
-    assert all(owner in {"base", "bip340", "ecdsa", "mdoc", "blindzap"} and target
+    assert all(owner in {"base", "bip340", "ecdsa", "mdoc"} and target
                for _, owner, target in entries), "invalid owner or replacement target"
     tracked = subprocess.check_output(["git", "ls-files", "scripts", "test", "spec"],
                                       cwd=ROOT, text=True).splitlines()
@@ -19,13 +19,15 @@ def main():
     project_scripts = [path.relative_to(ROOT).as_posix()
                        for path in (ROOT / "projects").glob("*/scripts/*")
                        if path.is_file()]
+    project_specs = [path.relative_to(ROOT).as_posix()
+                     for path in (ROOT / "projects").glob("*/spec/**/*")
+                     if path.is_file() and path.suffix == ".sage"]
     # Bats and bats-assert are vendored generic runners; result logs are outputs,
     # and the specification README is documentation rather than a test asset.
     exclusions = ("test/bats/", "test/test_helper/", "test/results/", "test/bats_setup",
-                  "test/cmake/", "test/tooling/test_ownership_manifest_test.py",
-                  "spec/blindzap/README.md")
+                  "test/cmake/", "test/tooling/test_ownership_manifest_test.py")
     eligible = {path for path in tracked if (ROOT / path).is_file()
-                and not path.startswith(exclusions)} | set(project_tests) | set(project_scripts)
+                and not path.startswith(exclusions)} | set(project_tests) | set(project_scripts) | set(project_specs)
     owned = set(paths)
     # During this uncommitted migration the two package inventory tests are
     # deliberately already owned; once committed they join `eligible` above.

@@ -26,8 +26,8 @@ def main() -> None:
             rows = list(csv.DictReader(stream))
             assert stream.seek(0) == 0
             assert next(csv.reader(stream)) == FIELDS
-        assert len(rows) == 12
-        assert {row["circuit"] for row in rows} == {"synthetic", "bip340", "blindzap", "mdoc"}
+        assert len(rows) == 9
+        assert {row["circuit"] for row in rows} == {"synthetic", "bip340", "mdoc"}
         assert {row["run"] for row in rows} == {"1", "2", "3"}
         assert all(len(row["sha256"]) == 64 and int(row["input_bytes"]) > 0 for row in rows)
         warning = Path(directory) / "warning.cc"

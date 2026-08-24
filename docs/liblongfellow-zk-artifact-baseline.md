@@ -10,7 +10,7 @@ checks, not behavior changes.
 
 The qualification baseline remains the current matrix: LFC1/LFC2 vectors and
 proof verification, compiler/circuit IDs, ECDSA module/artifact tests, BIP340
-vectors, mdoc Bats, and BlindZap protocol/integration/CLI/Sage gates.  Random
+vectors and mdoc Bats.  Random
 proofs are verified and tamper-rejected rather than byte-compared.  The test
 ownership manifest names one post-split owner and replacement target for every
 first-party test, vector, corpus, and qualification script; Bats runner and

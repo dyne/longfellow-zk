@@ -6,12 +6,6 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      run_blindzap_sanitizers:
-        description: Run the optional BlindZap ASan/UBSan package test
-        required: false
-        type: boolean
-        default: false
 
 env:
   BUILD_TYPE: Release
@@ -118,8 +112,6 @@ jobs:
         path: |
           longfellow-zk_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz
           longfellow-zk_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz.sha256
-          longfellow-zk-blindzap_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz
-          longfellow-zk-blindzap_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz.sha256
           build/qualified-packages/metrics/*_bip340_metrics.csv
     outputs:
        git_sha_short: ${{ steps.sha.outputs.git_sha_short }}
@@ -212,8 +204,6 @@ jobs:
         path: |
           longfellow-zk_${{ github.job }}.tar.gz
           longfellow-zk_${{ github.job }}.tar.gz.sha256
-          longfellow-zk-blindzap_${{ github.job }}.tar.gz
-          longfellow-zk-blindzap_${{ github.job }}.tar.gz.sha256
           build/qualified-packages/metrics/*_bip340_metrics.csv
 
   bip340-metrics:
@@ -248,75 +238,9 @@ jobs:
           release-metrics/longfellow-zk_bip340_metrics.png
           release-metrics/bip340_metrics_release.md
 
-  blindzap-proof:
-    name: BlindZap full proof gate
-    needs: [posix-x86]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      with:
-        fetch-depth: 0
-        submodules: recursive
-    - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
-    - name: Run real one-key and maximum two-key proofs
-      run: |
-        bash scripts/ci-installed-package.sh
-
-  blindzap-static-analysis:
-    name: BlindZap static analysis
-    needs: [ci-scope]
-    if: needs.ci-scope.outputs.run_tests == 'true'
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      with:
-        submodules: recursive
-    - name: Install analyzers
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y clang-tidy cppcheck shellcheck
-    - name: Run analyzers
-      run: |
-        bash projects/blindzap/scripts/run_blindzap_static_analysis.sh
-
-  blindzap-sage-reference:
-    name: BlindZap Sage reference model
-    needs: [ci-scope]
-    if: needs.ci-scope.outputs.run_tests == 'true'
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-    - name: Run independent mathematical and differential checks
-      run: |
-        make blindzap-sage-test
-
-  blindzap-sanitizers:
-    name: BlindZap ASan and UBSan
-    needs: [ci-scope]
-    if: >-
-      needs.ci-scope.outputs.run_tests == 'true' &&
-      github.event_name == 'workflow_dispatch' &&
-      inputs.run_blindzap_sanitizers
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      with:
-        submodules: recursive
-    - name: Build and run the production gate under sanitizers
-      env:
-        ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-        UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-      run: |
-        CC=clang CXX=clang++ \
-          LONGFELLOW_ZK_BUILD_TYPE=Debug \
-          LONGFELLOW_ZK_LINKAGES=shared \
-          LONGFELLOW_ZK_SANITIZERS=ON \
-          bash scripts/ci-installed-package.sh
-
   draft-binary-release:
     name: 📦 Pack
-    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics, blindzap-proof, blindzap-static-analysis, blindzap-sage-reference]
+    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     steps:

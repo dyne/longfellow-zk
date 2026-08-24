@@ -53,7 +53,7 @@ def main() -> None:
             else:
                 pending.append(include)
     assert not missing, "public header closure is incomplete: " + "; ".join(sorted(missing))
-    forbidden = [path for path in public if path.startswith(("blindzap/", "cli/", "circuits/mdoc/", "circuits/ecdsa/", "circuits/bip340/", "circuits/blindzap/", "circuits/tests/"))]
+    forbidden = [path for path in public if path.startswith(("circuits/mdoc/", "circuits/ecdsa/", "circuits/bip340/", "circuits/tests/"))]
     assert not forbidden, f"named/private headers leaked into public manifest: {forbidden}"
     print(f"package manifests: {len(base_sources)} sources, {len(public)} public headers, closure complete")
 

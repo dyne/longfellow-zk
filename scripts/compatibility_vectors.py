@@ -26,8 +26,7 @@ CXX = shlex.split(os.environ.get("CXX", "g++"))
 RUSTC = shlex.split(os.environ.get("RUSTC", str(Path.home() / ".cargo" / "bin" / "rustc")))
 ARTIFACTS = (
     ("transcript", "transcript", "vendor/longfellow-zk/rust/runtime/random/tests/transcript_test_vector.bin"),
-    ("commitment", "commitment", "test/blindzap/testdata/blindzap_vectors.json"),
-    ("proof", "proof", "test/bip340/testdata/bip340_golden.inc"),
+    ("proof", "proof", "projects/bip340/tests/bip340/testdata/bip340_golden.inc"),
     ("lfc1", "LFC1", "test/compatibility/lfc1_fixture.bin"),
     ("verification", "verification", "vendor/longfellow-zk/rust/runtime/ligero/tests/ligero.rs"),
 )

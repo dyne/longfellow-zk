@@ -34,8 +34,6 @@ The upstream Google implementation is mostly left untouched in this distribution
 
 Some additional code is Copyright (C) by the Dyne.org foundation is also licensed as **Apache 2.0**.
 
-The Blindzap circuit implementation is Copyright (C) by the Plan-B foundation and licensed as **GPLv3+**.
-
 Everyone is welcome to submit patches under MIT and/or Apache 2.0 licenses.
 
 ![Funded by the European Union](https://www.pacesetters.eu/sites/default/files/inline-images/EN_FundedbytheEU_RGB_POS.png)

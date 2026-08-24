@@ -11,10 +11,9 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 SAMPLES = (
-    ("synthetic", "test/circuit_0.json"),
-    ("bip340", "test/bip340/testdata/bip340_golden.inc"),
-    ("blindzap", "test/blindzap/testdata/blindzap_vectors.json"),
-    ("mdoc", "test/mdoc_00.json"),
+    ("synthetic", "projects/mdoc/tests/fixtures/circuit_0.json"),
+    ("bip340", "projects/bip340/tests/bip340/testdata/bip340_golden.inc"),
+    ("mdoc", "projects/mdoc/tests/fixtures/mdoc_00.json"),
 )
 FIELDS = ("run", "circuit", "input_path", "input_bytes", "sha256", "resident_bytes")
 

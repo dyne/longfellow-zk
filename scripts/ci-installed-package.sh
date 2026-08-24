@@ -66,7 +66,7 @@ for linkage in $linkages; do
   prefix="$work/$linkage/prefix"
   cmake -E copy_directory "$base_prefix" "$prefix"
 
-  for project in ecdsa bip340 mdoc blindzap; do
+  for project in ecdsa bip340 mdoc; do
     project_build="$work/$linkage/$project"
     cmake -S "$root/projects/$project" -B "$project_build" -G Ninja \
       "${configure_args[@]}" \
@@ -87,11 +87,6 @@ for linkage in $linkages; do
       }
       cmake -E copy "$metrics_file" \
         "$metrics_dir/${linkage}_native_bip340_metrics.csv"
-    fi
-
-    if [[ -n "$package_output" && "$project" == blindzap ]]; then
-      cmake --install "$project_build" \
-        --prefix "$package_output/$linkage/blindzap"
     fi
   done
 

@@ -47,7 +47,7 @@ def main() -> None:
     assert set(owned) == tracked_production(), "manifest does not exhaust tracked production files"
 
     base = set(groups[0] + groups[3])
-    banned = re.compile(r'^#include "(?:blindzap/|circuits/(?:mdoc|ecdsa|bip340|blindzap)/)')
+    banned = re.compile(r'^#include "circuits/(?:mdoc|ecdsa|bip340)/')
     offenders = []
     for path in sorted(base):
         offenders.extend(f"{path}:{line}" for line in (ROOT / path).read_text().splitlines()

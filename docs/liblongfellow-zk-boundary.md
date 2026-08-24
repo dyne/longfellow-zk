@@ -11,7 +11,7 @@ MAC, SHA-256, RIPEMD-160, CBOR parsing, and generic secp256k1 gadgets map to
 proof machinery map to `runtime/*` and `core/proto`.  This is an architectural
 comparison only: `vendor/longfellow-zk` is read-only.
 
-Named projects own mdoc, ECDSA, BIP340, BlindZap, and application CLIs.  The
+Named projects own mdoc, ECDSA, BIP340, and application CLIs.  The
 only allowed dependency direction is named project -> base (plus explicitly
 declared named-project dependencies).  Base files may not include those named
 paths.  Test helper code is tooling, never a package input.

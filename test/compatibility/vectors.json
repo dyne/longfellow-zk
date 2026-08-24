@@ -8,17 +8,10 @@
       "sha256": "4c50c33686983aa3417f45c3fe78d57bf7aa679de051a5e769aa1d9f9f3f2c3f"
     },
     {
-      "bytes": 4603,
-      "kind": "commitment",
-      "name": "commitment",
-      "path": "projects/blindzap/tests/blindzap/testdata/blindzap_vectors.json",
-      "sha256": "37b59a14415eb1add49578736c71525c48d342eb51b99b5f96839eba8b7c863f"
-    },
-    {
       "bytes": 6873,
       "kind": "proof",
       "name": "proof",
-      "path": "test/bip340/testdata/bip340_golden.inc",
+      "path": "projects/bip340/tests/bip340/testdata/bip340_golden.inc",
       "sha256": "45a284d1f175f90695be04473f6ae6e37bcc274d1f56009e46c99839aa37a5be"
     },
     {

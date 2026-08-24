@@ -1,9 +1,8 @@
 # Production qualification and staged rollout
 
 This record qualifies the C++20 boundary migration as an additive release. It
-does not authorize protocol changes, replace an independent cryptographic
-audit, or expand the BlindZap support boundary in
-[BlindZap operations](blindzap-operations.md).
+does not authorize protocol changes or replace an independent cryptographic
+audit.
 
 ## Release evidence
 
@@ -23,18 +22,17 @@ Any non-`pass` row rejects the candidate; the script never writes reviewed
 vectors.
 
 `baseline-metrics` publishes the input-size CSV alongside that matrix. It has
-three rows each for synthetic, BIP340, BlindZap, and mdoc inputs. Budgets are:
+three rows each for synthetic, BIP340, and mdoc inputs. Budgets are:
 no reviewed-vector or canonical-ID drift; no >10% C++20 contract elapsed-time
 increase on the same host; and native/static/WASM size growth above 1% requires
 release review. The current recorded baseline and its limitations are in
 [C++20 migration measurements](cpp20_migration_metrics.md).
 
 GitHub Actions is the authoritative platform matrix: native Clang/Linux runs
-mdoc Bats and the BlindZap production gate; WASI builds and executes
-`test/wasm_test.mjs`; macOS ARM64 builds, mdoc, and BlindZap gates; separate
-jobs run ASan/UBSan, static analysis, the Sage reference model, and one- and
-two-key BlindZap proofs. A release candidate must retain successful artifacts
-for every job, including the BIP340 aggregate CSV, before promotion.
+mdoc Bats; WASI builds and executes `test/wasm_test.mjs`; macOS ARM64 builds and
+runs the mdoc gates; separate jobs run ASan/UBSan and static analysis. A release
+candidate must retain successful artifacts for every job, including the BIP340
+aggregate CSV, before promotion.
 
 ## Boundary audit checklist
 
@@ -49,8 +47,8 @@ CSV artifacts, and reviewer in the deployment ticket, then confirms:
   their dedicated tests; release scheduling has no retained mutable layer.
 - Optimizer changes do not alter circuit IDs or compatibility vectors. Any such
   change is a protocol review, not a performance-only release.
-- mdoc, BIP340, and BlindZap results are consumed only within their documented
-  support boundaries. BlindZap never authorizes minting or production funds.
+- mdoc and BIP340 results are consumed only within their documented support
+  boundaries.
 
 ## Upgrade, observation, and rollback
 

@@ -2,7 +2,7 @@
 # compiler flags, link steps, installation and test registration.
 .DEFAULT_GOAL := all
 
-.PHONY: all build test install package clean debug sanitizers wasm posix osx-arm64 qualification-matrix blindzap-sage-test help
+.PHONY: all build test install package clean debug sanitizers wasm posix osx-arm64 qualification-matrix help
 
 all build posix:
 	cmake --preset release
@@ -39,9 +39,6 @@ osx-arm64:
 
 qualification-matrix:
 	bash scripts/ci-installed-package.sh
-
-blindzap-sage-test:
-	bash projects/blindzap/scripts/run_blindzap_sage.sh
 
 clean:
 	cmake -E rm -rf build
