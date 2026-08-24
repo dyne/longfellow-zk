@@ -75,7 +75,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
   add_executable(longfellow-zk-wasi-smoke cmake/wasi_smoke.cc)
   target_link_libraries(longfellow-zk-wasi-smoke PRIVATE LongfellowZK::static)
   target_link_options(longfellow-zk-wasi-smoke PRIVATE
-    -Wl,--no-entry -Wl,--export=longfellow_zk_wasi_smoke)
+    -mexec-model=reactor -Wl,--export=longfellow_zk_wasi_smoke)
   set_target_properties(longfellow-zk-wasi-smoke PROPERTIES SUFFIX ".wasm")
 endif()
 
