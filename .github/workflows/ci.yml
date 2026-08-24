@@ -151,8 +151,22 @@ jobs:
       run: |
         WASI_SDK_PATH=/opt/wasi-sdk cmake --preset wasi
         cmake --build --preset wasi --parallel
-    - name: Run WASI Node smoke
-      run: node test/wasi_smoke.mjs build/wasi/longfellow-zk-wasi-smoke.wasm
+        cmake --install build/wasi --prefix build/wasi-prefix
+        WASI_SDK_PATH=/opt/wasi-sdk cmake \
+          -S projects/ecdsa \
+          -B build/wasi-ecdsa \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/toolchains/wasi.cmake" \
+          -DCMAKE_PREFIX_PATH="$PWD/build/wasi-prefix" \
+          -DLONGFELLOW_ZK_TARGET=LongfellowZK::static \
+          -DBUILD_TESTING=ON
+        cmake --build build/wasi-ecdsa --target ecdsa-wasi-verify-smoke --parallel
+    - name: Run WASI ECDSA verifier smoke
+      run: |
+        node test/wasi_smoke.mjs \
+          build/wasi/longfellow-zk-wasi-smoke.wasm \
+          build/wasi-ecdsa/ecdsa-wasi-verify-smoke.wasm
     - name: Pack build results
       run: |
         LONGFELLOW_ZK_BUILD_DIR=build/wasi bash scripts/pack_release.sh ${{ github.job }}

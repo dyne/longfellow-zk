@@ -38,7 +38,17 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/LongfellowZKECDSAConfig.cmake
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/LongfellowZKECDSA)
 
 if(BUILD_TESTING)
-  add_executable(ecdsa-module-test tests/verify_module_test.cc)
-  target_link_libraries(ecdsa-module-test PRIVATE LongfellowZKECDSA::ecdsa)
-  add_test(NAME ecdsa-module-test COMMAND ecdsa-module-test)
+  if(CMAKE_SYSTEM_NAME STREQUAL "WASI")
+    add_executable(ecdsa-wasi-verify-smoke tests/wasi_verify_smoke.cc)
+    target_link_libraries(ecdsa-wasi-verify-smoke PRIVATE LongfellowZKECDSA::ecdsa)
+    target_link_options(ecdsa-wasi-verify-smoke PRIVATE
+      -mexec-model=reactor
+      -Wl,-z,stack-size=1048576
+      -Wl,--export=longfellow_zk_ecdsa_wasi_verify)
+    set_target_properties(ecdsa-wasi-verify-smoke PROPERTIES SUFFIX ".wasm")
+  else()
+    add_executable(ecdsa-module-test tests/verify_module_test.cc)
+    target_link_libraries(ecdsa-module-test PRIVATE LongfellowZKECDSA::ecdsa)
+    add_test(NAME ecdsa-module-test COMMAND ecdsa-module-test)
+  endif()
 endif()
