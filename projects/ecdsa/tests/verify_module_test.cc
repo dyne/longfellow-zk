@@ -111,11 +111,45 @@ void CheckRelation(bool corrupt) {
           corrupt ? "corrupt intermediate was accepted" : "valid relation failed");
 }
 
+void CheckCompactScalarBinding(bool splice_r, bool splice_negative_s) {
+  const Fixture fixture = MakeFixture();
+  NativeWitness native(p256_scalar, p256);
+  Require(native.compute_witness(fixture.pk_x, fixture.pk_y, fixture.e,
+                                 fixture.r, fixture.s),
+          "native ECDSA evaluation rejected a valid signature");
+
+  const Backend backend(p256_base, false);
+  const LogicCircuit logic(&backend, p256_base);
+  const Relation relation(logic, p256, n256_order);
+  const auto witness = ToCircuitWitness(logic, native);
+
+  auto expected_r = p256_base.to_montgomery(fixture.r);
+  if (splice_r) expected_r = p256_base.addf(expected_r, p256_base.one());
+  const auto negative_s = p256_scalar.from_montgomery(
+      p256_scalar.negf(p256_scalar.to_montgomery(fixture.s)));
+  auto expected_negative_s = p256_base.to_montgomery(negative_s);
+  if (splice_negative_s) {
+    expected_negative_s =
+        p256_base.addf(expected_negative_s, p256_base.one());
+  }
+  relation.verify_signature3_bound(
+      logic.konst(fixture.pk_x), logic.konst(fixture.pk_y),
+      logic.konst(p256_base.to_montgomery(fixture.e)),
+      logic.konst(expected_r), logic.konst(expected_negative_s), witness);
+  const bool spliced = splice_r || splice_negative_s;
+  Require(backend.assertion_failed() == spliced,
+          spliced ? "spliced compact ECDSA scalar was accepted"
+                  : "valid compact ECDSA scalar binding failed");
+}
+
 void TestContract() {
   static_assert(kVerifyWitnessLayoutElements<EC> == 1034,
                 "ECDSA witness allocation layout changed");
   CheckRelation(false);
   CheckRelation(true);
+  CheckCompactScalarBinding(false, false);
+  CheckCompactScalarBinding(true, false);
+  CheckCompactScalarBinding(false, true);
 }
 
 uint64_t Fnv1a(const std::vector<uint8_t>& bytes) {
