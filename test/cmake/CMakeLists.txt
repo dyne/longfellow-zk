@@ -16,3 +16,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
 endif()
 add_test(NAME longfellow-zk-fixed-depth-merkle COMMAND longfellow-zk-fixed-depth-merkle)
 set_tests_properties(longfellow-zk-fixed-depth-merkle PROPERTIES LABELS merkle)
+
+add_executable(longfellow-zk-upstream-crypto-vectors
+  ../vectors/upstream_crypto_vectors_test.cc)
+target_link_libraries(longfellow-zk-upstream-crypto-vectors PRIVATE LongfellowZK::static)
+add_test(NAME longfellow-zk-upstream-crypto-vectors
+  COMMAND longfellow-zk-upstream-crypto-vectors)
+set_tests_properties(longfellow-zk-upstream-crypto-vectors PROPERTIES
+  LABELS vectors)
