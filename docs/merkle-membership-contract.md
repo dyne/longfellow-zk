@@ -164,3 +164,11 @@ This schema deliberately lets an issuer-authorization caller and a credential
 status caller supply different leaf encodings and policy inputs while reusing
 the exact same path relation.  Neither caller imports SD-JWT types or rewrites
 the SHA-256 path loop.
+
+`canonical_merkle_membership_vectors.json` is the checked corpus.  Its initial
+four-leaf vector is provenance-preserving: it is emitted by Google's native
+`MerkleTree` API and must match the unchanged European native implementation
+byte-for-byte before the installed European adapter and witness are evaluated.
+The only intentional European addition is the generic in-circuit membership
+layer in `circuits/merkle/`; the tree, compressed-proof, SHA-256, and packing
+primitives remain the existing compatible implementations.

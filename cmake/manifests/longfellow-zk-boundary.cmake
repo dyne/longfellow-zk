@@ -82,6 +82,7 @@ set(LONGFELLOW_ZK_BASE_HEADERS
   src/circuits/mac/mac_circuit.h
   src/circuits/mac/mac_reference.h
   src/circuits/mac/mac_witness.h
+  src/circuits/merkle/fixed_depth_sha256_merkle_membership.h
   src/circuits/ripemd160/ripemd160_circuit.h
   src/circuits/ripemd160/ripemd160_fixed.h
   src/circuits/ripemd160/ripemd160.h
