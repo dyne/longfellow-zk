@@ -90,3 +90,26 @@ endif()
 add_test(NAME longfellow-zk-upstream-logic-regressions
   COMMAND longfellow-zk-upstream-logic-regressions)
 set_tests_properties(longfellow-zk-upstream-logic-regressions PROPERTIES LABELS logic)
+
+add_executable(longfellow-zk-upstream-gf2-coding-regressions
+  ../gf2/upstream_gf2_coding_regression_test.cc)
+target_link_libraries(longfellow-zk-upstream-gf2-coding-regressions PRIVATE LongfellowZK::static)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+  target_compile_options(longfellow-zk-upstream-gf2-coding-regressions PRIVATE -UNDEBUG)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
+    target_compile_options(longfellow-zk-upstream-gf2-coding-regressions PRIVATE -mpclmul -msse2)
+  endif()
+endif()
+add_test(NAME longfellow-zk-upstream-gf2-coding-regressions
+  COMMAND longfellow-zk-upstream-gf2-coding-regressions)
+set_tests_properties(longfellow-zk-upstream-gf2-coding-regressions PROPERTIES LABELS gf2)
+
+add_executable(longfellow-zk-upstream-sumcheck-regressions
+  ../sumcheck/upstream_sumcheck_regression_test.cc)
+target_link_libraries(longfellow-zk-upstream-sumcheck-regressions PRIVATE LongfellowZK::static)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+  target_compile_options(longfellow-zk-upstream-sumcheck-regressions PRIVATE -UNDEBUG)
+endif()
+add_test(NAME longfellow-zk-upstream-sumcheck-regressions
+  COMMAND longfellow-zk-upstream-sumcheck-regressions)
+set_tests_properties(longfellow-zk-upstream-sumcheck-regressions PROPERTIES LABELS sumcheck)
