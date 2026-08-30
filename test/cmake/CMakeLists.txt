@@ -1,3 +1,11 @@
+function(longfellow_zk_enable_test_assertions target)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /UNDEBUG)
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    target_compile_options(${target} PRIVATE -UNDEBUG)
+  endif()
+endfunction()
+
 add_executable(longfellow-zk-smoke-static smoke.cc)
 target_link_libraries(longfellow-zk-smoke-static PRIVATE LongfellowZK::static)
 add_test(NAME longfellow-zk-smoke-static COMMAND longfellow-zk-smoke-static)
@@ -19,9 +27,7 @@ set_tests_properties(longfellow-zk-fixed-depth-merkle PROPERTIES LABELS merkle)
 
 add_executable(longfellow-zk-native-merkle-tree ../merkle/native_merkle_tree_test.cc)
 target_link_libraries(longfellow-zk-native-merkle-tree PRIVATE LongfellowZK::static)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-  target_compile_options(longfellow-zk-native-merkle-tree PRIVATE -UNDEBUG)
-endif()
+longfellow_zk_enable_test_assertions(longfellow-zk-native-merkle-tree)
 add_test(NAME longfellow-zk-native-merkle-tree COMMAND longfellow-zk-native-merkle-tree)
 set_tests_properties(longfellow-zk-native-merkle-tree PROPERTIES LABELS merkle)
 
@@ -36,9 +42,7 @@ set_tests_properties(longfellow-zk-upstream-crypto-vectors PROPERTIES
 add_executable(longfellow-zk-flatsha256-regressions
   ../sha/flatsha256_circuit_regression_test.cc)
 target_link_libraries(longfellow-zk-flatsha256-regressions PRIVATE LongfellowZK::static)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-  target_compile_options(longfellow-zk-flatsha256-regressions PRIVATE -UNDEBUG)
-endif()
+longfellow_zk_enable_test_assertions(longfellow-zk-flatsha256-regressions)
 add_test(NAME longfellow-zk-flatsha256-regressions
   COMMAND longfellow-zk-flatsha256-regressions)
 set_tests_properties(longfellow-zk-flatsha256-regressions PROPERTIES LABELS sha)
@@ -57,16 +61,14 @@ set_tests_properties(longfellow-zk-base64-decoder PROPERTIES LABELS base64)
 
 add_executable(longfellow-zk-cbor-host-decoder ../cbor/host_decoder_test.cc)
 target_link_libraries(longfellow-zk-cbor-host-decoder PRIVATE LongfellowZK::static)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-  target_compile_options(longfellow-zk-cbor-host-decoder PRIVATE -UNDEBUG)
-endif()
+longfellow_zk_enable_test_assertions(longfellow-zk-cbor-host-decoder)
 add_test(NAME longfellow-zk-cbor-host-decoder COMMAND longfellow-zk-cbor-host-decoder)
 set_tests_properties(longfellow-zk-cbor-host-decoder PROPERTIES LABELS cbor)
 
 add_executable(longfellow-zk-cbor-byte-decoder ../cbor/cbor_byte_decoder_test.cc)
 target_link_libraries(longfellow-zk-cbor-byte-decoder PRIVATE LongfellowZK::static)
+longfellow_zk_enable_test_assertions(longfellow-zk-cbor-byte-decoder)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-  target_compile_options(longfellow-zk-cbor-byte-decoder PRIVATE -UNDEBUG)
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
     target_compile_options(longfellow-zk-cbor-byte-decoder PRIVATE -mpclmul)
   endif()
@@ -77,6 +79,7 @@ set_tests_properties(longfellow-zk-cbor-byte-decoder PROPERTIES LABELS cbor)
 add_executable(longfellow-zk-upstream-compiler-regressions
   ../compiler/upstream_compiler_regression_test.cc)
 target_link_libraries(longfellow-zk-upstream-compiler-regressions PRIVATE LongfellowZK::static)
+longfellow_zk_enable_test_assertions(longfellow-zk-upstream-compiler-regressions)
 add_test(NAME longfellow-zk-upstream-compiler-regressions
   COMMAND longfellow-zk-upstream-compiler-regressions)
 set_tests_properties(longfellow-zk-upstream-compiler-regressions PROPERTIES LABELS compiler)
@@ -84,6 +87,7 @@ set_tests_properties(longfellow-zk-upstream-compiler-regressions PROPERTIES LABE
 add_executable(longfellow-zk-upstream-logic-regressions
   ../logic/upstream_logic_regression_test.cc)
 target_link_libraries(longfellow-zk-upstream-logic-regressions PRIVATE LongfellowZK::static)
+longfellow_zk_enable_test_assertions(longfellow-zk-upstream-logic-regressions)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
   target_compile_options(longfellow-zk-upstream-logic-regressions PRIVATE -mpclmul -msse2)
 endif()
@@ -94,8 +98,8 @@ set_tests_properties(longfellow-zk-upstream-logic-regressions PROPERTIES LABELS 
 add_executable(longfellow-zk-upstream-gf2-coding-regressions
   ../gf2/upstream_gf2_coding_regression_test.cc)
 target_link_libraries(longfellow-zk-upstream-gf2-coding-regressions PRIVATE LongfellowZK::static)
+longfellow_zk_enable_test_assertions(longfellow-zk-upstream-gf2-coding-regressions)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-  target_compile_options(longfellow-zk-upstream-gf2-coding-regressions PRIVATE -UNDEBUG)
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
     target_compile_options(longfellow-zk-upstream-gf2-coding-regressions PRIVATE -mpclmul -msse2)
   endif()
@@ -107,9 +111,7 @@ set_tests_properties(longfellow-zk-upstream-gf2-coding-regressions PROPERTIES LA
 add_executable(longfellow-zk-upstream-sumcheck-regressions
   ../sumcheck/upstream_sumcheck_regression_test.cc)
 target_link_libraries(longfellow-zk-upstream-sumcheck-regressions PRIVATE LongfellowZK::static)
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-  target_compile_options(longfellow-zk-upstream-sumcheck-regressions PRIVATE -UNDEBUG)
-endif()
+longfellow_zk_enable_test_assertions(longfellow-zk-upstream-sumcheck-regressions)
 add_test(NAME longfellow-zk-upstream-sumcheck-regressions
   COMMAND longfellow-zk-upstream-sumcheck-regressions)
 set_tests_properties(longfellow-zk-upstream-sumcheck-regressions PROPERTIES LABELS sumcheck)
