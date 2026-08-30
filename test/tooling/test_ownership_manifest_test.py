@@ -39,6 +39,8 @@ def main():
         "test/tooling/merkle_parity_qualification_test.py",
         "test/merkle/canonical_merkle_membership_vector.schema.json",
         "test/merkle/canonical_merkle_membership_vectors.json",
+        "test/cbor/host_decoder_test.cc",
+        "test/cbor/cbor_byte_decoder_test.cc",
     }
     assert owned - eligible <= pending_inventory_tests, f"stale={sorted(owned - eligible)}"
     assert eligible <= owned, f"missing={sorted(eligible - owned)}"
