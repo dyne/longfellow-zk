@@ -24,3 +24,15 @@ add_test(NAME longfellow-zk-upstream-crypto-vectors
   COMMAND longfellow-zk-upstream-crypto-vectors)
 set_tests_properties(longfellow-zk-upstream-crypto-vectors PROPERTIES
   LABELS vectors)
+
+add_executable(longfellow-zk-base64-decoder
+  ../base64/base64_decoder_test.cc)
+target_link_libraries(longfellow-zk-base64-decoder PRIVATE LongfellowZK::static)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+  target_compile_options(longfellow-zk-base64-decoder PRIVATE -UNDEBUG)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
+    target_compile_options(longfellow-zk-base64-decoder PRIVATE -mpclmul)
+  endif()
+endif()
+add_test(NAME longfellow-zk-base64-decoder COMMAND longfellow-zk-base64-decoder)
+set_tests_properties(longfellow-zk-base64-decoder PROPERTIES LABELS base64)

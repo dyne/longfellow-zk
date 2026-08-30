@@ -61,6 +61,7 @@ set(LONGFELLOW_ZK_BASE_HEADERS
   src/arrays/eq.h
   src/arrays/eqs.h
   src/cbor/host_decoder.h
+  src/circuits/base64/base64_decoder.h
   src/circuits/cbor_parser/cbor_byte_decoder.h
   src/circuits/compiler/assertion_symbols.h
   src/circuits/compiler/circuit_dump.h
