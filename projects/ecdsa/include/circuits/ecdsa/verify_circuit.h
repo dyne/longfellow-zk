@@ -74,6 +74,24 @@ class VerifyCircuit {
   //    pkx != 0, and we ensure that (pkx,pky) is on the curve.
   //
   void verify_signature3(EltW pk_x, EltW pk_y, EltW e, const Witness& w) const {
+    verify_signature3_impl(pk_x, pk_y, e, w, nullptr, nullptr);
+  }
+
+  // As above, additionally bind externally decoded ECDSA scalars to the
+  // witness-derived r and -s values. Compact-signature circuits use this to
+  // prevent a separately decoded signature from being spliced with unrelated
+  // ECDSA witness advice.
+  void verify_signature3_bound(EltW pk_x, EltW pk_y, EltW e, EltW expected_r,
+                               EltW expected_negative_s,
+                               const Witness& w) const {
+    verify_signature3_impl(pk_x, pk_y, e, w, &expected_r,
+                           &expected_negative_s);
+  }
+
+ private:
+  void verify_signature3_impl(EltW pk_x, EltW pk_y, EltW e,
+                              const Witness& w, const EltW* expected_r,
+                              const EltW* expected_negative_s) const {
     EltW zero = lc_.konst(lc_.zero());
     EltW one = lc_.konst(lc_.one());
     EltW gx = lc_.konst(ec_.gx_), gy = lc_.konst(ec_.gy_);
@@ -194,6 +212,9 @@ class VerifyCircuit {
     // Check that the bits used for {e,rx} correspond to the input {e, rx}.
     lc_.assert_eq(est, e);
     lc_.assert_eq(rst, w.rx);
+    if (expected_r != nullptr) lc_.assert_eq(rst, *expected_r);
+    if (expected_negative_s != nullptr)
+      lc_.assert_eq(sst, *expected_negative_s);
 
     // Check that (pk,py), (rx,ry) satisfy the curve equation.
     is_on_curve(pk_x, pk_y);
@@ -211,7 +232,6 @@ class VerifyCircuit {
     lc_.assert1(s_range);
   }
 
- private:
   void assert_nonzero(EltW x, EltW witness) const {
     auto maybe_one = lc_.mul(x, witness);
     auto one = lc_.konst(lc_.one());
