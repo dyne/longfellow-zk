@@ -17,6 +17,14 @@ endif()
 add_test(NAME longfellow-zk-fixed-depth-merkle COMMAND longfellow-zk-fixed-depth-merkle)
 set_tests_properties(longfellow-zk-fixed-depth-merkle PROPERTIES LABELS merkle)
 
+add_executable(longfellow-zk-native-merkle-tree ../merkle/native_merkle_tree_test.cc)
+target_link_libraries(longfellow-zk-native-merkle-tree PRIVATE LongfellowZK::static)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+  target_compile_options(longfellow-zk-native-merkle-tree PRIVATE -UNDEBUG)
+endif()
+add_test(NAME longfellow-zk-native-merkle-tree COMMAND longfellow-zk-native-merkle-tree)
+set_tests_properties(longfellow-zk-native-merkle-tree PROPERTIES LABELS merkle)
+
 add_executable(longfellow-zk-upstream-crypto-vectors
   ../vectors/upstream_crypto_vectors_test.cc)
 target_link_libraries(longfellow-zk-upstream-crypto-vectors PRIVATE LongfellowZK::static)

@@ -37,6 +37,7 @@ def main():
         "test/tooling/merkle_contract_inventory_test.py",
         "test/tooling/merkle_membership_contract_test.py",
         "test/tooling/merkle_parity_qualification_test.py",
+        "test/merkle/native_merkle_tree_test.cc",
         "test/merkle/canonical_merkle_membership_vector.schema.json",
         "test/merkle/canonical_merkle_membership_vectors.json",
         "test/cbor/host_decoder_test.cc",
