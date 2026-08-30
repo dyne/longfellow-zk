@@ -126,6 +126,16 @@ branches and variable proof length do not denote one fixed-depth private
 path, and accepting them would require a separate compressed-proof parser and
 tree/path algorithm in the circuit.  That would duplicate native ownership.
 
+## Reviewed circuit bound
+
+V1 supports `Depth <= 4`; template instantiations above that limit fail before
+circuit construction.  The checked depth-four compiler fixture allocates
+13,321 inputs, 668,953 scheduled wires, and 2,135,652 quadratic terms.  On
+the controlled Linux build it completed in 2.90 seconds with a 499,344 KiB
+peak RSS.  Cost is linear in depth because every level adds two fixed SHA-256
+blocks.  Consumers needing a deeper path must use a separately reviewed and
+measured bound rather than triggering an accidental expensive instantiation.
+
 ## Canonical vector schema and required cases
 
 `test/merkle/canonical_merkle_membership_vector.schema.json` is the checked
