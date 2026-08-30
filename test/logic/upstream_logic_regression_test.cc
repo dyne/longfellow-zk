@@ -2,6 +2,7 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
+#include <cstdlib>
 
 #include "algebra/fp.h"
 #include "algebra/poly.h"
@@ -22,6 +23,10 @@ const Field kField("18446744073709551557");
 using Backend = EvaluationBackend<Field>;
 using Circuit = Logic<Field, Backend>;
 
+void Require(bool condition) {
+  if (!condition) std::abort();
+}
+
 void BitAdderAndLogic() {
   constexpr size_t kWidth = 4;
   const Backend backend(kField, false);
@@ -34,10 +39,12 @@ void BitAdderAndLogic() {
         const auto sum = (a + b + c) & 15u;
         adder.assert_eqmod(logic.vbit<kWidth>(sum),
                            adder.add({logic.vbit<kWidth>(a), logic.vbit<kWidth>(b), logic.vbit<kWidth>(c)}), 3);
-        assert(!backend.assertion_failed());
+        Require(!backend.assertion_failed());
         adder.assert_eqmod(logic.vbit<kWidth>((sum + 1) & 15u),
                            adder.add({logic.vbit<kWidth>(a), logic.vbit<kWidth>(b), logic.vbit<kWidth>(c)}), 3);
-        assert(backend.assertion_failed());
+        // assertion_failed() is deliberately read on every negative vector:
+        // EvaluationBackend resets the sticky flag only when it is consumed.
+        Require(backend.assertion_failed());
       }
     }
   }
@@ -64,7 +71,7 @@ void BitPluckerAndCounter() {
   for (size_t value : {size_t{0}, size_t{1}, size_t{7}, size_t{31}}) {
     const auto actual = counter.add(counter.as_counter(value), counter.mone());
     counter.assert0(actual);
-    assert(backend.assertion_failed() == (value != 1));
+    Require(backend.assertion_failed() == (value != 1));
   }
 }
 
