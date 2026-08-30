@@ -32,6 +32,8 @@ set(LONGFELLOW_ZK_TEST_OWNERSHIP
   "test/tooling/merkle_membership_contract_test.py|base|merkle-membership-contract-test"
   "test/tooling/merkle_parity_qualification_test.py|base|merkle-parity-qualification-test"
   "test/merkle/fixed_depth_sha256_merkle_membership_test.cc|base|fixed-depth-sha256-merkle-membership-test"
+  "test/cbor/host_decoder_test.cc|base|cbor-host-decoder-test"
+  "test/cbor/cbor_byte_decoder_test.cc|base|cbor-byte-decoder-test"
   "test/merkle/canonical_merkle_membership_vector.schema.json|base|merkle-membership-contract-test"
   "test/merkle/canonical_merkle_membership_vectors.json|base|merkle-parity-qualification-test"
   "projects/bip340/tests/bip340/bip340_test.cc|bip340|bip340-test"
