@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DOC = ROOT / "docs" / "merkle-membership-contract.md"
 SCHEMA = ROOT / "test" / "merkle" / "canonical_merkle_membership_vector.schema.json"
+CORPUS = ROOT / "test" / "merkle" / "canonical_merkle_membership_vectors.json"
 
 
 def main() -> None:
@@ -30,6 +31,10 @@ def main() -> None:
     assert expected <= required_fields, "canonical vector fields are incomplete"
     assert schema["$defs"]["digest"]["pattern"] == "^[0-9a-f]{64}$"
     assert schema["properties"]["levels"]["items"]["properties"]["leftRightPreimage"]["pattern"] == "^[0-9a-f]{128}$"
+    vectors = json.loads(CORPUS.read_text(encoding="utf-8"))
+    assert vectors and all(expected <= set(vector) for vector in vectors)
+    assert all(len(vector["nativeCompressedProof"]) == vector["depth"] for vector in vectors)
+    assert all(len(vector["levels"]) == vector["depth"] for vector in vectors)
     print("merkle membership contract: API, ordering, adapter, and vector schema complete")
 
 

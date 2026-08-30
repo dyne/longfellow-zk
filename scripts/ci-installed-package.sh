@@ -29,7 +29,11 @@ else
   exit 69
 fi
 
-configure_args=("-DCMAKE_BUILD_TYPE=$build_type")
+configure_args=(
+  "-DCMAKE_BUILD_TYPE=$build_type"
+  "-DCMAKE_C_COMPILER_LAUNCHER=ccache"
+  "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+)
 base_configure_args=("${configure_args[@]}")
 ctest_args=(--output-on-failure)
 if [[ ${LONGFELLOW_ZK_SANITIZERS:-OFF} == ON ]]; then

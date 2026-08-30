@@ -14,6 +14,12 @@ add_executable(app app.cc)
 target_link_libraries(app PRIVATE LongfellowZK::shared) # or ::static
 ```
 
+The generic fixed-depth SHA-256 Merkle membership surface is part of this base
+package.  Include `circuits/merkle/fixed_depth_sha256_merkle_membership.h` and
+use `FixedDepthSha256MerklePathAdapter` only with a single-leaf proof generated
+and verified by the installed `MerkleTree` API.  No Google source-tree include
+path is part of the supported consumer contract.
+
 Configure a consumer with `-DCMAKE_PREFIX_PATH=/path/to/prefix`.  On ELF
 systems, make the shared library discoverable through the platform loader
 configuration (for example, an application rpath or an approved loader path),
