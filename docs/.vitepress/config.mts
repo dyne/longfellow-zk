@@ -98,6 +98,7 @@ export default defineConfig({
           { text: '0.x ABI policy', link: '/abi' },
           { text: 'Library boundary', link: '/liblongfellow-zk-boundary' },
           { text: 'Compiler ownership', link: '/compiler-ownership' },
+          { text: 'Merkle membership contract', link: '/merkle-membership-contract' },
           { text: 'Artifact baseline', link: '/liblongfellow-zk-artifact-baseline' },
           { text: 'C++20 measurements', link: '/cpp20_migration_metrics' },
           { text: 'Production qualification', link: '/production-qualification' }

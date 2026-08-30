@@ -34,6 +34,9 @@ def main():
     pending_inventory_tests = {
         "test/tooling/package_boundary_test.py",
         "test/tooling/package_manifest_test.py",
+        "test/tooling/merkle_contract_inventory_test.py",
+        "test/tooling/merkle_membership_contract_test.py",
+        "test/merkle/canonical_merkle_membership_vector.schema.json",
     }
     assert owned - eligible <= pending_inventory_tests, f"stale={sorted(owned - eligible)}"
     assert eligible <= owned, f"missing={sorted(eligible - owned)}"

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Longfellow fixed-depth SHA-256 Merkle membership vector",
+  "type": "object",
+  "required": ["treeSize", "depth", "leaves", "selectedIndex", "leaf", "nativeCompressedProof", "nativeCompressedProofBytes", "expandedPath", "indexBitsLsbFirst", "levels", "root"],
+  "properties": {
+    "treeSize": {"type": "integer", "minimum": 1},
+    "depth": {"type": "integer", "minimum": 0},
+    "leaves": {"type": "array", "items": {"$ref": "#/$defs/digest"}},
+    "selectedIndex": {"type": "integer", "minimum": 0},
+    "leaf": {"$ref": "#/$defs/digest"},
+    "nativeCompressedProof": {"type": "array", "items": {"$ref": "#/$defs/digest"}},
+    "nativeCompressedProofBytes": {"type": "string", "pattern": "^[0-9a-f]{0,}$"},
+    "expandedPath": {"type": "array", "items": {"type": "object", "required": ["sibling", "siblingIsLeft"], "properties": {"sibling": {"$ref": "#/$defs/digest"}, "siblingIsLeft": {"type": "integer", "enum": [0, 1]}}}},
+    "indexBitsLsbFirst": {"type": "array", "items": {"type": "integer", "enum": [0, 1]}},
+    "levels": {"type": "array", "items": {"type": "object", "required": ["leftRightPreimage", "digest"], "properties": {"leftRightPreimage": {"type": "string", "pattern": "^[0-9a-f]{128}$"}, "digest": {"$ref": "#/$defs/digest"}}}},
+    "root": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}
