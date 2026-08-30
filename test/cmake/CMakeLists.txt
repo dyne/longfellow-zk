@@ -55,3 +55,20 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
 endif()
 add_test(NAME longfellow-zk-cbor-byte-decoder COMMAND longfellow-zk-cbor-byte-decoder)
 set_tests_properties(longfellow-zk-cbor-byte-decoder PROPERTIES LABELS cbor)
+
+add_executable(longfellow-zk-upstream-compiler-regressions
+  ../compiler/upstream_compiler_regression_test.cc)
+target_link_libraries(longfellow-zk-upstream-compiler-regressions PRIVATE LongfellowZK::static)
+add_test(NAME longfellow-zk-upstream-compiler-regressions
+  COMMAND longfellow-zk-upstream-compiler-regressions)
+set_tests_properties(longfellow-zk-upstream-compiler-regressions PROPERTIES LABELS compiler)
+
+add_executable(longfellow-zk-upstream-logic-regressions
+  ../logic/upstream_logic_regression_test.cc)
+target_link_libraries(longfellow-zk-upstream-logic-regressions PRIVATE LongfellowZK::static)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|i[3-6]86)$")
+  target_compile_options(longfellow-zk-upstream-logic-regressions PRIVATE -mpclmul -msse2)
+endif()
+add_test(NAME longfellow-zk-upstream-logic-regressions
+  COMMAND longfellow-zk-upstream-logic-regressions)
+set_tests_properties(longfellow-zk-upstream-logic-regressions PROPERTIES LABELS logic)
