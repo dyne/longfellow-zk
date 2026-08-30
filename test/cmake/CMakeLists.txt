@@ -33,6 +33,16 @@ add_test(NAME longfellow-zk-upstream-crypto-vectors
 set_tests_properties(longfellow-zk-upstream-crypto-vectors PROPERTIES
   LABELS vectors)
 
+add_executable(longfellow-zk-flatsha256-regressions
+  ../sha/flatsha256_circuit_regression_test.cc)
+target_link_libraries(longfellow-zk-flatsha256-regressions PRIVATE LongfellowZK::static)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+  target_compile_options(longfellow-zk-flatsha256-regressions PRIVATE -UNDEBUG)
+endif()
+add_test(NAME longfellow-zk-flatsha256-regressions
+  COMMAND longfellow-zk-flatsha256-regressions)
+set_tests_properties(longfellow-zk-flatsha256-regressions PROPERTIES LABELS sha)
+
 add_executable(longfellow-zk-base64-decoder
   ../base64/base64_decoder_test.cc)
 target_link_libraries(longfellow-zk-base64-decoder PRIVATE LongfellowZK::static)
