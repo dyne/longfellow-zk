@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(LongfellowZKMDoc VERSION 0.1.0 LANGUAGES CXX)
+set(LONGFELLOW_ZK_VERSION "1.0.0" CACHE STRING
+    "Longfellow-ZK semantic version (without the v tag prefix)")
+if(NOT LONGFELLOW_ZK_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+  message(FATAL_ERROR
+    "LONGFELLOW_ZK_VERSION must be a strict numeric semantic version")
+endif()
+project(LongfellowZKMDoc VERSION ${LONGFELLOW_ZK_VERSION} LANGUAGES CXX)
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)

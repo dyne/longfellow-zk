@@ -21,10 +21,11 @@ headers. Do not treat source paths, build paths, or unexported symbols as API.
 | `LongfellowZKBIP340` | `LongfellowZKBIP340::bip340` | Header/interface circuit library |
 | `LongfellowZKMDoc` | `LongfellowZKMDoc::mdoc` | Static application library |
 
-WASI builds only the static base target. The native shared target carries
-version `0.1.0` and SOVERSION `0`.
+WASI builds only the static base target. The native shared target starts at
+version `1.0.0` and SOVERSION `1`; release builds use the version selected by
+the semantic-version workflow.
 
-## 0.x dynamic-link policy
+## 1.x dynamic-link policy
 
 Only declarations marked `LONGFELLOW_ZK_API` are supported shared-library entry
 points. Header-only templates and inline gadgets compile inside the consumer.

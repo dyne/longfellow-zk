@@ -1,7 +1,8 @@
-# Longfellow ZK 0.x ABI policy
+# Longfellow ZK 1.x ABI policy
 
-The shared library SONAME is `liblongfellow-zk.so.0`; patch releases retain
-SONAME 0 while 0.x remains pre-stable.  Only declarations marked
+The shared library SONAME is `liblongfellow-zk.so.1`. Compatible 1.x releases
+retain SONAME 1; a future incompatible ABI requires a new major release and
+SONAME. Only declarations marked
 `LONGFELLOW_ZK_API` are supported dynamic-link entry points.  Header-only
 templates and inline gadgets remain compiled by the consumer.
 

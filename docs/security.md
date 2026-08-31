@@ -52,7 +52,7 @@ and the repository's [production qualification record](production-qualification.
 
 ## Release boundary
 
-The current base package is pre-stable (`0.1.0`, SOVERSION `0`). The release
+The stable base-package line starts at `1.0.0` with SOVERSION `1`. The release
 matrix tests source, artifact, and protocol compatibility, but does not promise
 cross-toolchain C++ ABI compatibility. LFC2 remains opt-in and reversible;
 LFC1 remains the default writer.

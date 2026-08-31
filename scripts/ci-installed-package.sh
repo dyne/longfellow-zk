@@ -11,6 +11,7 @@ base_prefix="$work/base-prefix"
 build_type=${LONGFELLOW_ZK_BUILD_TYPE:-Release}
 linkages=${LONGFELLOW_ZK_LINKAGES:-"static shared"}
 package_output=${LONGFELLOW_ZK_PACKAGE_OUTPUT_DIR:-}
+release_version=${LONGFELLOW_ZK_VERSION:-1.0.0}
 
 case " $linkages " in
   *" static "*|*" shared "*) ;;
@@ -33,6 +34,7 @@ configure_args=(
   "-DCMAKE_BUILD_TYPE=$build_type"
   "-DCMAKE_C_COMPILER_LAUNCHER=ccache"
   "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+  "-DLONGFELLOW_ZK_VERSION=$release_version"
 )
 base_configure_args=("${configure_args[@]}")
 ctest_args=(--output-on-failure)

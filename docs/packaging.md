@@ -91,11 +91,32 @@ package`; distribution recipes should normally use the staged CMake install.
 
 ## ABI, upgrades, and rollback
 
-The native shared library is currently version `0.1.0` with SOVERSION `0`.
-Longfellow-ZK does not promise C++ ABI compatibility across 0.x releases,
-compilers, or standard libraries. Follow the [ABI policy](abi.md), coordinate
+The native shared library starts its stable release line at version `1.0.0`
+with SOVERSION `1`. Release CI supplies the semantic version calculated from
+conventional commits through `LONGFELLOW_ZK_VERSION`; source-tree builds default
+to `1.0.0`. Longfellow-ZK does not promise binary compatibility across compilers
+or C++ standard libraries. Follow the [ABI policy](abi.md), coordinate major
 transitions, and never mix headers from one release with libraries from another.
 Pin circuit IDs, formats, specifications, and vectors with the package version.
+
+## Automated release versions
+
+Successful `main` CI runs continue to publish the same platform archives,
+checksums, BIP-340 metrics, generated notes, and non-draft GitHub release. The
+release tag is now calculated by the pinned `ietf-tools/semver-action` action:
+
+- the first semantic release is bootstrapped as `v1.0.0`;
+- `BREAKING CHANGE` commits select a major increment;
+- `feat` and `feature` select a minor increment;
+- `fix`, `bugfix`, `perf`, `refactor`, and test commits select a patch;
+- other or non-conventional commits fall back to a patch so the existing
+  release-on-every-successful-main-push behavior is preserved;
+- rerunning the same tagged commit reuses the current version.
+
+Historical commit-SHA tags are ignored when locating the latest semantic
+release. The strict version without the leading `v` is passed to CMake as
+`LONGFELLOW_ZK_VERSION`; the leading-`v` form is used for the GitHub release
+and metrics links.
 
 ## License and maintainer contact
 

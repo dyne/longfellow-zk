@@ -10,10 +10,54 @@ on:
 env:
   BUILD_TYPE: Release
 
+permissions:
+  contents: read
+
 jobs:
+  version:
+    name: Calculate release version
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.semver.outputs.next || steps.bootstrap.outputs.next }}
+      version: ${{ steps.semver.outputs.nextStrict || steps.bootstrap.outputs.next_strict }}
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 0
+    - name: Detect the first semantic release
+      id: tags
+      shell: bash
+      run: |
+        if git tag --list | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+          echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "bootstrap=true" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Bootstrap v1.0.0
+      id: bootstrap
+      if: steps.tags.outputs.bootstrap == 'true'
+      shell: bash
+      run: |
+        echo "next=v1.0.0" >> "$GITHUB_OUTPUT"
+        echo "next_strict=1.0.0" >> "$GITHUB_OUTPUT"
+    - name: Calculate the next semantic version
+      id: semver
+      if: steps.tags.outputs.bootstrap == 'false'
+      uses: ietf-tools/semver-action@c90370b2958652d71c06a3484129a4d423a6d8a8 # v1.11.0
+      with:
+        token: ${{ github.token }}
+        branch: main
+        maxTagsToFetch: 100
+        skipInvalidTags: true
+        noNewCommitBehavior: current
+        noVersionBumpBehavior: patch
+
   posix-x86:
     name: Build & Test on POSIX x86
+    needs: version
     runs-on: ubuntu-latest
+    env:
+      LONGFELLOW_ZK_VERSION: ${{ needs.version.outputs.version }}
     strategy:
       fail-fast: false
       matrix:
@@ -25,9 +69,6 @@ jobs:
       with:
         fetch-depth: 0
         submodules: recursive
-    - name: short SHA of current commit
-      id: sha
-      run: echo "git_sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
     - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
     - name: Cache APT packages
       uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
@@ -35,7 +76,10 @@ jobs:
         packages: "build-essential g++ clang make jq xxd"
     - name: Build project with ${{ matrix.compiler.cxx }}
       run: |
-        cmake --preset release -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        cmake --preset release \
+          -DLONGFELLOW_ZK_VERSION="$LONGFELLOW_ZK_VERSION" \
+          -DCMAKE_CXX_COMPILER=${{ matrix.compiler.cxx }} \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build --preset release --parallel
         ctest --preset release
     - name: Verify installed package consumers
@@ -54,9 +98,6 @@ jobs:
           longfellow-zk_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz
           longfellow-zk_${{ github.job }}-${{ matrix.compiler.id }}.tar.gz.sha256
           build/qualified-packages/metrics/*_bip340_metrics.csv
-    outputs:
-       git_sha_short: ${{ steps.sha.outputs.git_sha_short }}
-
   google-rust-parity:
     name: Google Rust parity
     runs-on: ubuntu-latest
@@ -75,7 +116,10 @@ jobs:
 
   wasm-wasi:
     name: Build & Test on WASM WASI
+    needs: version
     runs-on: ubuntu-latest
+    env:
+      LONGFELLOW_ZK_VERSION: ${{ needs.version.outputs.version }}
     strategy:
       fail-fast: false
     steps:
@@ -96,7 +140,8 @@ jobs:
         add-to-path: true
     - name: Build project
       run: |
-        WASI_SDK_PATH=/opt/wasi-sdk cmake --preset wasi
+        WASI_SDK_PATH=/opt/wasi-sdk cmake --preset wasi \
+          -DLONGFELLOW_ZK_VERSION="$LONGFELLOW_ZK_VERSION"
         cmake --build --preset wasi --parallel
         cmake --install build/wasi --prefix build/wasi-prefix
         WASI_SDK_PATH=/opt/wasi-sdk cmake \
@@ -106,6 +151,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/toolchains/wasi.cmake" \
           -DCMAKE_PREFIX_PATH="$PWD/build/wasi-prefix" \
+          -DLONGFELLOW_ZK_VERSION="$LONGFELLOW_ZK_VERSION" \
           -DLONGFELLOW_ZK_TARGET=LongfellowZK::static \
           -DBUILD_TESTING=ON
         cmake --build build/wasi-ecdsa --target ecdsa-wasi-verify-smoke --parallel
@@ -127,7 +173,10 @@ jobs:
 
   apple-osx:
     name: Build & Test on Apple OSX 15 ARM64
+    needs: version
     runs-on: macos-15
+    env:
+      LONGFELLOW_ZK_VERSION: ${{ needs.version.outputs.version }}
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       with:
@@ -137,10 +186,13 @@ jobs:
     - name: Install latest Bash via Homebrew
       run: |
         brew install bash
-        echo "/opt/homebrew/bin" >> $GITHUB_PATH
+        echo "/opt/homebrew/bin" >> "$GITHUB_PATH"
     - name: Build project
       run: |
-        cmake --preset release -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        cmake --preset release \
+          -DLONGFELLOW_ZK_VERSION="$LONGFELLOW_ZK_VERSION" \
+          -DCMAKE_CXX_COMPILER=clang++ \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build --preset release --parallel
         ctest --preset release
     - name: Verify installed package consumers
@@ -161,7 +213,7 @@ jobs:
 
   bip340-metrics:
     name: Render BIP340 metrics
-    needs: [posix-x86, wasm-wasi, apple-osx]
+    needs: [version, posix-x86, wasm-wasi, apple-osx]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -180,7 +232,7 @@ jobs:
         bash scripts/aggregate_bip340_metrics.sh \
           release \
           release-metrics \
-          "${{ needs.posix-x86.outputs.git_sha_short }}" \
+          "${{ needs.version.outputs.release_tag }}" \
           "${{ github.repository }}"
     - name: Upload BIP340 metrics artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -193,9 +245,11 @@ jobs:
 
   draft-binary-release:
     name: 📦 Pack
-    needs: [posix-x86, wasm-wasi, apple-osx, bip340-metrics]
+    needs: [version, posix-x86, wasm-wasi, apple-osx, bip340-metrics]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
     steps:
     - name: download binary artifacts
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -216,7 +270,7 @@ jobs:
           release/apple-osx/*
           release/bip340-metrics/longfellow-zk_bip340_metrics.csv
           release/bip340-metrics/longfellow-zk_bip340_metrics.png
-        tag_name: ${{ needs.posix-x86.outputs.git_sha_short }}
+        tag_name: ${{ needs.version.outputs.release_tag }}
         draft: false
         prerelease: false
         generate_release_notes: true
