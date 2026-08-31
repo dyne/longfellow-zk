@@ -1,12 +1,14 @@
 use std::{env, fs};
 
 use core_algebra::{ec, AlgebraicField, Curve, Nat, SerializableField, SupportsU128Conversions, SupportsU64Conversions, GF2_16_BASIS_V1};
-use runtime_algebra::{gf2_128::Gf2_128Field, lch14::Lch14, lch14_reed_solomon::Lch14ReedSolomon, p256::P256Field, subfield::BinarySubfield, Interpolator, Q256Field, RuntimeNat, RuntimeSecp256r1, Subfield};
+use runtime_algebra::{gf2_128::Gf2_128Field, lch14::Lch14, lch14_reed_solomon::Lch14ReedSolomon, p256::P256Field, subfield::BinarySubfield, Interpolator, Q256Field, RuntimeNat, RuntimeSecp256r1, Subfield, SupportsSampling};
 use runtime_random::{RandomEngine, Transcript};
 use runtime_merkle::{commit as merkle_commit, open as merkle_open, verify as merkle_verify, verify_proof, Digest, MerkleHeap};
 use sha2::Digest as ShaDigest;
 use compile_algebra::p256::P256Field as CompileP256Field;
 use core_proto::{circuit::{Circuit as ProtoCircuit, RawCircuit, compute_id}, reader::CircuitReader, writer::CircuitWriter, FieldID, Layer, TermDelta};
+use runtime_ligero::{LigeroConfig, LigeroParam, LigeroProver, LigeroQuadraticConstraint, LigeroVerifier};
+use runtime_algebra::lch14_reed_solomon::Lch14InterpolatorFactory;
 
 fn record(out: &mut Vec<u8>, key: u32, value: &[u8]) {
     out.extend_from_slice(b"LFP2"); out.extend_from_slice(&[1, 1]);
@@ -94,5 +96,19 @@ fn main() {
     let circuit_reader = CircuitReader::new(&circuit_field, FieldID::P256);
     circuit_value.push(u8::from(circuit_reader.from_bytes(&lfc1, true).is_ok())); circuit_value.push(u8::from(circuit_reader.from_bytes(&lfc2, true).is_ok())); lfc2.push(0); circuit_value.push(u8::from(matches!(circuit_reader.from_bytes(&lfc2, true), Ok((_, remaining)) if remaining.is_empty()))); lfc2.pop(); lfc2.insert(4, 0x80); circuit_value.push(u8::from(circuit_reader.from_bytes(&lfc2, true).is_ok())); let mut truncated_lfc1 = lfc1.clone(); truncated_lfc1.pop(); circuit_value.push(u8::from(circuit_reader.from_bytes(&truncated_lfc1, true).is_ok())); let mut trailing_lfc1 = lfc1.clone(); trailing_lfc1.push(0); circuit_value.push(u8::from(matches!(circuit_reader.from_bytes(&trailing_lfc1, true), Ok((_, remaining)) if remaining.is_empty())));
     record(&mut out, 50, &circuit_value);
+    let ligero_interpolator = Lch14InterpolatorFactory::new(&gf, &subfield);
+    let ligero_geometry = LigeroParam::new(8, 2, LigeroConfig { rateinv: 4, nreq: 2, block_enc: 64 }, &ligero_interpolator);
+    record(&mut out, 60, &[ligero_geometry.geom.block as u8, ligero_geometry.geom.dblock as u8, ligero_geometry.geom.block_enc as u8, ligero_geometry.w as u8, ligero_geometry.geom.nrow as u8, ligero_geometry.geom.nreq as u8, ligero_geometry.geom.mc_pathlen as u8]);
+    let mut ligero_w: Vec<_> = (0..ligero_geometry.nw).map(|_| gf.sample(|count| merkle_rng.bytes(count))).collect();
+    let ligero_lqc: Vec<_> = (0..ligero_geometry.nq).map(|index| LigeroQuadraticConstraint { x: 0, y: 0, z: 2 * index + 1 }).collect();
+    for constraint in &ligero_lqc { ligero_w[constraint.z] = gf.mulf(&ligero_w[constraint.x], &ligero_w[constraint.y]); }
+    let mut ligero_transcript = Transcript::new(b"test");
+    let (ligero_prover, ligero_commitment) = LigeroProver::commit(0, &ligero_w, ligero_geometry, &mut ligero_transcript, &ligero_lqc, &ligero_interpolator, &mut merkle_rng, &gf, &subfield);
+    record(&mut out, 61, &ligero_commitment.root.data);
+    let ligero_b = vec![gf.zero()]; let ligero_statement = Digest { data: [0xba, 0xad, 0xf0, 0x0d, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] };
+    let ligero_proof = ligero_prover.prove(&ligero_b, &mut ligero_transcript, &[], &ligero_statement, &ligero_lqc, &ligero_interpolator, &gf);
+    let mut ligero_proof_value = ligero_commitment.root.data.to_vec(); ligero_proof_value.push(ligero_proof.merkle.path.len() as u8); record(&mut out, 62, &ligero_proof_value);
+    let ligero_verify_geometry = LigeroParam::new(8, 2, LigeroConfig { rateinv: 4, nreq: 2, block_enc: 64 }, &ligero_interpolator); let mut ligero_verify_transcript = Transcript::new(b"test"); let mut ligero_verifier = LigeroVerifier::new(&mut ligero_verify_transcript, &ligero_verify_geometry);
+    ligero_verifier.receive_commitment(&ligero_commitment); let ligero_ok = ligero_verifier.verify(&ligero_b, &ligero_commitment, &ligero_proof, &[], &ligero_statement, &ligero_lqc, &ligero_interpolator, &gf).is_ok(); let mut ligero_tampered = ligero_proof.clone(); ligero_tampered.merkle.path[0].data[0] ^= 1; let mut ligero_tampered_transcript = Transcript::new(b"test"); let mut ligero_tampered_verifier = LigeroVerifier::new(&mut ligero_tampered_transcript, &ligero_verify_geometry); ligero_tampered_verifier.receive_commitment(&ligero_commitment); let ligero_tampered_ok = ligero_tampered_verifier.verify(&ligero_b, &ligero_commitment, &ligero_tampered, &[], &ligero_statement, &ligero_lqc, &ligero_interpolator, &gf).is_ok(); record(&mut out, 63, &[u8::from(ligero_ok), u8::from(ligero_tampered_ok)]);
     if fs::write(&args[2], out).is_err() { std::process::exit(66); }
 }
