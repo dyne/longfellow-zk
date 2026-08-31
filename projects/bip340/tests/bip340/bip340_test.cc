@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <functional>
@@ -695,6 +696,21 @@ int main(int argc, char** argv) {
   try {
     const char* argv0 = argc > 0 ? argv[0] : "test/bip340_test";
     proofs::set_log_level(proofs::ERROR);
+    if (argc > 1) {
+      if (argc != 3 || std::strcmp(argv[1], "--profile") != 0) {
+        throw std::runtime_error("usage: bip340-test [--profile ITERATIONS]");
+      }
+      char* end = nullptr;
+      const unsigned long iterations = std::strtoul(argv[2], &end, 10);
+      if (end == argv[2] || *end != '\0' || iterations == 0) {
+        throw std::runtime_error("profile iterations must be a positive integer");
+      }
+      for (unsigned long i = 0; i < iterations; ++i) {
+        proofs::TestZkProverVerifierVector0(argv0);
+      }
+      std::cout << "profile workload completed " << iterations << " iterations\n";
+      return 0;
+    }
     proofs::Run("hex parser rejects malformed input", proofs::TestHexParser);
     proofs::Run("scalar evaluation accepts and rejects witnesses",
                 proofs::TestScalarEvaluation);

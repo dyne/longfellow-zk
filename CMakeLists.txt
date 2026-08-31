@@ -15,6 +15,7 @@ include(CTest)
 option(LONGFELLOW_ZK_BUILD_TESTING "Build Longfellow ZK qualification tests" ON)
 option(LONGFELLOW_ZK_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(LONGFELLOW_ZK_BUILD_GOOGLE_RUST_PARITY "Build the opt-in Google Rust parity C++ oracle" OFF)
+option(LONGFELLOW_ZK_BUILD_PROFILING "Build the opt-in profiling workloads" OFF)
 
 include(cmake/manifests/longfellow-zk-sources.cmake)
 include(cmake/manifests/longfellow-zk-public-headers.cmake)
@@ -56,6 +57,17 @@ if(LONGFELLOW_ZK_ENABLE_SANITIZERS)
   if(TARGET longfellow-zk-shared)
     target_link_options(longfellow-zk-shared INTERFACE -fsanitize=address,undefined)
   endif()
+endif()
+
+if(LONGFELLOW_ZK_BUILD_PROFILING)
+  if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "LONGFELLOW_ZK_BUILD_PROFILING currently requires GNU C++ on Linux")
+  endif()
+  if(NOT CMAKE_BUILD_TYPE MATCHES "^(Release|RelWithDebInfo)$")
+    message(WARNING "Profiling results are representative only with Release or RelWithDebInfo")
+  endif()
+  find_program(LONGFELLOW_ZK_GPROF_EXECUTABLE gprof REQUIRED)
+  find_program(LONGFELLOW_ZK_PERF_EXECUTABLE perf)
 endif()
 
 foreach(target longfellow-zk-objects ${LONGFELLOW_ZK_LIBRARY_TARGETS})
@@ -134,6 +146,73 @@ include(CPack)
 
 if(BUILD_TESTING AND LONGFELLOW_ZK_BUILD_TESTING)
   add_subdirectory(test/cmake)
+endif()
+
+if(LONGFELLOW_ZK_BUILD_PROFILING)
+  add_library(longfellow-zk-gprof-objects OBJECT EXCLUDE_FROM_ALL
+    ${LONGFELLOW_ZK_SOURCES})
+  set_target_properties(longfellow-zk-gprof-objects PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
+  target_compile_features(longfellow-zk-gprof-objects PUBLIC cxx_std_20)
+  target_include_directories(longfellow-zk-gprof-objects PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_compile_options(longfellow-zk-gprof-objects PRIVATE
+    -Wall -Wextra -Wpedantic -fno-strict-overflow
+    -fvisibility=hidden -fvisibility-inlines-hidden
+    -pg -fno-omit-frame-pointer)
+  add_library(longfellow-zk-gprof-static STATIC EXCLUDE_FROM_ALL
+    $<TARGET_OBJECTS:longfellow-zk-gprof-objects>)
+  target_compile_features(longfellow-zk-gprof-static PUBLIC cxx_std_20)
+  target_include_directories(longfellow-zk-gprof-static PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_link_options(longfellow-zk-gprof-static INTERFACE -pg)
+
+  add_executable(longfellow-zk-profile-bip340 EXCLUDE_FROM_ALL
+    projects/bip340/tests/bip340/bip340_test.cc)
+  target_include_directories(longfellow-zk-profile-bip340 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/projects/bip340/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/projects/bip340/tests/bip340)
+  target_link_libraries(longfellow-zk-profile-bip340 PRIVATE
+    longfellow-zk-gprof-static)
+  target_compile_options(longfellow-zk-profile-bip340 PRIVATE
+    -pg -fno-omit-frame-pointer)
+
+  set(LONGFELLOW_ZK_PROFILE_DIR "${CMAKE_CURRENT_BINARY_DIR}/profile")
+  set(LONGFELLOW_ZK_PROFILE_REPORT "${LONGFELLOW_ZK_PROFILE_DIR}/gprof.txt")
+  add_custom_target(longfellow-zk-profile
+    COMMAND ${CMAKE_COMMAND}
+      -DPROFILE_PROGRAM=$<TARGET_FILE:longfellow-zk-profile-bip340>
+      -DGPROF_PROGRAM=${LONGFELLOW_ZK_GPROF_EXECUTABLE}
+      -DPROFILE_DIR=${LONGFELLOW_ZK_PROFILE_DIR}
+      -DPROFILE_REPORT=${LONGFELLOW_ZK_PROFILE_REPORT}
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_gprof.cmake
+    DEPENDS longfellow-zk-profile-bip340
+    COMMENT "Profiling the BIP-340 end-to-end workload"
+    VERBATIM)
+
+  if(LONGFELLOW_ZK_PERF_EXECUTABLE)
+    add_executable(longfellow-zk-profile-bip340-perf EXCLUDE_FROM_ALL
+      projects/bip340/tests/bip340/bip340_test.cc)
+    target_include_directories(longfellow-zk-profile-bip340-perf PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/projects/bip340/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/projects/bip340/tests/bip340)
+    target_link_libraries(longfellow-zk-profile-bip340-perf PRIVATE
+      LongfellowZK::static)
+    target_compile_options(longfellow-zk-profile-bip340-perf PRIVATE
+      -fno-omit-frame-pointer)
+
+    set(LONGFELLOW_ZK_PERF_REPORT "${LONGFELLOW_ZK_PROFILE_DIR}/perf-report.txt")
+    add_custom_target(longfellow-zk-profile-perf
+      COMMAND ${CMAKE_COMMAND}
+        -DPROFILE_PROGRAM=$<TARGET_FILE:longfellow-zk-profile-bip340-perf>
+        -DPERF_PROGRAM=${LONGFELLOW_ZK_PERF_EXECUTABLE}
+        -DPROFILE_DIR=${LONGFELLOW_ZK_PROFILE_DIR}
+        -DPROFILE_REPORT=${LONGFELLOW_ZK_PERF_REPORT}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_perf.cmake
+      DEPENDS longfellow-zk-profile-bip340-perf
+      COMMENT "Sampling the BIP-340 end-to-end workload with perf"
+      VERBATIM)
+  endif()
 endif()
 
 # This target is deliberately opt-in and omitted from install/export rules.  The
