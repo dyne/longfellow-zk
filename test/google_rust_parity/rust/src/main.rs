@@ -5,6 +5,8 @@ use runtime_algebra::{gf2_128::Gf2_128Field, lch14::Lch14, lch14_reed_solomon::L
 use runtime_random::{RandomEngine, Transcript};
 use runtime_merkle::{commit as merkle_commit, open as merkle_open, verify as merkle_verify, verify_proof, Digest, MerkleHeap};
 use sha2::Digest as ShaDigest;
+use compile_algebra::p256::P256Field as CompileP256Field;
+use core_proto::{circuit::{Circuit as ProtoCircuit, RawCircuit, compute_id}, reader::CircuitReader, writer::CircuitWriter, FieldID, Layer, TermDelta};
 
 fn record(out: &mut Vec<u8>, key: u32, value: &[u8]) {
     out.extend_from_slice(b"LFP2"); out.extend_from_slice(&[1, 1]);
@@ -82,5 +84,15 @@ fn main() {
     commitment_proof.path.push(Digest::default());
     commitment_value.push(u8::from(merkle_verify(4, &commitment_root, &commitment_positions, &commitment_proof, |_r, _index, sha| sha.update([0xa5, 0x5a])).is_ok()));
     record(&mut out, 42, &commitment_value);
+    let circuit_field = CompileP256Field::new();
+    let raw = RawCircuit { ninput: 2, npublic_input: 1, noutput: 2, logv: 1, subfield_boundary: 1,
+        constants: vec![circuit_field.one(), circuit_field.zero()],
+        layers: vec![Layer::new(2, 1, vec![TermDelta { g: 0, h: [0, 1], k_index: 0 }, TermDelta { g: 1, h: [1, 0], k_index: 1 }], vec![vec![0, 1]], vec![0])] };
+    let circuit = ProtoCircuit { id: compute_id(&circuit_field, &raw), raw };
+    let circuit_writer = CircuitWriter::new(&circuit_field, FieldID::P256); let lfc1 = circuit_writer.to_bytes_lfc1(&circuit); let mut lfc2 = circuit_writer.to_bytes_lfc2(&circuit);
+    let mut circuit_value = lfc1.clone(); circuit_value.extend(&lfc2); circuit_value.extend(circuit.id);
+    let circuit_reader = CircuitReader::new(&circuit_field, FieldID::P256);
+    circuit_value.push(u8::from(circuit_reader.from_bytes(&lfc1, true).is_ok())); circuit_value.push(u8::from(circuit_reader.from_bytes(&lfc2, true).is_ok())); lfc2.push(0); circuit_value.push(u8::from(matches!(circuit_reader.from_bytes(&lfc2, true), Ok((_, remaining)) if remaining.is_empty()))); lfc2.pop(); lfc2.insert(4, 0x80); circuit_value.push(u8::from(circuit_reader.from_bytes(&lfc2, true).is_ok())); let mut truncated_lfc1 = lfc1.clone(); truncated_lfc1.pop(); circuit_value.push(u8::from(circuit_reader.from_bytes(&truncated_lfc1, true).is_ok())); let mut trailing_lfc1 = lfc1.clone(); trailing_lfc1.push(0); circuit_value.push(u8::from(matches!(circuit_reader.from_bytes(&trailing_lfc1, true), Ok((_, remaining)) if remaining.is_empty())));
+    record(&mut out, 50, &circuit_value);
     if fs::write(&args[2], out).is_err() { std::process::exit(66); }
 }
