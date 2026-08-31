@@ -12,3 +12,5 @@ util = { path = "../../../vendor/longfellow-zk/rust/util" }
 core-algebra = { path = "../../../vendor/longfellow-zk/rust/core/algebra" }
 runtime-algebra = { path = "../../../vendor/longfellow-zk/rust/runtime/algebra" }
 runtime-random = { path = "../../../vendor/longfellow-zk/rust/runtime/random" }
+runtime-merkle = { path = "../../../vendor/longfellow-zk/rust/runtime/merkle" }
+sha2 = "0.10.8"

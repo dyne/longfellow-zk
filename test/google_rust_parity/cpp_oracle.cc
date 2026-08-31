@@ -7,6 +7,7 @@
 #include "gf2k/gf2_128.h"
 #include "gf2k/lch14.h"
 #include "gf2k/lch14_reed_solomon.h"
+#include "merkle/merkle_commitment.h"
 #include "random/transcript.h"
 
 namespace {
@@ -24,6 +25,17 @@ std::vector<uint8_t> draw(proofs::Transcript& t, size_t n) {
 void append(std::vector<uint8_t>& to, const std::vector<uint8_t>& from) {
   to.insert(to.end(), from.begin(), from.end());
 }
+void append_digest(std::vector<uint8_t>& out, const proofs::Digest& digest) {
+  out.insert(out.end(), digest.data, digest.data + proofs::Digest::kLength);
+}
+class CounterRng final : public proofs::RandomEngine {
+ public:
+  void bytes(uint8_t* out, size_t count) override {
+    for (size_t index = 0; index != count; ++index) out[index] = next_++;
+  }
+ private:
+  uint8_t next_ = 0;
+};
 template <class Field>
 void append_field(std::vector<uint8_t>& out, const Field& field,
                   const typename Field::Elt& value) {
@@ -102,5 +114,42 @@ int main(int argc, char** argv) {
   auto seeded = proofs::p256.scalar_multf(proofs::p256.generator(), proofs::P256::N("0x123456789abcdef00112233445566778899aabbccddeeff0011223344556677")); proofs::p256.normalize(seeded); std::vector<uint8_t> seeded_curve; append_field(seeded_curve, proofs::p256_base, seeded.x); append_field(seeded_curve, proofs::p256_base, seeded.y); record(output, 33, seeded_curve);
   auto negative = proofs::p256.generator(); proofs::p256_base.neg(negative.y); std::vector<uint8_t> curve_law; proofs::p256.normalize(negative); append_field(curve_law, proofs::p256_base, negative.x); append_field(curve_law, proofs::p256_base, negative.y); record(output, 31, curve_law);
   const auto identity = proofs::p256.zero(); record(output, 34, {static_cast<uint8_t>(proofs::p256.zerop(identity))});
+  for (const auto count : {size_t{4}, size_t{5}}) {
+    proofs::MerkleTree tree(count);
+    std::vector<proofs::Digest> leaves(count);
+    for (size_t index = 0; index != count; ++index) {
+      leaves[index].data[0] = static_cast<uint8_t>(index + 1);
+      tree.set_leaf(index, leaves[index]);
+    }
+    const auto root = tree.build_tree();
+    const std::array<size_t, 2> positions = {1, count - 1};
+    std::array<proofs::Digest, 2> opened = {leaves[positions[0]], leaves[positions[1]]};
+    std::vector<proofs::Digest> proof;
+    tree.generate_compressed_proof(proof, positions.data(), positions.size());
+    std::vector<uint8_t> value; append_digest(value, root);
+    for (const auto& node : proof) append_digest(value, node);
+    const proofs::MerkleTreeVerifier verifier(count, root);
+    value.push_back(static_cast<uint8_t>(verifier.verify_compressed_proof(proof.data(), proof.size(), opened.data(), positions.data(), positions.size())));
+    proof.push_back(proofs::Digest{});
+    value.push_back(static_cast<uint8_t>(verifier.verify_compressed_proof(proof.data(), proof.size(), opened.data(), positions.data(), positions.size())));
+    record(output, count == 4 ? 40 : 41, value);
+  }
+  CounterRng merkle_rng;
+  proofs::MerkleCommitment commitment(4);
+  const auto commitment_root = commitment.commit([](size_t, proofs::SHA256& sha) {
+    const std::array<uint8_t, 2> leaf = {0xa5, 0x5a};
+    sha.Update(leaf.data(), leaf.size());
+  }, merkle_rng);
+  const std::array<size_t, 2> commitment_positions = {1, 3};
+  proofs::MerkleProof commitment_proof(commitment_positions.size());
+  commitment.open(commitment_proof, commitment_positions.data(), commitment_positions.size());
+  std::vector<uint8_t> commitment_value; append_digest(commitment_value, commitment_root);
+  for (const auto& nonce : commitment_proof.nonce) commitment_value.insert(commitment_value.end(), nonce.bytes, nonce.bytes + proofs::MerkleNonce::kLength);
+  for (const auto& node : commitment_proof.path) append_digest(commitment_value, node);
+  const auto update_commitment = [](size_t, proofs::SHA256& sha) { const std::array<uint8_t, 2> leaf = {0xa5, 0x5a}; sha.Update(leaf.data(), leaf.size()); };
+  commitment_value.push_back(static_cast<uint8_t>(proofs::MerkleCommitmentVerifier::verify(4, commitment_root, commitment_proof, commitment_positions.data(), commitment_positions.size(), update_commitment)));
+  commitment_proof.path.push_back(proofs::Digest{});
+  commitment_value.push_back(static_cast<uint8_t>(proofs::MerkleCommitmentVerifier::verify(4, commitment_root, commitment_proof, commitment_positions.data(), commitment_positions.size(), update_commitment)));
+  record(output, 42, commitment_value);
   return output ? 0 : 66;
 }
