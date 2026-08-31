@@ -83,3 +83,9 @@ bash scripts/ci-installed-package.sh
 ```
 
 See [Packaging](packaging.md) for target names and release artifacts.
+
+## Optional Google Rust parity
+
+The pinned Google Rust comparison is a manual developer command, not a normal
+build requirement. See [Optional Google Rust parity](google-rust-parity.md) for
+its prerequisites, safe submodule bootstrap contract, and coverage boundary.
