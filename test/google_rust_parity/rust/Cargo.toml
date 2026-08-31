@@ -1,0 +1,11 @@
+[package]
+name = "google-rust-parity-oracle"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Keep any upstream dependency explicitly path-pinned under the configured
+# submodule; later parity records can use this crate without changing Cargo's
+# source selection.
+[dependencies]
+util = { path = "../../../vendor/longfellow-zk/rust/util" }

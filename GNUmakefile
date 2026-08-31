@@ -2,7 +2,7 @@
 # compiler flags, link steps, installation and test registration.
 .DEFAULT_GOAL := all
 
-.PHONY: all build test install package clean debug sanitizers wasm posix osx-arm64 qualification-matrix help
+.PHONY: all build test install package clean debug sanitizers wasm posix osx-arm64 qualification-matrix google-rust-parity help
 
 all build posix:
 	cmake --preset release
@@ -40,8 +40,12 @@ osx-arm64:
 qualification-matrix:
 	bash scripts/ci-installed-package.sh
 
+google-rust-parity:
+	bash scripts/google_rust_parity.sh
+
 clean:
 	cmake -E rm -rf build
 
 help:
 	@echo "Deprecated Make compatibility front-end: use cmake --preset <release|debug|sanitizers|wasi>."
+	@echo "google-rust-parity: opt-in pinned Google C++/Rust parity harness."
