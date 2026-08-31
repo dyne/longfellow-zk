@@ -8,8 +8,9 @@ description: Run and interpret the opt-in comparison against the pinned Google R
 `make google-rust-parity` is an opt-in developer qualification command. It
 compares bounded, deterministic records produced by this repository's C++
 implementation and the Google Rust implementation at the gitlink pinned in
-`vendor/longfellow-zk`. It is not part of the normal build, CTest, install,
-package, consumer, or release-qualification matrix.
+`vendor/longfellow-zk`. CI runs it as a dedicated `Google Rust parity` job;
+it is not folded into the normal build, CTest, install, package, consumer, or
+release-qualification matrix.
 
 ## Run it
 
