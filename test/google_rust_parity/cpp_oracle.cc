@@ -8,7 +8,10 @@
 #include "gf2k/lch14.h"
 #include "gf2k/lch14_reed_solomon.h"
 #include "merkle/merkle_commitment.h"
+#include "proto/circuit_reader.h"
+#include "proto/circuit_writer.h"
 #include "random/transcript.h"
+#include "sumcheck/quad_builder.h"
 
 namespace {
 void u32(std::ofstream& out, uint32_t value) {
@@ -36,6 +39,18 @@ class CounterRng final : public proofs::RandomEngine {
  private:
   uint8_t next_ = 0;
 };
+proofs::Circuit<proofs::Fp256Base> CircuitFixture() {
+  proofs::EQuad<proofs::Fp256Base> terms(2);
+  terms.ec_[0] = {0, {0, 1}, proofs::p256_base.one()};
+  terms.ec_[1] = {1, {1, 1}, proofs::p256_base.zero()};
+  terms.canonicalize(proofs::p256_base);
+  proofs::Circuit<proofs::Fp256Base> circuit{};
+  circuit.nv = 2; circuit.logv = 1; circuit.nc = 1; circuit.logc = 0;
+  circuit.nl = 1; circuit.npub_in = 1; circuit.subfield_boundary = 1; circuit.ninputs = 2;
+  circuit.l.push_back({2, 1, proofs::QuadBuilder<proofs::Fp256Base>::compress(&terms, proofs::p256_base)});
+  proofs::circuit_id(circuit.id, circuit, proofs::p256_base);
+  return circuit;
+}
 template <class Field>
 void append_field(std::vector<uint8_t>& out, const Field& field,
                   const typename Field::Elt& value) {
@@ -151,5 +166,16 @@ int main(int argc, char** argv) {
   commitment_proof.path.push_back(proofs::Digest{});
   commitment_value.push_back(static_cast<uint8_t>(proofs::MerkleCommitmentVerifier::verify(4, commitment_root, commitment_proof, commitment_positions.data(), commitment_positions.size(), update_commitment)));
   record(output, 42, commitment_value);
+  const auto circuit = CircuitFixture();
+  proofs::CircuitWriter<proofs::Fp256Base> circuit_writer(proofs::p256_base, proofs::P256_ID);
+  std::vector<uint8_t> lfc1, lfc2; circuit_writer.to_bytes(circuit, lfc1); circuit_writer.to_bytes(circuit, lfc2, proofs::CircuitFormat::kLfc2);
+  std::vector<uint8_t> circuit_value = lfc1; append(circuit_value, lfc2); circuit_value.insert(circuit_value.end(), circuit.id, circuit.id + proofs::CircuitIO::kIdSize);
+  proofs::ByteCursor lfc1_cursor(lfc1.data(), lfc1.size()), lfc2_cursor(lfc2.data(), lfc2.size()); proofs::CircuitReader<proofs::Fp256Base> circuit_reader(proofs::p256_base, proofs::P256_ID);
+  circuit_value.push_back(static_cast<uint8_t>(circuit_reader.from_bytes(lfc1_cursor, true) != nullptr)); circuit_value.push_back(static_cast<uint8_t>(circuit_reader.from_bytes(lfc2_cursor, true) != nullptr));
+  lfc2.push_back(0); proofs::ByteCursor trailing(lfc2.data(), lfc2.size()); circuit_value.push_back(static_cast<uint8_t>(circuit_reader.from_bytes(trailing, true) != nullptr));
+  lfc2.pop_back(); lfc2.insert(lfc2.begin() + 4, 0x80); proofs::ByteCursor nonminimal(lfc2.data(), lfc2.size()); circuit_value.push_back(static_cast<uint8_t>(circuit_reader.from_bytes(nonminimal, true) != nullptr));
+  auto truncated_lfc1 = lfc1; truncated_lfc1.pop_back(); proofs::ByteCursor truncated_lfc1_cursor(truncated_lfc1.data(), truncated_lfc1.size()); circuit_value.push_back(static_cast<uint8_t>(circuit_reader.from_bytes(truncated_lfc1_cursor, true) != nullptr));
+  auto trailing_lfc1 = lfc1; trailing_lfc1.push_back(0); proofs::ByteCursor trailing_lfc1_cursor(trailing_lfc1.data(), trailing_lfc1.size()); circuit_value.push_back(static_cast<uint8_t>(circuit_reader.from_bytes(trailing_lfc1_cursor, true) != nullptr));
+  record(output, 50, circuit_value);
   return output ? 0 : 66;
 }
