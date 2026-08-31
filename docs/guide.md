@@ -19,6 +19,7 @@ ECDSA, and BIP340.
 | Integrating C++ or WASM | [Getting started](getting-started.md) | [API and ABI](api.md) |
 | Reviewing the cryptography | [Architecture](architecture.md) | [Specifications](specifications/index.md) |
 | Maintaining a release | [Packaging](packaging.md) | [Production qualification](production-qualification.md) |
+| Comparing with Google Rust | [Optional parity suite](google-rust-parity.md) | [Interoperability](interoperability.md) |
 
 ## What it is
 
