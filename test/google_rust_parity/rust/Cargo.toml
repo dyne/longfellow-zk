@@ -9,3 +9,6 @@ publish = false
 # source selection.
 [dependencies]
 util = { path = "../../../vendor/longfellow-zk/rust/util" }
+core-algebra = { path = "../../../vendor/longfellow-zk/rust/core/algebra" }
+runtime-algebra = { path = "../../../vendor/longfellow-zk/rust/runtime/algebra" }
+runtime-random = { path = "../../../vendor/longfellow-zk/rust/runtime/random" }
