@@ -57,6 +57,22 @@ jobs:
     outputs:
        git_sha_short: ${{ steps.sha.outputs.git_sha_short }}
 
+  google-rust-parity:
+    name: Google Rust parity
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    - uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+    - name: Cache APT packages
+      uses: awalsh128/cache-apt-pkgs-action@553a35bb8ebd9fcabcb1c9451aa4c98e1b4ca8a9 # v1.6.3
+      with:
+        packages: "build-essential cmake make python3"
+    - name: Compare pinned Google Rust primitives
+      run: CCACHE_BASEDIR="$PWD" make google-rust-parity
+
   wasm-wasi:
     name: Build & Test on WASM WASI
     runs-on: ubuntu-latest
