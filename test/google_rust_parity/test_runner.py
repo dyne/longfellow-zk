@@ -27,4 +27,8 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(set(range(20, 25)), set(range(20, 25)))
         self.assertEqual(set(range(30, 35)), set(range(30, 35)))
 
+    def test_every_emitted_case_has_a_stable_display_name(self):
+        expected = set(range(1, 7)) | set(range(10, 16)) | set(range(20, 26)) | set(range(30, 36)) | set(range(40, 43)) | {50, 60, 61, 62, 63, 70}
+        self.assertEqual(set(runner.CASE_NAMES), expected)
+
 if __name__ == "__main__": unittest.main()

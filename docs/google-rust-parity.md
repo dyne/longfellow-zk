@@ -45,10 +45,18 @@ rerun when the submodule and cache remain available. Remove the selected build
 and Cargo-target directories to clean parity artifacts; do not remove or edit
 the submodule to clean them.
 
-The success output includes the exact Google gitlink and record count. On a
-drift, it identifies the primitive subset, case ID, pinned commit, and the two
-normalized outcomes. It intentionally does not print witnesses, proofs,
-language-specific exception text, addresses, or timings.
+The success output lists every validated record with its stable case name,
+canonical value length, normalized outcome, exact Google gitlink, and record
+count. Add `GOOGLE_RUST_PARITY_TIMINGS=1` to display non-normative elapsed
+time for each oracle:
+
+```sh
+GOOGLE_RUST_PARITY_TIMINGS=1 make google-rust-parity
+```
+
+On a drift, it identifies the primitive subset, case ID, pinned commit, and the
+two normalized outcomes. It intentionally does not print witnesses, proofs,
+language-specific exception text, or addresses.
 
 ## What a passing comparison means
 
