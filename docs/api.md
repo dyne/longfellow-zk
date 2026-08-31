@@ -9,6 +9,9 @@ Longfellow-ZK exposes three distinct integration surfaces: installed C++ CMake
 targets, explicitly exported dynamic-link symbols, and application-specific C
 or WASM adapters.
 
+For a new integration, use an installed CMake target and public installed
+headers. Do not treat source paths, build paths, or unexported symbols as API.
+
 ## Installed C++ targets
 
 | Package | Target | Kind |
@@ -60,3 +63,7 @@ Pin the library version, named-project version, circuit ID, ZK specification
 index, wire format, and test vectors together. A compatible C++ call signature
 alone does not establish protocol compatibility.
 :::
+
+If the supported boundary does not cover an integration or platform need,
+contact [info@dyne.org](mailto:info@dyne.org) before depending on an internal
+surface.

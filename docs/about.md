@@ -31,15 +31,17 @@ Architecture and Reference Framework. It is supported by EU Horizon grant
 
 - [Dyne distribution](https://github.com/dyne/longfellow-zk)
 - [Google upstream](https://github.com/google/longfellow-zk)
-- [Apache License 2.0](https://github.com/dyne/longfellow-zk/blob/main/LICENSE)
-- Contributions may be submitted under MIT and/or Apache-2.0 terms, following
-  repository policy.
+- [GNU General Public License, version 3 or later](https://github.com/dyne/longfellow-zk/blob/main/LICENSE)
 
-The upstream code remains identifiable in the vendored submodule. Dyne-owned
-additions carry their own copyright notices.
+This distribution is free to use, study, modify, and redistribute. Software
+distributed using the library must be released under the same GPL terms and
+with corresponding source. The upstream code remains identifiable, and files
+inherited under compatible licenses retain their original copyright and license
+notices.
 
-## Documentation layers
+## Contact
 
-This website distinguishes explanatory guides, current integration pages,
-maintainer compatibility records, and upstream specification mirrors. The
-mirror's source of truth remains the vendored upstream directory.
+Contact [info@dyne.org](mailto:info@dyne.org) for adoption and packaging
+support, security coordination, contributions, or licensing needs. If the GPL
+does not fit a particular requirement, talk to us and we will work toward a
+suitable solution.

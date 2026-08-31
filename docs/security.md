@@ -10,6 +10,11 @@ build artifacts, application integration, and operational environment. Passing
 the repository's release gates is necessary evidence, not a universal safety
 certificate.
 
+For security reports or private coordination, contact
+[info@dyne.org](mailto:info@dyne.org). Include the affected revision, platform,
+and a minimal reproduction when possible; do not include real witnesses or
+other user secrets.
+
 ## Protocol assumptions
 
 - Collision-resistant hashes and secure transcript domain separation.

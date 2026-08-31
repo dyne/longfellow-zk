@@ -1,39 +1,76 @@
-# Longfellow-ZK - made in Europe
+# Longfellow-ZK
 
-Longfellow-ZK is a **Zero Knowledge** circuit [system developed by engineers at Google](https://github.com/google/longfellow-zk) and specifically designed to create ad-hoc ZK circuits that can be executed at competitive speed both for presenting and verifying proofs. Here is [our independent benchmark](https://news.dyne.org/longfellow-zero-knowledge-google-zk/) and the results are impressive.
+Longfellow-ZK is a community-maintained C++20 library for building and
+verifying zero-knowledge proofs. This Dyne.org distribution turns Google's
+[Longfellow-ZK](https://github.com/google/longfellow-zk) work into a reusable,
+installable base library, with separate ECDSA, BIP340, and mdoc packages.
 
-This repository is a soft fork of [Google's Longfellow-ZK library](https://github.com/google/longfellow-zk), it is made in **Europe** and maintained by the **Dyne.org foundation**, based in Amsterdam to best serve the purposes of the [EUDI ARF development](https://github.com/eu-digital-identity-wallet/eudi-doc-architecture-and-reference-framework).
+Use it when you need the proof system in a native, mobile, or WebAssembly
+project without depending on a proprietary operating-system API. The project
+is pre-1.0 cryptographic software; read the
+[security boundaries](docs/security.md) before production use.
 
-Our effort is currently supported by the EU HORIZON grant nr.[101132610](https://cordis.europa.eu/project/id/101132610) (PACESETTERS).
+## Choose your path
 
-[![PACESETTERS project](/docs/eurobuild_card.jpg)](https://pacesetters.eu)
+- **Building on the library?** Start with [Getting started](docs/getting-started.md),
+  then use the supported [API and ABI](docs/api.md) surface. The installed CMake
+  package is the integration boundary.
+- **Maintaining a distribution package?** Start with
+  [Packaging](docs/packaging.md) for dependencies, install layout, package
+  splits, ABI policy, and release checks.
+- **Evaluating the protocol?** Read the [architecture](docs/architecture.md),
+  [specification map](docs/specifications/index.md), and
+  [security guidance](docs/security.md).
 
-## Purpose and strategy
+## Build, test, and install
 
-This is **the community maintained Longfellow-ZK C++ implementation**. It doesn't depend from the Google Play API and **grants freedom of choice for mobile OS**, whilst solving a [privacy problem impacting the use of ZK](https://news.dyne.org/privacy-in-eudi).
+Requirements: a C++20 compiler, CMake 3.20 or newer, Ninja, and Git.
 
-Is is also fully portable to **WebAssembly (WASM) builds**, native mobile environments (Android and iOS) and adds usable command-line tools (CLI) for testing purposes.
+```sh
+git clone --recurse-submodules https://github.com/dyne/longfellow-zk.git
+cd longfellow-zk
+cmake --preset release
+cmake --build --preset release --parallel
+ctest --preset release
+cmake --install build/release --prefix /path/to/prefix
+```
 
-## References
-- [Anonymous credentials from ECDSA](https://eprint.iacr.org/2024/2010)
-- [libzk: A C++ Library for Zero-Knowledge Proofs](https://datatracker.ietf.org/doc/draft-google-cfrg-libzk/)
-- [Independent benchmark at Dyne.org](https://news.dyne.org/longfellow-zero-knowledge-google-zk/)
-- [Privacy analysis on integration](https://news.dyne.org/privacy-in-eudi) explaining why one should never use a ZK library via OS API.
+Consume the installed package from CMake:
 
-## Known implementations
+```cmake
+find_package(LongfellowZK CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE LongfellowZK::shared) # or ::static
+```
 
-- Upstream Longfellow-zk: https://github.com/google/longfellow-zk
-- ZKCC: Circuit Compiler DSL inside Zenroom VM: https://zenroom.org
-- EUDI-zk: EUDI compliant implementation journeys and [specifications](https://github.com/MyNextID/eudi-zk/tree/main/specs)
-- Multipaz https://github.com/openwallet-foundation/multipaz API library by Google and OWF
-- Rust: https://github.com/abetterinternet/zk-cred-longfellow experimental port by ISRG
+Set `CMAKE_PREFIX_PATH` when installing to a non-system prefix. Do not depend on
+source-tree or build-tree include paths. See [Getting started](docs/getting-started.md)
+for a complete consumer example and WASI instructions.
 
-## Licensing
+## Packages
 
-The upstream Google implementation is mostly left untouched in this distribution and it is licensed as **Apache 2.0**.
+| Package | CMake target | Purpose |
+| --- | --- | --- |
+| `LongfellowZK` | `LongfellowZK::shared` or `LongfellowZK::static` | Base proof system and generic circuits |
+| `LongfellowZKECDSA` | `LongfellowZKECDSA::ecdsa` | ECDSA circuit headers |
+| `LongfellowZKBIP340` | `LongfellowZKBIP340::bip340` | BIP340 circuit headers |
+| `LongfellowZKMDoc` | `LongfellowZKMDoc::mdoc` | mdoc library and command-line tool |
 
-Some additional code is Copyright (C) by the Dyne.org foundation is also licensed as **Apache 2.0**.
+The named projects consume an installed base package and can be packaged
+independently. They are not part of the base library's public boundary.
 
-Everyone is welcome to submit patches under MIT and/or Apache 2.0 licenses.
+## License and support
 
-![Funded by the European Union](https://www.pacesetters.eu/sites/default/files/inline-images/EN_FundedbytheEU_RGB_POS.png)
+This distribution is free software under the
+[GNU General Public License, version 3 or later](LICENSE). You may use, study,
+modify, and redistribute it. If you distribute software that uses this library,
+you must release that software under the same GPL terms and provide its
+corresponding source. Files inherited from upstream retain their original
+copyright and license notices.
+
+For integration and packaging support, security coordination, or licensing
+needs that the GPL does not accommodate, contact [info@dyne.org](mailto:info@dyne.org).
+We will work with you toward a suitable solution.
+
+Longfellow-ZK is maintained by the [Dyne.org foundation](https://dyne.org) with
+support from EU Horizon grant 101132610 through
+[PACESETTERS](https://pacesetters.eu).

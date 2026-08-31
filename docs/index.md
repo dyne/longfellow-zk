@@ -8,14 +8,14 @@ hero:
   tagline: "A community-maintained C++ zero-knowledge system for existing identity and signature infrastructure — portable across native, mobile, and WebAssembly environments."
   actions:
     - theme: brand
-      text: Understand the idea
-      link: /zero-knowledge
-    - theme: alt
-      text: Explore use cases
-      link: /use-cases
-    - theme: alt
-      text: Build from source
+      text: Integrate the library
       link: /getting-started
+    - theme: alt
+      text: Package for a distribution
+      link: /packaging
+    - theme: alt
+      text: Understand the design
+      link: /architecture
 features:
   - title: "Selective disclosure"
     details: "Show that a credential supports a claim without exposing every field in the credential."
@@ -31,14 +31,14 @@ features:
     link: /getting-started
 ---
 
-## One project, three ways in
+## Start with the artifact you need to ship
 
-You do not need to be a cryptographer to understand why Longfellow-ZK exists.
-Start with [zero-knowledge in plain language](zero-knowledge.md) and the
-[problems it can solve](use-cases.md). Implementers can move directly to the
-[mdoc, ECDSA, and BIP340 reference projects](projects/index.md). Protocol
-reviewers can follow the [specification map](specifications/index.md) into the
-full draft algorithms and test vectors.
+Application developers should follow [Getting started](getting-started.md) to
+install and consume the base CMake package, then choose an
+[ECDSA, BIP340, or mdoc package](projects/index.md). Distribution maintainers
+should use the [packaging recipe](packaging.md) and [0.x ABI policy](abi.md).
+Protocol reviewers can follow the [specification map](specifications/index.md)
+into the algorithms and test vectors.
 
 ## Why Dyne maintains this distribution
 
@@ -54,5 +54,8 @@ Longfellow-ZK is pre-1.0 software and active cryptographic engineering. Read the
 deployment. Documentation, test matrices, and external reviews are evidence;
 they are not a substitute for a use-case-specific security assessment.
 :::
+
+Longfellow-ZK is GPL-3.0-or-later free software. For integration, distribution,
+security, or licensing questions, contact [info@dyne.org](mailto:info@dyne.org).
 
 [![PACESETTERS project, funded by the European Union](/project/eurobuild-card.jpg)](https://pacesetters.eu)

@@ -5,87 +5,94 @@ description: Clone, build, test, install, and consume Longfellow-ZK on native an
 
 # Getting started
 
-## Prerequisites
+This is the shortest supported path from a checkout to an application that
+links an installed Longfellow-ZK package.
 
-Use a C++20 compiler, CMake 3.20 or newer, and Git with submodule support. Ninja
-is used by the supplied presets. Project-specific builds may also require zstd,
-Node.js for WASM smoke tests, Rust for interoperability checks, or a WASI SDK.
+## 1. Build and test the base library
+
+Install a C++20 compiler, CMake 3.20 or newer, Ninja, and Git, then run:
 
 ```sh
 git clone --recurse-submodules https://github.com/dyne/longfellow-zk.git
 cd longfellow-zk
-```
-
-If the repository was cloned without submodules:
-
-```sh
-git submodule update --init --recursive
-```
-
-## Native build and tests
-
-```sh
 cmake --preset release
 cmake --build --preset release --parallel
 ctest --preset release
 ```
 
-For development, use `debug`. To exercise AddressSanitizer and
-UndefinedBehaviorSanitizer with GCC or Clang:
+Use the `debug` preset for development or `sanitizers` with GCC or Clang for
+AddressSanitizer and UndefinedBehaviorSanitizer coverage. The `GNUmakefile` is a
+compatibility front-end; CMake presets define the supported build contract.
 
-```sh
-cmake --preset sanitizers
-cmake --build --preset sanitizers --parallel
-ctest --preset sanitizers
-```
-
-The `GNUmakefile` remains a compatibility front-end (`make`, `make test`,
-`make sanitizers`, `make wasm`), but CMake presets own the build contract.
-
-## Install and consume
+## 2. Install to a staging prefix
 
 ```sh
 cmake --install build/release --prefix "$PWD/build/prefix"
 ```
 
+The prefix now contains the static and versioned shared libraries, public
+headers under `include/longfellow-zk/`, and relocatable CMake package files.
+
+## 3. Consume the installed package
+
+In your application's `CMakeLists.txt`:
+
 ```cmake
+cmake_minimum_required(VERSION 3.20)
+project(example LANGUAGES CXX)
+
 find_package(LongfellowZK CONFIG REQUIRED)
-add_executable(app app.cc)
-target_link_libraries(app PRIVATE LongfellowZK::shared) # or ::static
+add_executable(example main.cc)
+target_link_libraries(example PRIVATE LongfellowZK::shared) # or ::static
 ```
 
-Configure the consumer with
-`-DCMAKE_PREFIX_PATH=/absolute/path/to/build/prefix`. Do not add source or build
-directories as include paths; the installed package is designed to be
-relocatable.
+A minimal compile check can include a generic circuit from the base package:
+
+```cpp
+#include <circuits/merkle/fixed_depth_sha256_merkle_membership.h>
+
+int main() {
+  constexpr proofs::FixedDepthSha256MerklePath<0> path{};
+  return path.direction_bits.size();
+}
+```
+
+Configure and run it against the staged installation:
+
+```sh
+cmake -S /path/to/example -B /path/to/example/build \
+  -DCMAKE_PREFIX_PATH="$PWD/build/prefix"
+cmake --build /path/to/example/build
+/path/to/example/build/example
+```
+
+Use an absolute prefix. Do not add this repository's `src/`, `projects/`, or
+build directories to consumer include or link paths. For a shared build, use
+your platform's normal loader configuration or application rpath.
+
+## Add an application circuit
+
+ECDSA, BIP340, and mdoc are separate packages layered on the installed base.
+Choose the relevant [named project](projects/index.md); do not copy its headers
+into the base include tree. The [packaging guide](packaging.md) gives the
+canonical configure order and target names.
 
 ## WASI / WebAssembly
 
-Set `WASI_SDK_PATH` if the SDK is not installed at `/opt/wasi-sdk`, then use the
-WASI preset:
+Set `WASI_SDK_PATH` if the SDK is not at `/opt/wasi-sdk`:
 
 ```sh
 WASI_SDK_PATH=/path/to/wasi-sdk cmake --preset wasi
 cmake --build --preset wasi --parallel
 ```
 
-WASI produces the static base library and a reactor-style smoke module. The
-configuration does not claim that native CTest executables can run inside WASI.
+This builds the static base library and a reactor-style smoke module. Native
+CTest executables are not run under WASI. Node.js is needed only to execute the
+WASM smoke test; Rust is not a base build requirement.
 
-## Named projects
+## Before production
 
-The release qualification script demonstrates the canonical order: build,
-test, install, relocate, and consume the base; then configure ECDSA, BIP340, and
-mdoc against that installed prefix.
-
-```sh
-bash scripts/ci-installed-package.sh
-```
-
-See [Packaging](packaging.md) for target names and release artifacts.
-
-## Optional Google Rust parity
-
-The pinned Google Rust comparison is a manual developer command, not a normal
-build requirement. See [Optional Google Rust parity](google-rust-parity.md) for
-its prerequisites, safe submodule bootstrap contract, and coverage boundary.
+Pin the library, named-project, circuit, format, and vector versions together.
+Review the [API and ABI contract](api.md) and
+[security qualification guidance](security.md). For integration assistance,
+contact [info@dyne.org](mailto:info@dyne.org).

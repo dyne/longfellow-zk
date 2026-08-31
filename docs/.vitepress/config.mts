@@ -17,8 +17,8 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Start here', link: '/guide' },
-      { text: 'Use cases', link: '/use-cases' },
-      { text: 'Reference projects', link: '/projects/' },
+      { text: 'Integrate', link: '/getting-started' },
+      { text: 'Package', link: '/packaging' },
       { text: 'Technical reference', link: '/architecture' },
       { text: 'About Dyne.org', link: 'https://dyne.org' }
     ],
@@ -60,27 +60,29 @@ export default defineConfig({
         ]
       },
       {
-        text: 'Reference projects',
-        items: [
-          { text: 'Projects overview', link: '/projects/' },
-          { text: 'mdoc', link: '/projects/mdoc' },
-          { text: 'ECDSA', link: '/projects/ecdsa' },
-          { text: 'BIP340', link: '/projects/bip340' }
-        ]
-      },
-      {
         text: 'Build & integrate',
         items: [
           { text: 'Getting started', link: '/getting-started' },
-          { text: 'Architecture', link: '/architecture' },
           { text: 'API & ABI', link: '/api' },
-          { text: 'Packaging', link: '/packaging' },
+          { text: 'Projects overview', link: '/projects/' },
+          { text: 'mdoc', link: '/projects/mdoc' },
+          { text: 'ECDSA', link: '/projects/ecdsa' },
+          { text: 'BIP340', link: '/projects/bip340' },
           { text: 'Interoperability', link: '/interoperability' }
+        ]
+      },
+      {
+        text: 'Package & release',
+        items: [
+          { text: 'Distribution packaging', link: '/packaging' },
+          { text: '0.x ABI policy', link: '/abi' },
+          { text: 'Production qualification', link: '/production-qualification' }
         ]
       },
       {
         text: 'Protocol & assurance',
         items: [
+          { text: 'Architecture', link: '/architecture' },
           { text: 'Specifications map', link: '/specifications/' },
           { text: 'libzk draft mirror', link: '/specifications/libzk' },
           { text: 'Ligero', link: '/specifications/ligero' },
@@ -95,13 +97,11 @@ export default defineConfig({
         text: 'Maintainer reference',
         collapsed: true,
         items: [
-          { text: '0.x ABI policy', link: '/abi' },
           { text: 'Library boundary', link: '/liblongfellow-zk-boundary' },
           { text: 'Compiler ownership', link: '/compiler-ownership' },
           { text: 'Merkle membership contract', link: '/merkle-membership-contract' },
           { text: 'Artifact baseline', link: '/liblongfellow-zk-artifact-baseline' },
-          { text: 'C++20 measurements', link: '/cpp20_migration_metrics' },
-          { text: 'Production qualification', link: '/production-qualification' }
+          { text: 'C++20 measurements', link: '/cpp20_migration_metrics' }
         ]
       }
     ]
