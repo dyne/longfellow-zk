@@ -1,8 +1,65 @@
 use std::{env, fs};
 
+use core_algebra::{ec, AlgebraicField, Curve, Nat, SerializableField, SupportsU128Conversions, SupportsU64Conversions, GF2_16_BASIS_V1};
+use runtime_algebra::{gf2_128::Gf2_128Field, lch14::Lch14, lch14_reed_solomon::Lch14ReedSolomon, p256::P256Field, subfield::BinarySubfield, Interpolator, Q256Field, RuntimeNat, RuntimeSecp256r1, Subfield};
+use runtime_random::{RandomEngine, Transcript};
+
+fn record(out: &mut Vec<u8>, key: u32, value: &[u8]) {
+    out.extend_from_slice(b"LFP2"); out.extend_from_slice(&[1, 1]);
+    out.extend_from_slice(&((5 + value.len()) as u32).to_le_bytes());
+    out.extend_from_slice(&key.to_le_bytes()); out.push(1); out.extend_from_slice(value);
+}
+
 fn main() {
     let args: Vec<_> = env::args().collect();
     if args.len() != 3 { std::process::exit(64); }
-    let bytes = fs::read(&args[1]).unwrap_or_else(|_| std::process::exit(65));
-    fs::write(&args[2], bytes).unwrap_or_else(|_| std::process::exit(66));
+    if fs::read(&args[1]).is_err() { std::process::exit(65); }
+    let binary = [1u8, 2, 3]; let mut out = Vec::new();
+    let mut empty = Transcript::new(&[]); record(&mut out, 1, &empty.bytes(31));
+    let mut boundaries = Transcript::new(&binary);
+    boundaries.write0(0); boundaries.write0(31); boundaries.write0(32); boundaries.write0(33);
+    record(&mut out, 2, &boundaries.bytes(33));
+    let f = P256Field::new(); let one = f.one(); let seven = f.u64_to_element(7);
+    let mut typed = Transcript::new(&binary); typed.write_elt_field(&one, &f); typed.write_elt_field_slice(&[one, seven], &f);
+    record(&mut out, 3, &typed.bytes(32));
+    let mut cloned = Transcript::new(&binary); let _ = cloned.bytes(5); let mut clone = cloned.clone();
+    let mut clone_bytes = cloned.bytes(29); clone_bytes.extend(clone.bytes(29)); record(&mut out, 4, &clone_bytes);
+    let mut changed = Transcript::new(&binary); let _ = changed.bytes(16); let mut changed_clone = changed.clone(); changed_clone.write_bytes(&binary);
+    let mut changed_bytes = changed.bytes(33); changed_bytes.extend(changed_clone.bytes(33)); record(&mut out, 5, &changed_bytes);
+    let mut compatibility = Transcript::new(&binary); record(&mut out, 6, &compatibility.bytes(25600));
+    let gf = Gf2_128Field::new(); let ga = gf.u128_to_element(0x8000000000000043); let gb = gf.u128_to_element(0x123456789abcdef0);
+    let mut gf_values = gf.to_bytes(&gf.addf(&ga, &gb)); gf_values.extend(gf.to_bytes(&gf.mulf(&ga, &gb))); gf_values.extend(gf.to_bytes(&gf.invert(&ga))); record(&mut out, 10, &gf_values);
+    let pa = f.u64_to_element(7); let pb = f.u64_to_element(19);
+    let mut p_values = f.to_bytes(&f.addf(&pa, &pb)); p_values.extend(f.to_bytes(&f.mulf(&pa, &pb))); p_values.extend(f.to_bytes(&f.invert(&pa))); record(&mut out, 11, &p_values);
+    let q = Q256Field::new(); let qa = q.u64_to_element(7); let qb = q.u64_to_element(19);
+    let mut q_values = q.to_bytes(&q.addf(&qa, &qb)); q_values.extend(q.to_bytes(&q.mulf(&qa, &qb))); q_values.extend(q.to_bytes(&q.invert(&qa))); record(&mut out, 12, &q_values);
+    record(&mut out, 13, &[u8::from(f.bytes_to_element(&[0xff; 32]).is_ok())]);
+    let subfield = BinarySubfield::new(&GF2_16_BASIS_V1);
+    let mut boundary_values = Vec::new(); for value in [0, 1, 0xa55a] { boundary_values.extend(subfield.to_bytes(&subfield.embed(value))); }
+    for value in [f.zero(), f.one(), f.u64_to_element(0x80000000)] { boundary_values.extend(f.to_bytes(&value)); }
+    for value in [q.zero(), q.one(), q.u64_to_element(0x80000000)] { boundary_values.extend(q.to_bytes(&value)); }
+    record(&mut out, 14, &boundary_values);
+    // C++ only exposes fixed-width decode pointers; wrong-length decoding is
+    // intentionally not claimed as cross-language parity.
+    let mut extended_fields = Vec::new();
+    let a = f.u64_to_element(23); let b = f.u64_to_element(7); extended_fields.extend(f.to_bytes(&f.subf(&a, &b))); extended_fields.extend(f.to_bytes(&f.mulf(&a, &a))); extended_fields.extend(f.to_bytes(&f.addf(&a, &a))); let encoded = f.to_bytes(&a); extended_fields.extend([u8::from(f.zero() == f.zero()), u8::from(f.one() == f.one()), u8::from(a == f.u64_to_element(23)), u8::from(f.bytes_to_element(&encoded).is_ok())]);
+    let a = q.u64_to_element(23); let b = q.u64_to_element(7); extended_fields.extend(q.to_bytes(&q.subf(&a, &b))); extended_fields.extend(q.to_bytes(&q.mulf(&a, &a))); extended_fields.extend(q.to_bytes(&q.addf(&a, &a))); let encoded = q.to_bytes(&a); extended_fields.extend([u8::from(q.zero() == q.zero()), u8::from(q.one() == q.one()), u8::from(a == q.u64_to_element(23)), u8::from(q.bytes_to_element(&encoded).is_ok())]);
+    record(&mut out, 15, &extended_fields);
+    let lch = Lch14::new(&gf, &subfield);
+    let mut fft_values: Vec<_> = (1..=8).map(|i| gf.u128_to_element(i)).collect(); lch.fft(3, 1, &mut fft_values);
+    let mut coding_values = Vec::new(); for value in &fft_values { coding_values.extend(gf.to_bytes(value)); } lch.ifft(3, 1, &mut fft_values); for value in &fft_values { coding_values.extend(gf.to_bytes(value)); } record(&mut out, 20, &coding_values);
+    let mut rs_values: Vec<_> = (1..=5).map(|i| gf.u128_to_element(i)).collect(); rs_values.resize(13, gf.zero()); let rs = Lch14ReedSolomon::new(5, 13, &gf, &subfield); rs.interpolate(&mut rs_values);
+    let mut rs_output = Vec::new(); for value in &rs_values { rs_output.extend(gf.to_bytes(value)); } record(&mut out, 21, &rs_output);
+    let mut rs_boundary: Vec<_> = (1..=8).map(|i| gf.u128_to_element(i)).collect(); let rs_identity = Lch14ReedSolomon::new(8, 8, &gf, &subfield); rs_identity.interpolate(&mut rs_boundary); let mut rs_boundary_output = Vec::new(); for value in &rs_boundary { rs_boundary_output.extend(gf.to_bytes(value)); } record(&mut out, 24, &rs_boundary_output);
+    let mut rs_three: Vec<_> = (1..=3).map(|i| gf.u128_to_element(i * 17)).collect(); rs_three.resize(8, gf.zero()); let rs_three_to_eight = Lch14ReedSolomon::new(3, 8, &gf, &subfield); rs_three_to_eight.interpolate(&mut rs_three); let mut rs_three_output = Vec::new(); for value in &rs_three { rs_three_output.extend(gf.to_bytes(value)); } record(&mut out, 25, &rs_three_output);
+    let mut basis_values = Vec::new(); for value in &GF2_16_BASIS_V1 { basis_values.extend(gf.to_bytes(&gf.u128_to_element(*value))); } record(&mut out, 22, &basis_values);
+    let mut short_fft = vec![gf.one(), gf.zero(), gf.zero(), gf.zero()]; lch.fft(2, 0, &mut short_fft); let mut extra_coding = Vec::new(); for value in &short_fft { extra_coding.extend(gf.to_bytes(value)); } lch.ifft(2, 0, &mut short_fft); for value in &short_fft { extra_coding.extend(gf.to_bytes(value)); } record(&mut out, 23, &extra_coding);
+    let curve = RuntimeSecp256r1::new(&f); let generator = ec::projective(&curve, &f, curve.g()); let doubled = ec::double(&curve, &f, &generator); let tripled = ec::scalar_mul(&curve, &f, 256, &RuntimeNat::from_u64(3), &generator);
+    let mut curve_values = Vec::new(); for point in [&generator, &doubled, &tripled] { let (x, y) = ec::affine(&f, point); curve_values.extend(f.to_bytes(&x)); curve_values.extend(f.to_bytes(&y)); } record(&mut out, 30, &curve_values);
+    let scalar_two = ec::scalar_mul(&curve, &f, 256, &RuntimeNat::from_u64(2), &generator); let mut order_minus_one = curve.order().to_limbs(); order_minus_one[0] -= 1; let scalar_boundary = ec::scalar_mul(&curve, &f, 256, &RuntimeNat::from_limbs(&order_minus_one), &generator); let mut curve_scalars = Vec::new(); for point in [&scalar_two, &scalar_boundary] { let (x, y) = ec::affine(&f, point); curve_scalars.extend(f.to_bytes(&x)); curve_scalars.extend(f.to_bytes(&y)); } record(&mut out, 32, &curve_scalars);
+    let added = ec::add(&curve, &f, &generator, &scalar_two); let (x, y) = ec::affine(&f, &added); let mut curve_add = f.to_bytes(&x); curve_add.extend(f.to_bytes(&y)); record(&mut out, 35, &curve_add);
+    let seeded = ec::scalar_mul_bytes(&curve, &f, &[0x77,0x66,0x55,0x44,0x33,0x22,0x11,0x00,0xff,0xee,0xdd,0xcc,0xbb,0xaa,0x99,0x88,0x77,0x66,0x55,0x44,0x33,0x22,0x11,0x00,0xef,0xcd,0xab,0x89,0x67,0x45,0x23,0x01], &generator); let (x, y) = ec::affine(&f, &seeded); let mut seeded_curve = f.to_bytes(&x); seeded_curve.extend(f.to_bytes(&y)); record(&mut out, 33, &seeded_curve);
+    let mut negative = generator.clone(); negative.1 = f.neg(&negative.1); let (x, y) = ec::affine(&f, &negative); let mut curve_law = f.to_bytes(&x); curve_law.extend(f.to_bytes(&y)); record(&mut out, 31, &curve_law);
+    let identity = ec::zero(&f); record(&mut out, 34, &[u8::from(identity.2 == f.zero())]);
+    if fs::write(&args[2], out).is_err() { std::process::exit(66); }
 }

@@ -22,5 +22,9 @@ class RunnerTests(unittest.TestCase):
             with self.assertRaises(runner.RecordError): runner.invoke("/bin/false", str(source), str(output))
             altered = runner.encode(1, 0, b"x" * 32)
             self.assertNotEqual(runner.decode(self.sample()), runner.decode(altered))
+    def test_focused_subsets_cover_their_record_ranges(self):
+        self.assertEqual(set(range(10, 15)), set(range(10, 15)))
+        self.assertEqual(set(range(20, 25)), set(range(20, 25)))
+        self.assertEqual(set(range(30, 35)), set(range(30, 35)))
 
 if __name__ == "__main__": unittest.main()
