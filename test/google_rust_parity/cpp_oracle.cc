@@ -8,6 +8,9 @@
 #include "gf2k/lch14.h"
 #include "gf2k/lch14_reed_solomon.h"
 #include "merkle/merkle_commitment.h"
+#include "ligero/ligero_param.h"
+#include "ligero/ligero_prover.h"
+#include "ligero/ligero_verifier.h"
 #include "proto/circuit_reader.h"
 #include "proto/circuit_writer.h"
 #include "random/transcript.h"
@@ -177,5 +180,41 @@ int main(int argc, char** argv) {
   auto truncated_lfc1 = lfc1; truncated_lfc1.pop_back(); proofs::ByteCursor truncated_lfc1_cursor(truncated_lfc1.data(), truncated_lfc1.size()); circuit_value.push_back(static_cast<uint8_t>(circuit_reader.from_bytes(truncated_lfc1_cursor, true) != nullptr));
   auto trailing_lfc1 = lfc1; trailing_lfc1.push_back(0); proofs::ByteCursor trailing_lfc1_cursor(trailing_lfc1.data(), trailing_lfc1.size()); circuit_value.push_back(static_cast<uint8_t>(circuit_reader.from_bytes(trailing_lfc1_cursor, true) != nullptr));
   record(output, 50, circuit_value);
+  proofs::LigeroParam<proofs::GF2_128<>> ligero_geometry(8, 2, 4, 2, 64);
+  std::vector<uint8_t> ligero_value;
+  for (const size_t value : {ligero_geometry.block, ligero_geometry.dblock, ligero_geometry.block_enc,
+                             ligero_geometry.w, ligero_geometry.nrow, ligero_geometry.nreq,
+                             ligero_geometry.mc_pathlen}) ligero_value.push_back(static_cast<uint8_t>(value));
+  record(output, 60, ligero_value);
+  proofs::LCH14ReedSolomonFactory<proofs::GF2_128<>> ligero_rs(gf);
+  std::vector<proofs::GF2_128<>::Elt> ligero_w(ligero_geometry.nw);
+  for (auto& value : ligero_w) value = gf.sample([&](size_t count, uint8_t* bytes) { merkle_rng.bytes(bytes, count); });
+  std::vector<proofs::LigeroQuadraticConstraint> ligero_lqc(ligero_geometry.nq);
+  for (size_t index = 0; index != ligero_lqc.size(); ++index) ligero_lqc[index] = {0, 0, 2 * index + 1};
+  for (const auto& constraint : ligero_lqc) ligero_w[constraint.z] = gf.mulf(ligero_w[constraint.x], ligero_w[constraint.y]);
+  const std::array<uint8_t, 4> ligero_seed = {'t', 'e', 's', 't'};
+  proofs::Transcript ligero_transcript(ligero_seed.data(), ligero_seed.size());
+  proofs::LigeroProver<proofs::GF2_128<>, proofs::LCH14ReedSolomonFactory<proofs::GF2_128<>>> ligero_prover(ligero_geometry);
+  proofs::LigeroCommitment<proofs::GF2_128<>> ligero_commitment;
+  ligero_prover.commit(ligero_commitment, ligero_transcript, ligero_w.data(), 0, ligero_lqc.data(), ligero_rs, merkle_rng, gf);
+  std::vector<uint8_t> ligero_commitment_value; append_digest(ligero_commitment_value, ligero_commitment.root);
+  record(output, 61, ligero_commitment_value);
+  std::array<proofs::GF2_128<>::Elt, 1> ligero_b = {gf.zero()};
+  const proofs::LigeroHash ligero_statement = {0xba, 0xad, 0xf0, 0x0d};
+  proofs::LigeroProof<proofs::GF2_128<>> ligero_proof(&ligero_geometry);
+  ligero_prover.prove(ligero_proof, ligero_transcript, 1, 0, nullptr, ligero_statement, ligero_lqc.data(), ligero_rs, gf);
+  std::vector<uint8_t> ligero_proof_value; append_digest(ligero_proof_value, ligero_commitment.root); ligero_proof_value.push_back(static_cast<uint8_t>(ligero_proof.merkle.path.size()));
+  record(output, 62, ligero_proof_value);
+  proofs::Transcript ligero_verify_transcript(ligero_seed.data(), ligero_seed.size());
+  proofs::LigeroVerifier<proofs::GF2_128<>, proofs::LCH14ReedSolomonFactory<proofs::GF2_128<>>>::receive_commitment(ligero_commitment, ligero_verify_transcript);
+  const char* ligero_why = nullptr;
+  const bool ligero_ok = proofs::LigeroVerifier<proofs::GF2_128<>, proofs::LCH14ReedSolomonFactory<proofs::GF2_128<>>>::verify(&ligero_why, ligero_geometry, ligero_commitment, ligero_proof, ligero_verify_transcript, 1, 0, nullptr, ligero_statement, ligero_b.data(), ligero_lqc.data(), ligero_rs, gf);
+  auto ligero_tampered = ligero_proof;
+  ligero_tampered.merkle.path[0].data[0] ^= 1;
+  proofs::Transcript ligero_tampered_transcript(ligero_seed.data(), ligero_seed.size());
+  proofs::LigeroVerifier<proofs::GF2_128<>, proofs::LCH14ReedSolomonFactory<proofs::GF2_128<>>>::receive_commitment(ligero_commitment, ligero_tampered_transcript);
+  const char* ligero_tampered_why = nullptr;
+  const bool ligero_tampered_ok = proofs::LigeroVerifier<proofs::GF2_128<>, proofs::LCH14ReedSolomonFactory<proofs::GF2_128<>>>::verify(&ligero_tampered_why, ligero_geometry, ligero_commitment, ligero_tampered, ligero_tampered_transcript, 1, 0, nullptr, ligero_statement, ligero_b.data(), ligero_lqc.data(), ligero_rs, gf);
+  record(output, 63, {static_cast<uint8_t>(ligero_ok), static_cast<uint8_t>(ligero_tampered_ok)});
   return output ? 0 : 66;
 }
