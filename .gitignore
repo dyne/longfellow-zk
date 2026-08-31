@@ -18,6 +18,9 @@ test/arrays/dense_test
 test/fuzz/parser_fuzz
 test/fuzz/transcript_fuzz
 __pycache__/
+test/google_rust_parity/rust/Cargo.lock
+test/google_rust_parity/rust/target/
+build/google-rust-parity/
 docs/node_modules/
 docs/.vitepress/cache/
 docs/.vitepress/dist/

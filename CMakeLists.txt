@@ -8,6 +8,7 @@ include(CTest)
 
 option(LONGFELLOW_ZK_BUILD_TESTING "Build Longfellow ZK qualification tests" ON)
 option(LONGFELLOW_ZK_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(LONGFELLOW_ZK_BUILD_GOOGLE_RUST_PARITY "Build the opt-in Google Rust parity C++ oracle" OFF)
 
 include(cmake/manifests/longfellow-zk-sources.cmake)
 include(cmake/manifests/longfellow-zk-public-headers.cmake)
@@ -127,4 +128,13 @@ include(CPack)
 
 if(BUILD_TESTING AND LONGFELLOW_ZK_BUILD_TESTING)
   add_subdirectory(test/cmake)
+endif()
+
+# This target is deliberately opt-in and omitted from install/export rules.  The
+# accompanying runner validates the pinned submodule before enabling it.
+if(LONGFELLOW_ZK_BUILD_GOOGLE_RUST_PARITY)
+  add_executable(longfellow-zk-google-cpp-oracle EXCLUDE_FROM_ALL
+    test/google_rust_parity/cpp_oracle.cc)
+  target_link_libraries(longfellow-zk-google-cpp-oracle PRIVATE LongfellowZK::static)
+  target_compile_features(longfellow-zk-google-cpp-oracle PRIVATE cxx_std_20)
 endif()
