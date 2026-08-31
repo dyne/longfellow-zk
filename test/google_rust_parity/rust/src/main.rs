@@ -3,6 +3,8 @@ use std::{env, fs};
 use core_algebra::{ec, AlgebraicField, Curve, Nat, SerializableField, SupportsU128Conversions, SupportsU64Conversions, GF2_16_BASIS_V1};
 use runtime_algebra::{gf2_128::Gf2_128Field, lch14::Lch14, lch14_reed_solomon::Lch14ReedSolomon, p256::P256Field, subfield::BinarySubfield, Interpolator, Q256Field, RuntimeNat, RuntimeSecp256r1, Subfield};
 use runtime_random::{RandomEngine, Transcript};
+use runtime_merkle::{commit as merkle_commit, open as merkle_open, verify as merkle_verify, verify_proof, Digest, MerkleHeap};
+use sha2::Digest as ShaDigest;
 
 fn record(out: &mut Vec<u8>, key: u32, value: &[u8]) {
     out.extend_from_slice(b"LFP2"); out.extend_from_slice(&[1, 1]);
@@ -61,5 +63,24 @@ fn main() {
     let seeded = ec::scalar_mul_bytes(&curve, &f, &[0x77,0x66,0x55,0x44,0x33,0x22,0x11,0x00,0xff,0xee,0xdd,0xcc,0xbb,0xaa,0x99,0x88,0x77,0x66,0x55,0x44,0x33,0x22,0x11,0x00,0xef,0xcd,0xab,0x89,0x67,0x45,0x23,0x01], &generator); let (x, y) = ec::affine(&f, &seeded); let mut seeded_curve = f.to_bytes(&x); seeded_curve.extend(f.to_bytes(&y)); record(&mut out, 33, &seeded_curve);
     let mut negative = generator.clone(); negative.1 = f.neg(&negative.1); let (x, y) = ec::affine(&f, &negative); let mut curve_law = f.to_bytes(&x); curve_law.extend(f.to_bytes(&y)); record(&mut out, 31, &curve_law);
     let identity = ec::zero(&f); record(&mut out, 34, &[u8::from(identity.2 == f.zero())]);
+    for count in [4usize, 5] {
+        let leaves: Vec<_> = (1..=count).map(|index| { let mut digest = Digest::default(); digest.data[0] = index as u8; digest }).collect();
+        let heap = MerkleHeap::new(&leaves); let root = heap.root(); let positions = [1usize, count - 1];
+        let mut proof = heap.generate_proof(&positions); let opened = [(positions[0], leaves[positions[0]]), (positions[1], leaves[positions[1]])];
+        let mut value = root.data.to_vec(); for node in &proof { value.extend(node.data); }
+        value.push(u8::from(verify_proof(count, &root, &proof, &opened).is_ok()));
+        proof.push(Digest::default()); value.push(u8::from(verify_proof(count, &root, &proof, &opened).is_ok()));
+        record(&mut out, if count == 4 { 40 } else { 41 }, &value);
+    }
+    struct CounterRng { next: u8 }
+    impl RandomEngine for CounterRng { fn bytes(&mut self, len: usize) -> Vec<u8> { (0..len).map(|_| { let value = self.next; self.next = self.next.wrapping_add(1); value }).collect() } }
+    let mut merkle_rng = CounterRng { next: 0 };
+    let (commitment, commitment_root) = merkle_commit(4, &mut merkle_rng, |_index, sha| sha.update([0xa5, 0x5a]));
+    let commitment_positions = [1usize, 3]; let mut commitment_proof = merkle_open(&commitment, &commitment_positions);
+    let mut commitment_value = commitment_root.data.to_vec(); for nonce in &commitment_proof.nonce { commitment_value.extend(nonce.bytes); } for node in &commitment_proof.path { commitment_value.extend(node.data); }
+    commitment_value.push(u8::from(merkle_verify(4, &commitment_root, &commitment_positions, &commitment_proof, |_r, _index, sha| sha.update([0xa5, 0x5a])).is_ok()));
+    commitment_proof.path.push(Digest::default());
+    commitment_value.push(u8::from(merkle_verify(4, &commitment_root, &commitment_positions, &commitment_proof, |_r, _index, sha| sha.update([0xa5, 0x5a])).is_ok()));
+    record(&mut out, 42, &commitment_value);
     if fs::write(&args[2], out).is_err() { std::process::exit(66); }
 }

@@ -104,6 +104,12 @@ void CheckRejectedProofs() {
   const size_t length = tree.generate_compressed_proof(proof, indices.data(), indices.size());
   assert(!MerkleTreeVerifier(300, root).verify_compressed_proof(
       proof.data(), length - 1, leaves.data(), indices.data(), indices.size()));
+
+  // A trailing digest is not part of the canonical compressed proof and must
+  // be rejected rather than silently ignored.
+  proof.push_back(Digest{});
+  assert(!MerkleTreeVerifier(300, root).verify_compressed_proof(
+      proof.data(), proof.size(), leaves.data(), indices.data(), indices.size()));
 }
 
 void CheckZeroLengthProof() {

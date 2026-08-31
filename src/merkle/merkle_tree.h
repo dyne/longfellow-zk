@@ -165,11 +165,11 @@ class MerkleTreeVerifier {
     std::vector<Digest> layers(2 * n_, Digest{});
     std::vector<bool> defined(2 * n_, false);
 
+    size_t sz = 0;
     /*scope for TREE */ {
       std::vector<bool> tree = compressed_merkle_proof_tree(n_, pos, np);
 
       // read the proof
-      size_t sz = 0;
       for (size_t i = n_; i-- > 1;) {
         if (tree[i]) {
           size_t child = 2 * i;
@@ -186,6 +186,13 @@ class MerkleTreeVerifier {
           }
         }
       }
+    }
+
+    // The compressed proof has a unique traversal encoding.  Consuming only a
+    // prefix would accept a second, trailing-node encoding of the same
+    // opening, which disagrees with the pinned Rust verifier.
+    if (sz != proof_len) {
+      return false;
     }
 
     // set LAYERS at all leaves in POS
