@@ -38,4 +38,8 @@ fi
 cmake "${cmake_args[@]}"
 cmake --build "$build_dir/cpp" --target longfellow-zk-google-cpp-oracle --parallel
 CARGO_TARGET_DIR="$cargo_target" cargo build --release --manifest-path "$root/test/google_rust_parity/rust/Cargo.toml"
-python3 "$root/test/google_rust_parity/runner.py" --cpp "$build_dir/cpp/longfellow-zk-google-cpp-oracle" --rust "$cargo_target/release/google-rust-parity-oracle" --commit "$expected"
+runner_args=(--cpp "$build_dir/cpp/longfellow-zk-google-cpp-oracle" --rust "$cargo_target/release/google-rust-parity-oracle" --commit "$expected")
+if [[ "${GOOGLE_RUST_PARITY_TIMINGS:-0}" == 1 ]]; then
+  runner_args+=(--timings)
+fi
+python3 "$root/test/google_rust_parity/runner.py" "${runner_args[@]}"
