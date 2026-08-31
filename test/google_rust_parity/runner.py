@@ -36,7 +36,7 @@ def invoke(exe: str, corpus: str, output: str) -> dict[int, tuple[int, bytes]]:
     return decode(open(output, "rb").read())
 
 def main() -> int:
-    parser = argparse.ArgumentParser(); parser.add_argument("--cpp", required=True); parser.add_argument("--rust", required=True); parser.add_argument("--commit", required=True); parser.add_argument("--subset", choices=("all", "transcript", "field", "coding", "curve", "merkle", "circuit", "ligero"), default="all")
+    parser = argparse.ArgumentParser(); parser.add_argument("--cpp", required=True); parser.add_argument("--rust", required=True); parser.add_argument("--commit", required=True); parser.add_argument("--subset", choices=("all", "transcript", "field", "coding", "curve", "merkle", "circuit", "ligero", "zk"), default="all")
     args = parser.parse_args()
     # The corpus is a versioned selector, not a duplicated primitive implementation.
     corpus = b"".join(encode(key, 1, b"") for key in (1, 2, 3, 4, 5))
@@ -46,7 +46,7 @@ def main() -> int:
             left = invoke(args.cpp, source, os.path.join(temp, "cpp.bin")); right = invoke(args.rust, source, os.path.join(temp, "rust.bin"))
     except (OSError, RecordError) as error:
         print(f"google-rust-parity: {error}", file=sys.stderr); return 1
-    keys = set(range(1, 7)) if args.subset == "transcript" else set(range(10, 16)) if args.subset == "field" else set(range(20, 26)) if args.subset == "coding" else set(range(30, 36)) if args.subset == "curve" else set(range(40, 43)) if args.subset == "merkle" else {50} if args.subset == "circuit" else {60, 61, 62, 63} if args.subset == "ligero" else set(left)
+    keys = set(range(1, 7)) if args.subset == "transcript" else set(range(10, 16)) if args.subset == "field" else set(range(20, 26)) if args.subset == "coding" else set(range(30, 36)) if args.subset == "curve" else set(range(40, 43)) if args.subset == "merkle" else {50} if args.subset == "circuit" else {60, 61, 62, 63} if args.subset == "ligero" else {70} if args.subset == "zk" else set(left)
     if left.keys() != right.keys() or not keys <= left.keys(): print("google-rust-parity: missing record key", file=sys.stderr); return 1
     for key in sorted(keys):
         if left[key] != right[key]:

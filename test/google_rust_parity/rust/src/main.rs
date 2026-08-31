@@ -9,6 +9,20 @@ use compile_algebra::p256::P256Field as CompileP256Field;
 use core_proto::{circuit::{Circuit as ProtoCircuit, RawCircuit, compute_id}, reader::CircuitReader, writer::CircuitWriter, FieldID, Layer, TermDelta};
 use runtime_ligero::{LigeroConfig, LigeroParam, LigeroProver, LigeroQuadraticConstraint, LigeroVerifier};
 use runtime_algebra::lch14_reed_solomon::Lch14InterpolatorFactory;
+use runtime_zk::{ZkProver, ZkVerifier, common::ZkContext};
+
+// Bounded canonical circuit from Google Rust `test_zk_rfc_testvector1`.
+const ZK_RFC_CIRCUIT: &[u8] = &[
+    0x01, 0x04, 0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x02, 0x00, 0x00, 0x03, 0x00,
+    0x00, 0x04, 0x00, 0x00, 0x01, 0x00, 0x00, 0x02, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00,
+    0x04, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x01, 0x00, 0x00, 0x5f, 0x8d, 0x9e,
+    0x33, 0x1b, 0x0e, 0x60, 0x11, 0x46, 0x46, 0x5e, 0x20, 0x7c, 0xb6, 0xbf, 0x38, 0x73, 0xac,
+    0xfe, 0x5d, 0x0b, 0xf0, 0xe3, 0x26, 0x18, 0x0d, 0xbb, 0xaf, 0xcc, 0x48, 0x8c, 0xb6,
+];
 
 fn record(out: &mut Vec<u8>, key: u32, value: &[u8]) {
     out.extend_from_slice(b"LFP2"); out.extend_from_slice(&[1, 1]);
@@ -26,6 +40,54 @@ fn main() {
     boundaries.write0(0); boundaries.write0(31); boundaries.write0(32); boundaries.write0(33);
     record(&mut out, 2, &boundaries.bytes(33));
     let f = P256Field::new(); let one = f.one(); let seven = f.u64_to_element(7);
+    let zk_rfc_field = Gf2_128Field::new();
+    let zk_rfc_circuit = CircuitReader::new(&zk_rfc_field, FieldID::Gf2_128).from_bytes(ZK_RFC_CIRCUIT, false).expect("RFC circuit must parse").0;
+    let zk_rfc_prover = ZkProver::new(zk_rfc_circuit, LigeroConfig { rateinv: 4, nreq: 6, block_enc: 128 });
+    let zk_rfc_subfield = BinarySubfield::new(&GF2_16_BASIS_V1);
+    let zk_rfc_interpolator = Lch14InterpolatorFactory::new(&zk_rfc_field, &zk_rfc_subfield);
+    struct ZkRfcRng;
+    impl RandomEngine for ZkRfcRng {
+        fn bytes(&mut self, len: usize) -> Vec<u8> {
+            let mut bytes = vec![0; len];
+            if !bytes.is_empty() { bytes[0] = 2; }
+            bytes
+        }
+    }
+    let zk_rfc_n = zk_rfc_subfield.embed(5);
+    let zk_rfc_m = zk_rfc_subfield.embed(6);
+    let mut zk_rfc_inputs = vec![zk_rfc_field.one(); zk_rfc_prover.circuit.raw.ninput];
+    zk_rfc_inputs[1] = zk_rfc_n;
+    zk_rfc_inputs[2] = zk_rfc_m;
+    zk_rfc_inputs[3] = zk_rfc_field.mulf(&zk_rfc_field.addf(&zk_rfc_n, &zk_rfc_m), &zk_rfc_field.u128_to_element(2));
+    let mut zk_rfc_transcript = Transcript::new(b"test");
+    let mut zk_rfc_rng = ZkRfcRng;
+    let (zk_rfc_commit, _zk_rfc_geometry) = zk_rfc_prover.commit(
+        &zk_rfc_inputs[zk_rfc_prover.circuit.raw.npublic_input..],
+        &ZkContext { f: &zk_rfc_field, make_interpolator: &zk_rfc_interpolator },
+        &mut zk_rfc_transcript,
+        &mut zk_rfc_rng,
+        &zk_rfc_subfield,
+    );
+    let zk_rfc_public = zk_rfc_inputs[..zk_rfc_prover.circuit.raw.npublic_input].to_vec();
+    let zk_rfc_witness = zk_rfc_inputs[zk_rfc_prover.circuit.raw.npublic_input..].to_vec();
+    let zk_rfc_proof = zk_rfc_prover.prove(zk_rfc_public.clone(), zk_rfc_witness, &zk_rfc_commit,
+        &mut zk_rfc_transcript, &ZkContext { f: &zk_rfc_field, make_interpolator: &zk_rfc_interpolator })
+        .expect("RFC ZK proof must succeed");
+    let zk_rfc_verifier_circuit = CircuitReader::new(&zk_rfc_field, FieldID::Gf2_128).from_bytes(ZK_RFC_CIRCUIT, false).expect("RFC circuit must reparse").0;
+    let zk_rfc_verifier = ZkVerifier::new(zk_rfc_verifier_circuit, LigeroConfig { rateinv: 4, nreq: 6, block_enc: 128 });
+    let mut zk_rfc_verify_transcript = Transcript::new(b"test");
+    let zk_rfc_ctx = ZkContext { f: &zk_rfc_field, make_interpolator: &zk_rfc_interpolator };
+    zk_rfc_verifier.recv_commitment(&zk_rfc_proof, &mut zk_rfc_verify_transcript, &zk_rfc_ctx);
+    let zk_rfc_verified = zk_rfc_verifier.verify(zk_rfc_public, &zk_rfc_proof, &mut zk_rfc_verify_transcript, &zk_rfc_ctx).is_ok();
+    let mut zk_rfc_tampered = zk_rfc_proof.clone(); zk_rfc_tampered.com.root.data[0] ^= 1;
+    let mut zk_rfc_tampered_transcript = Transcript::new(b"test");
+    zk_rfc_verifier.recv_commitment(&zk_rfc_tampered, &mut zk_rfc_tampered_transcript, &zk_rfc_ctx);
+    let zk_rfc_tampered_verified = zk_rfc_verifier.verify(
+        zk_rfc_inputs[..zk_rfc_prover.circuit.raw.npublic_input].to_vec(),
+        &zk_rfc_tampered, &mut zk_rfc_tampered_transcript, &zk_rfc_ctx).is_ok();
+    let mut zk_rfc_value = zk_rfc_proof.com.root.data.to_vec();
+    zk_rfc_value.extend([u8::from(zk_rfc_verified), u8::from(zk_rfc_tampered_verified)]);
+    record(&mut out, 70, &zk_rfc_value);
     let mut typed = Transcript::new(&binary); typed.write_elt_field(&one, &f); typed.write_elt_field_slice(&[one, seven], &f);
     record(&mut out, 3, &typed.bytes(32));
     let mut cloned = Transcript::new(&binary); let _ = cloned.bytes(5); let mut clone = cloned.clone();
