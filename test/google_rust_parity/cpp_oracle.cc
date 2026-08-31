@@ -1,5 +1,6 @@
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <vector>
 
@@ -15,6 +16,8 @@
 #include "proto/circuit_writer.h"
 #include "random/transcript.h"
 #include "sumcheck/quad_builder.h"
+#include "zk/zk_prover.h"
+#include "zk/zk_verifier.h"
 
 namespace {
 void u32(std::ofstream& out, uint32_t value) {
@@ -41,6 +44,13 @@ class CounterRng final : public proofs::RandomEngine {
   }
  private:
   uint8_t next_ = 0;
+};
+class ZkRfcRng final : public proofs::RandomEngine {
+ public:
+  void bytes(uint8_t* out, size_t count) override {
+    std::memset(out, 0, count);
+    if (count != 0) out[0] = 2;
+  }
 };
 proofs::Circuit<proofs::Fp256Base> CircuitFixture() {
   proofs::EQuad<proofs::Fp256Base> terms(2);
@@ -216,5 +226,37 @@ int main(int argc, char** argv) {
   const char* ligero_tampered_why = nullptr;
   const bool ligero_tampered_ok = proofs::LigeroVerifier<proofs::GF2_128<>, proofs::LCH14ReedSolomonFactory<proofs::GF2_128<>>>::verify(&ligero_tampered_why, ligero_geometry, ligero_commitment, ligero_tampered, ligero_tampered_transcript, 1, 0, nullptr, ligero_statement, ligero_b.data(), ligero_lqc.data(), ligero_rs, gf);
   record(output, 63, {static_cast<uint8_t>(ligero_ok), static_cast<uint8_t>(ligero_tampered_ok)});
+  using ZkField = proofs::GF2_128<>;
+  constexpr std::array<uint8_t, 134> zk_rfc_circuit = {
+      0x01,0x04,0x00,0x00,0x01,0x00,0x00,0x01,0x00,0x00,0x02,0x00,0x00,0x03,0x00,0x00,0x04,0x00,0x00,0x01,0x00,0x00,0x02,0x00,0x00,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x00,0x04,0x00,0x00,0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x00,0x00,0x01,0x00,0x00,0x5f,0x8d,0x9e,0x33,0x1b,0x0e,0x60,0x11,0x46,0x46,0x5e,0x20,0x7c,0xb6,0xbf,0x38,0x73,0xac,0xfe,0x5d,0x0b,0xf0,0xe3,0x26,0x18,0x0d,0xbb,0xaf,0xcc,0x48,0x8c,0xb6};
+  proofs::ByteCursor zk_cursor(zk_rfc_circuit.data(), zk_rfc_circuit.size());
+  proofs::CircuitReader<ZkField> zk_reader(gf, proofs::GF2_128_ID);
+  auto zk_circuit_ptr = zk_reader.from_bytes(zk_cursor, false);
+  if (!zk_circuit_ptr) return 67;
+  const auto& zk_circuit = *zk_circuit_ptr;
+  const auto zk_n = gf.of_scalar(5), zk_m = gf.of_scalar(6);
+  const std::array<ZkField::Elt, 4> zk_inputs = {gf.one(), zk_n, zk_m,
+      gf.mulf(gf.addf(zk_n, zk_m), gf.of_scalar_field(2))};
+  auto zk_witness = proofs::Dense<ZkField>::from_row(zk_inputs);
+  proofs::LCH14ReedSolomonFactory<ZkField> zk_rs(gf);
+  proofs::ZkProof<ZkField> zk_proof(zk_circuit, 4, 6, 128);
+  proofs::ZkProver<ZkField, proofs::LCH14ReedSolomonFactory<ZkField>> zk_prover(zk_circuit, gf, zk_rs);
+  proofs::Transcript zk_transcript(ligero_seed.data(), ligero_seed.size()); ZkRfcRng zk_rng;
+  zk_prover.commit(zk_proof, zk_witness, zk_transcript, zk_rng);
+  const bool zk_proved = zk_prover.prove(zk_proof, zk_witness, zk_transcript);
+  proofs::ZkVerifier<ZkField, proofs::LCH14ReedSolomonFactory<ZkField>> zk_verifier(
+      zk_circuit, zk_rs, 4, 6, 128, gf);
+  proofs::Transcript zk_verify_transcript(ligero_seed.data(), ligero_seed.size());
+  zk_verifier.recv_commitment(zk_proof, zk_verify_transcript);
+  const bool zk_verified = zk_proved && zk_verifier.verify(zk_proof, zk_witness, zk_verify_transcript);
+  auto zk_tampered = zk_proof;
+  zk_tampered.com.root.data[0] ^= 1;
+  proofs::Transcript zk_tampered_transcript(ligero_seed.data(), ligero_seed.size());
+  zk_verifier.recv_commitment(zk_tampered, zk_tampered_transcript);
+  const bool zk_tampered_verified = zk_verifier.verify(zk_tampered, zk_witness, zk_tampered_transcript);
+  std::vector<uint8_t> zk_value; append_digest(zk_value, zk_proof.com.root);
+  zk_value.push_back(static_cast<uint8_t>(zk_verified));
+  zk_value.push_back(static_cast<uint8_t>(zk_tampered_verified));
+  record(output, 70, zk_value);
   return output ? 0 : 66;
 }
