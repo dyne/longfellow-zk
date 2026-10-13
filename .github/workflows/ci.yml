@@ -91,7 +91,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}-${{ matrix.compiler.id }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ github.job }}-${{ matrix.compiler.id }}
         path: |
@@ -164,7 +164,7 @@ jobs:
       run: |
         LONGFELLOW_ZK_BUILD_DIR=build/wasi bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ github.job }}
         path: |
@@ -203,7 +203,7 @@ jobs:
       run: |
         bash scripts/pack_release.sh ${{ github.job }}
     - name: Upload artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{ github.job }}
         path: |
@@ -235,7 +235,7 @@ jobs:
           "${{ needs.version.outputs.release_tag }}" \
           "${{ github.repository }}"
     - name: Upload BIP340 metrics artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: bip340-metrics
         path: |
